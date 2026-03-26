@@ -10,7 +10,11 @@ import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+<<<<<<< HEAD
     // Load biến môi trường 
+=======
+    // Load biến môi trường (Ví dụ: thông tin kết nối Database)
+>>>>>>> babcfffd7744f411549d6de92ac5e6106cfa00bd
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -25,4 +29,8 @@ import { ConfigModule } from '@nestjs/config';
   controllers: [],
   providers: [],
 })
+<<<<<<< HEAD
 export class AppModule {}
+=======
+export class AppModule {}
+>>>>>>> babcfffd7744f411549d6de92ac5e6106cfa00bd
