@@ -4,7 +4,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
-  // 2 dòng khởi tạo ứng dụng mà bạn đang bị thiếu:
+  // 2 dòng khởi tạo ứng dụng
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
@@ -36,7 +36,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  logger.log(`🚀 Mini-ERP Backend is running on: http://localhost:${port}`);
-  logger.log(`📑 Swagger Docs is available at: http://localhost:${port}/api/docs`);
+  logger.log(`Mini-ERP Backend is running on: http://localhost:${port}`);
+  logger.log(`Swagger Docs is available at: http://localhost:${port}/api/docs`);
 }
 bootstrap();
