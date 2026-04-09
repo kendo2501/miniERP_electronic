@@ -9,7 +9,7 @@ export class AuthService {
   constructor(
     private readonly userRepo: UserRepository,
     private readonly jwt: JwtService
-  ) {}
+  ) { }
 
   async login(dto: { username: string; password: string }) {
     const user = await this.userRepo.findByUsername(dto.username);
@@ -20,7 +20,7 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException("Invalid credentials");
 
     const permissions = Array.from(new Set(
-      user.roles.flatMap((ur) =>
+      user.user_roles.flatMap((ur) =>
         ur.role.permissions.map((rp) => rp.permission.code)
       )
     ));
@@ -33,14 +33,14 @@ export class AuthService {
 
     const accessToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_ACCESS_SECRET ?? "change-me-access",
-      expiresIn: process.env.JWT_ACCESS_TTL ?? "15m"
+      expiresIn: (process.env.JWT_ACCESS_TTL ?? "15m") as any
     });
 
     const refreshToken = await this.jwt.signAsync(
       { sub: user.id, jti: randomUUID() },
       {
         secret: process.env.JWT_REFRESH_SECRET ?? "change-me-refresh",
-        expiresIn: process.env.JWT_REFRESH_TTL ?? "30d"
+        expiresIn: (process.env.JWT_REFRESH_TTL ?? "30d") as any
       }
     );
 

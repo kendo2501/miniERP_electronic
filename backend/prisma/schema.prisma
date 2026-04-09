@@ -54,6 +54,7 @@ model User {
   purchase_requests   PurchaseRequest[]
   stock_ledger        StockLedger[]
   user_roles          UserRole[]
+  refresh_tokens RefreshToken[]
 
   @@map("users")
 }
@@ -66,6 +67,16 @@ model UserRole {
 
   @@id([user_id, role_id])
   @@map("user_roles")
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String   @db.Uuid
+  tokenHash  String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Attachment {

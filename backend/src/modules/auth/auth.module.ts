@@ -9,7 +9,9 @@ import { UserRepositoryImpl } from "./adapters/repositories/user.repository.impl
   imports: [
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET ?? "change-me-access",
-      signOptions: { expiresIn: process.env.JWT_ACCESS_TTL ?? "15m" }
+      signOptions: {
+        expiresIn: (process.env.JWT_ACCESS_TTL ?? "15m") as any
+      }
     })
   ],
   controllers: [AuthController],
@@ -23,4 +25,4 @@ import { UserRepositoryImpl } from "./adapters/repositories/user.repository.impl
   ],
   exports: [AuthService]
 })
-export class AuthModule {}
+export class AuthModule { }
