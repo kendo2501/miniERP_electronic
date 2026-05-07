@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+yarn.lock
+
+# Build
+dist/
+build/
+.next/
+
+# Environment
+.env.local
+.env.*.local
+
+# Prisma
+backend/database/prisma/migrations/*.sql.bak
+
+# Logs
+*.log
+*.err
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Turbo
+.turbo/
+
+# Docker
+postgres_data/
+redis_data/
+minio_data/

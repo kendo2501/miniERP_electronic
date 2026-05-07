@@ -1,0 +1,25 @@
+{
+  "name": "mini-erp",
+  "private": true,
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "yarn workspace @mini-erp/backend dev",
+    "dev:fe": "yarn workspace @mini-erp/frontend dev",
+    "build": "yarn workspace @mini-erp/backend build",
+    "build:fe": "yarn workspace @mini-erp/frontend build",
+    "lint": "yarn workspace @mini-erp/backend lint",
+    "test": "yarn workspace @mini-erp/backend test",
+    "db:migrate": "yarn workspace @mini-erp/backend db:migrate",
+    "db:generate": "yarn workspace @mini-erp/backend db:generate",
+    "db:seed": "yarn workspace @mini-erp/backend db:seed",
+    "start:all": "docker compose --env-file backend/.env up -d && yarn workspace @mini-erp/backend dev & yarn workspace @mini-erp/frontend start",
+    "infra:up": "docker compose --env-file backend/.env up -d",
+    "infra:down": "docker compose --env-file backend/.env down",
+    "infra:logs": "docker compose --env-file backend/.env logs -f",
+    "infra:reset": "docker compose --env-file backend/.env down -v"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=22"
+  }
+}

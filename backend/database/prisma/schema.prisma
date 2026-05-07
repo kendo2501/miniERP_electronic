@@ -1,0 +1,665 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+
+model User {
+  id                  Int       @id @default(autoincrement())
+  organizationId      Int?      @map("organization_id")
+  email               String    @unique @db.VarChar(255)
+  passwordHash        String    @map("password_hash") @db.Text
+  fullName            String    @map("full_name") @db.VarChar(255)
+  status              String    @db.VarChar(50)
+  isVerified          Boolean   @default(false) @map("is_verified")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  lastLoginAt         DateTime? @map("last_login_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at")
+
+  organization          Organization?          @relation(fields: [organizationId], references: [id])
+  userRoles             UserRole[]
+  sessions              Session[]
+  refreshTokens         RefreshToken[]
+  inventoryTransactions InventoryTransaction[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  attachments           Attachment[]
+  assignedCustomers     Customer[]             @relation("AssignedSales")
+  settingsUpdated       Setting[]
+  generatedReports      GeneratedReport[]
+  scheduledReports      ScheduledReport[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(100)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(255)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId     Int      @map("user_id")
+  roleId     Int      @map("role_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       Int @map("role_id")
+  permissionId Int @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================================
+// SESSIONS
+// ============================================================
+
+model Session {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @map("user_id")
+  sessionIdentifier String    @unique @map("session_identifier") @db.Uuid
+  status            String    @db.VarChar(50)
+  ipAddress         String?   @map("ip_address") @db.VarChar(100)
+  userAgent         String?   @map("user_agent") @db.Text
+  deviceFingerprint String?   @map("device_fingerprint") @db.Text
+  lastActivityAt    DateTime? @map("last_activity_at")
+  expiresAt         DateTime  @map("expires_at")
+  revokedAt         DateTime? @map("revoked_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id])
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model RefreshToken {
+  id            Int       @id @default(autoincrement())
+  sessionId     Int       @map("session_id")
+  userId        Int       @map("user_id")
+  tokenHash     String    @map("token_hash") @db.Text
+  status        String    @db.VarChar(50)
+  expiresAt     DateTime  @map("expires_at")
+  revokedAt     DateTime? @map("revoked_at")
+  rotatedFromId Int?      @map("rotated_from")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  session     Session        @relation(fields: [sessionId], references: [id])
+  user        User           @relation(fields: [userId], references: [id])
+  rotatedFrom RefreshToken?  @relation("TokenRotation", fields: [rotatedFromId], references: [id])
+  rotatedTo   RefreshToken[] @relation("TokenRotation")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ============================================================
+// ORGANIZATION & CUSTOMER
+// ============================================================
+
+model Organization {
+  id        Int      @id @default(autoincrement())
+  code      String?  @unique @db.VarChar(100)
+  name      String   @db.VarChar(255)
+  taxCode   String?  @map("tax_code") @db.VarChar(100)
+  phone     String?  @db.VarChar(50)
+  email     String?  @db.VarChar(255)
+  address   String?  @db.Text
+  status    String?  @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users     User[]
+  customers Customer[]
+  settings  Setting[]
+
+  @@map("organizations")
+}
+
+model Customer {
+  id                  Int       @id @default(autoincrement())
+  organizationId      Int?      @map("organization_id")
+  customerCode        String?   @unique @map("customer_code") @db.VarChar(100)
+  companyName         String    @map("company_name") @db.VarChar(255)
+  contactName         String?   @map("contact_name") @db.VarChar(255)
+  phone               String?   @db.VarChar(50)
+  email               String?   @db.VarChar(255)
+  address             String?   @db.Text
+  taxCode             String?   @map("tax_code") @db.VarChar(100)
+  creditLimit         Decimal   @default(0) @map("credit_limit") @db.Decimal(18, 2)
+  status              String?   @db.VarChar(50)
+  assignedSalesUserId Int?      @map("assigned_sales_user_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at")
+
+  organization  Organization?            @relation(fields: [organizationId], references: [id])
+  assignedSales User?                    @relation("AssignedSales", fields: [assignedSalesUserId], references: [id])
+  quotations    Quotation[]
+  salesOrders   SalesOrder[]
+  invoices      Invoice[]
+  payments      Payment[]
+  arLedger      AccountsReceivableLedger[]
+
+  @@index([organizationId])
+  @@map("customers")
+}
+
+// ============================================================
+// CATALOG
+// ============================================================
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  parentId    Int?     @map("parent_id")
+  code        String?  @unique @db.VarChar(100)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Brand {
+  id          Int      @id @default(autoincrement())
+  code        String?  @unique @db.VarChar(100)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  products Product[]
+
+  @@map("brands")
+}
+
+model Product {
+  id            Int       @id @default(autoincrement())
+  categoryId    Int?      @map("category_id")
+  brandId       Int?      @map("brand_id")
+  sku           String    @unique @db.VarChar(100)
+  productName   String    @map("product_name") @db.VarChar(255)
+  description   String?   @db.Text
+  unit          String?   @db.VarChar(50)
+  standardPrice Decimal?  @map("standard_price") @db.Decimal(18, 2)
+  weight        Decimal?  @db.Decimal(18, 2)
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  category              Category?              @relation(fields: [categoryId], references: [id])
+  brand                 Brand?                 @relation(fields: [brandId], references: [id])
+  images                ProductImage[]
+  inventoryStocks       InventoryStock[]
+  inventoryTransactions InventoryTransaction[]
+  quotationItems        QuotationItem[]
+  salesOrderItems       SalesOrderItem[]
+  deliveryItems         DeliveryItem[]
+
+  @@index([sku])
+  @@map("products")
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  imageUrl  String   @map("image_url") @db.Text
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+// ============================================================
+// INVENTORY
+// ============================================================
+
+model Warehouse {
+  id            Int      @id @default(autoincrement())
+  code          String?  @unique @db.VarChar(100)
+  warehouseName String   @map("warehouse_name") @db.VarChar(255)
+  address       String?  @db.Text
+  status        String?  @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  inventoryStocks       InventoryStock[]
+  inventoryTransactions InventoryTransaction[]
+  deliveries            Delivery[]
+
+  @@map("warehouses")
+}
+
+model InventoryStock {
+  id                Int      @id @default(autoincrement())
+  warehouseId       Int      @map("warehouse_id")
+  productId         Int      @map("product_id")
+  availableQuantity Decimal  @default(0) @map("available_quantity") @db.Decimal(18, 2)
+  reservedQuantity  Decimal  @default(0) @map("reserved_quantity") @db.Decimal(18, 2)
+  damagedQuantity   Decimal  @default(0) @map("damaged_quantity") @db.Decimal(18, 2)
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@unique([warehouseId, productId])
+  @@index([productId])
+  @@map("inventory_stocks")
+}
+
+model InventoryTransaction {
+  id              Int      @id @default(autoincrement())
+  warehouseId     Int?     @map("warehouse_id")
+  productId       Int?     @map("product_id")
+  transactionType String   @map("transaction_type") @db.VarChar(50)
+  referenceType   String?  @map("reference_type") @db.VarChar(50)
+  referenceId     Int?     @map("reference_id")
+  quantity        Decimal  @db.Decimal(18, 2)
+  balanceAfter    Decimal? @map("balance_after") @db.Decimal(18, 2)
+  notes           String?  @db.Text
+  createdBy       Int?     @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
+  product   Product?   @relation(fields: [productId], references: [id])
+  creator   User?      @relation(fields: [createdBy], references: [id])
+
+  @@index([productId])
+  @@index([warehouseId])
+  @@map("inventory_transactions")
+}
+
+// ============================================================
+// SALES
+// ============================================================
+
+model Quotation {
+  id              Int       @id @default(autoincrement())
+  quotationNumber String    @unique @map("quotation_number") @db.VarChar(100)
+  customerId      Int       @map("customer_id")
+  salesUserId     Int?      @map("sales_user_id")
+  subtotal        Decimal?  @db.Decimal(18, 2)
+  taxAmount       Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  totalAmount     Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  status          String?   @db.VarChar(50)
+  validUntil      DateTime? @map("valid_until") @db.Date
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  customer    Customer        @relation(fields: [customerId], references: [id])
+  items       QuotationItem[]
+  salesOrders SalesOrder[]
+
+  @@index([customerId])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id             Int     @id @default(autoincrement())
+  quotationId    Int     @map("quotation_id")
+  productId      Int     @map("product_id")
+  quantity       Decimal @db.Decimal(18, 2)
+  unitPrice      Decimal @map("unit_price") @db.Decimal(18, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(18, 2)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(18, 2)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@map("quotation_items")
+}
+
+model SalesOrder {
+  id          Int       @id @default(autoincrement())
+  orderNumber String    @unique @map("order_number") @db.VarChar(100)
+  customerId  Int       @map("customer_id")
+  quotationId Int?      @map("quotation_id")
+  salesUserId Int?      @map("sales_user_id")
+  subtotal    Decimal?  @db.Decimal(18, 2)
+  taxAmount   Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  totalAmount Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  status      String?   @db.VarChar(50)
+  orderedAt   DateTime? @map("ordered_at")
+  confirmedAt DateTime? @map("confirmed_at")
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  customer   Customer         @relation(fields: [customerId], references: [id])
+  quotation  Quotation?       @relation(fields: [quotationId], references: [id])
+  items      SalesOrderItem[]
+  deliveries Delivery[]
+  invoices   Invoice[]
+
+  @@index([customerId])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id                Int     @id @default(autoincrement())
+  salesOrderId      Int     @map("sales_order_id")
+  productId         Int     @map("product_id")
+  quantity          Decimal @db.Decimal(18, 2)
+  deliveredQuantity Decimal @default(0) @map("delivered_quantity") @db.Decimal(18, 2)
+  unitPrice         Decimal @map("unit_price") @db.Decimal(18, 2)
+  discountAmount    Decimal @default(0) @map("discount_amount") @db.Decimal(18, 2)
+  totalAmount       Decimal @map("total_amount") @db.Decimal(18, 2)
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id])
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@map("sales_order_items")
+}
+
+model Delivery {
+  id             Int       @id @default(autoincrement())
+  deliveryNumber String    @unique @map("delivery_number") @db.VarChar(100)
+  salesOrderId   Int?      @map("sales_order_id")
+  warehouseId    Int?      @map("warehouse_id")
+  status         String?   @db.VarChar(50)
+  deliveredAt    DateTime? @map("delivered_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  salesOrder SalesOrder?    @relation(fields: [salesOrderId], references: [id])
+  warehouse  Warehouse?     @relation(fields: [warehouseId], references: [id])
+  items      DeliveryItem[]
+
+  @@map("deliveries")
+}
+
+model DeliveryItem {
+  id         Int     @id @default(autoincrement())
+  deliveryId Int?    @map("delivery_id")
+  productId  Int?    @map("product_id")
+  quantity   Decimal @db.Decimal(18, 2)
+
+  delivery Delivery? @relation(fields: [deliveryId], references: [id])
+  product  Product?  @relation(fields: [productId], references: [id])
+
+  @@map("delivery_items")
+}
+
+// ============================================================
+// FINANCE
+// ============================================================
+
+model Invoice {
+  id                Int       @id @default(autoincrement())
+  invoiceNumber     String    @unique @map("invoice_number") @db.VarChar(100)
+  customerId        Int?      @map("customer_id")
+  salesOrderId      Int?      @map("sales_order_id")
+  subtotal          Decimal?  @db.Decimal(18, 2)
+  taxAmount         Decimal?  @map("tax_amount") @db.Decimal(18, 2)
+  totalAmount       Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  outstandingAmount Decimal?  @map("outstanding_amount") @db.Decimal(18, 2)
+  issueDate         DateTime? @map("issue_date") @db.Date
+  dueDate           DateTime? @map("due_date") @db.Date
+  status            String?   @db.VarChar(50)
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  customer    Customer?           @relation(fields: [customerId], references: [id])
+  salesOrder  SalesOrder?         @relation(fields: [salesOrderId], references: [id])
+  allocations PaymentAllocation[]
+
+  @@index([customerId])
+  @@map("invoices")
+}
+
+model Payment {
+  id              Int       @id @default(autoincrement())
+  paymentNumber   String    @unique @map("payment_number") @db.VarChar(100)
+  customerId      Int?      @map("customer_id")
+  paymentMethod   String?   @map("payment_method") @db.VarChar(50)
+  totalAmount     Decimal   @map("total_amount") @db.Decimal(18, 2)
+  paymentDate     DateTime? @map("payment_date") @db.Date
+  referenceNumber String?   @map("reference_number") @db.VarChar(255)
+  status          String?   @db.VarChar(50)
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  customer    Customer?           @relation(fields: [customerId], references: [id])
+  allocations PaymentAllocation[]
+
+  @@index([customerId])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id              Int      @id @default(autoincrement())
+  paymentId       Int      @map("payment_id")
+  invoiceId       Int      @map("invoice_id")
+  allocatedAmount Decimal  @map("allocated_amount") @db.Decimal(18, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("payment_allocations")
+}
+
+model AccountsReceivableLedger {
+  id              Int      @id @default(autoincrement())
+  customerId      Int?     @map("customer_id")
+  transactionType String   @map("transaction_type") @db.VarChar(100)
+  referenceType   String?  @map("reference_type") @db.VarChar(100)
+  referenceId     Int?     @map("reference_id")
+  debitAmount     Decimal  @default(0) @map("debit_amount") @db.Decimal(18, 2)
+  creditAmount    Decimal  @default(0) @map("credit_amount") @db.Decimal(18, 2)
+  balanceAfter    Decimal? @map("balance_after") @db.Decimal(18, 2)
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("accounts_receivable_ledger")
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id               Int       @id @default(autoincrement())
+  recipientId      Int?      @map("recipient_id")
+  channel          String?   @db.VarChar(50)
+  notificationType String?   @map("notification_type") @db.VarChar(100)
+  subject          String?   @db.VarChar(255)
+  content          String?   @db.Text
+  status           String?   @db.VarChar(50)
+  priority         String?   @db.VarChar(50)
+  metadata         Json?     @db.JsonB
+  scheduledAt      DateTime? @map("scheduled_at")
+  sentAt           DateTime? @map("sent_at")
+  readAt           DateTime? @map("read_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  recipient User? @relation(fields: [recipientId], references: [id])
+
+  @@index([recipientId])
+  @@map("notifications")
+}
+
+model NotificationTemplate {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique @db.VarChar(100)
+  channel         String?  @db.VarChar(50)
+  subjectTemplate String?  @map("subject_template") @db.Text
+  bodyTemplate    String?  @map("body_template") @db.Text
+  variables       Json?    @db.JsonB
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("notification_templates")
+}
+
+// ============================================================
+// FILE ATTACHMENTS
+// ============================================================
+
+model Attachment {
+  id               Int       @id @default(autoincrement())
+  ownerType        String?   @map("owner_type") @db.VarChar(100)
+  ownerId          Int?      @map("owner_id")
+  fileName         String?   @map("file_name") @db.VarChar(255)
+  originalFileName String?   @map("original_file_name") @db.VarChar(255)
+  mimeType         String?   @map("mime_type") @db.VarChar(255)
+  fileSize         Int?      @map("file_size")
+  storagePath      String?   @map("storage_path") @db.Text
+  storageProvider  String?   @map("storage_provider") @db.VarChar(50)
+  checksum         String?   @db.Text
+  visibility       String?   @db.VarChar(50)
+  uploadedBy       Int?      @map("uploaded_by")
+  status           String?   @db.VarChar(50)
+  metadata         Json?     @db.JsonB
+  uploadedAt       DateTime  @default(now()) @map("uploaded_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  uploader User? @relation(fields: [uploadedBy], references: [id])
+
+  @@index([ownerType, ownerId])
+  @@map("attachments")
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+model Setting {
+  id             Int      @id @default(autoincrement())
+  category       String?  @db.VarChar(100)
+  key            String   @db.VarChar(255)
+  value          Json?    @db.JsonB
+  valueType      String?  @map("value_type") @db.VarChar(50)
+  scope          String?  @db.VarChar(50)
+  organizationId Int?     @map("organization_id")
+  environment    String?  @db.VarChar(50)
+  isSensitive    Boolean  @default(false) @map("is_sensitive")
+  isReadonly     Boolean  @default(false) @map("is_readonly")
+  version        Int      @default(1)
+  updatedBy      Int?     @map("updated_by")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  updater      User?         @relation(fields: [updatedBy], references: [id])
+
+  @@unique([key, scope, organizationId])
+  @@map("settings")
+}
+
+// ============================================================
+// AUDIT LOGS (append-only)
+// ============================================================
+
+model AuditLog {
+  id             Int      @id @default(autoincrement())
+  eventType      String?  @map("event_type") @db.VarChar(100)
+  category       String?  @db.VarChar(100)
+  actorId        Int?     @map("actor_id")
+  actorType      String?  @map("actor_type") @db.VarChar(50)
+  entityType     String?  @map("entity_type") @db.VarChar(100)
+  entityId       Int?     @map("entity_id")
+  action         String?  @db.VarChar(100)
+  status         String?  @db.VarChar(50)
+  correlationId  String?  @map("correlation_id") @db.Uuid
+  requestId      String?  @map("request_id") @db.Uuid
+  ipAddress      String?  @map("ip_address") @db.VarChar(100)
+  userAgent      String?  @map("user_agent") @db.Text
+  metadata       Json?    @db.JsonB
+  beforeSnapshot Json?    @map("before_snapshot") @db.JsonB
+  afterSnapshot  Json?    @map("after_snapshot") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// REPORTING
+// ============================================================
+
+model GeneratedReport {
+  id          Int       @id @default(autoincrement())
+  reportType  String?   @map("report_type") @db.VarChar(100)
+  title       String?   @db.VarChar(255)
+  filters     Json?     @db.JsonB
+  generatedBy Int?      @map("generated_by")
+  generatedAt DateTime? @map("generated_at")
+  format      String?   @db.VarChar(50)
+  status      String?   @db.VarChar(50)
+  filePath    String?   @map("file_path") @db.Text
+  metadata    Json?     @db.JsonB
+
+  generator User? @relation(fields: [generatedBy], references: [id])
+
+  @@map("generated_reports")
+}
+
+model ScheduledReport {
+  id             Int      @id @default(autoincrement())
+  reportType     String?  @map("report_type") @db.VarChar(100)
+  cronExpression String?  @map("cron_expression") @db.VarChar(255)
+  recipients     Json?    @db.JsonB
+  format         String?  @db.VarChar(50)
+  active         Boolean  @default(true)
+  createdBy      Int?     @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  creator User? @relation(fields: [createdBy], references: [id])
+
+  @@map("scheduled_reports")
+}

@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.env
+.env.*
+*.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+prisma/migrations/*.sql.bak

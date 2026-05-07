@@ -1,0 +1,371 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuthUser } from '../common/types/auth-user.type';
+import {
+  CreateQuotationDto, QuotationQueryDto,
+  CreateSalesOrderDto, SalesOrderQueryDto,
+  CreateDeliveryDto, DeliveryQueryDto,
+} from './dto/sales.dto';
+
+const QUOTATION_SELECT = {
+  id: true, quotationNumber: true, status: true, subtotal: true,
+  taxAmount: true, totalAmount: true, validUntil: true, notes: true,
+  createdAt: true, updatedAt: true,
+  customer: { select: { id: true, companyName: true, customerCode: true } },
+  items: {
+    select: {
+      id: true, quantity: true, unitPrice: true, discountAmount: true, totalAmount: true,
+      product: { select: { id: true, sku: true, productName: true, unit: true } },
+    },
+  },
+};
+
+const ORDER_SELECT = {
+  id: true, orderNumber: true, status: true, subtotal: true,
+  taxAmount: true, totalAmount: true, orderedAt: true, confirmedAt: true, notes: true,
+  createdAt: true, updatedAt: true,
+  customer: { select: { id: true, companyName: true, customerCode: true } },
+  quotation: { select: { id: true, quotationNumber: true } },
+  items: {
+    select: {
+      id: true, quantity: true, deliveredQuantity: true, unitPrice: true, discountAmount: true, totalAmount: true,
+      product: { select: { id: true, sku: true, productName: true, unit: true } },
+    },
+  },
+};
+
+@Injectable()
+export class SalesService {
+  constructor(private prisma: PrismaService) {}
+
+  // ─── Quotations ───────────────────────────────────────────────────────────
+
+  async listQuotations(query: QuotationQueryDto) {
+    const { page = 1, limit = 20, customerId, status, search } = query;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (customerId) where.customerId = customerId;
+    if (status) where.status = status;
+    if (search) where.quotationNumber = { contains: search, mode: 'insensitive' };
+
+    const [items, total] = await Promise.all([
+      this.prisma.quotation.findMany({
+        where, skip, take: limit, orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, quotationNumber: true, status: true, totalAmount: true, validUntil: true, createdAt: true,
+          customer: { select: { id: true, companyName: true, customerCode: true } },
+          _count: { select: { items: true } },
+        },
+      }),
+      this.prisma.quotation.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getQuotation(id: number) {
+    const q = await this.prisma.quotation.findUnique({ where: { id }, select: QUOTATION_SELECT });
+    if (!q) throw new NotFoundException(`Quotation #${id} not found`);
+    return q;
+  }
+
+  async createQuotation(dto: CreateQuotationDto) {
+    await this.ensureCustomerExists(dto.customerId);
+    const number = await this.generateQuotationNumber();
+    const { items, ...data } = dto;
+    const { subtotal, taxAmount, totalAmount } = this.calcTotals(items);
+
+    return this.prisma.quotation.create({
+      data: {
+        ...data,
+        quotationNumber: number,
+        status: 'DRAFT',
+        subtotal, taxAmount, totalAmount,
+        validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+        items: {
+          create: items.map((i) => ({
+            productId: i.productId,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            discountAmount: i.discountAmount ?? 0,
+            totalAmount: i.quantity * i.unitPrice - (i.discountAmount ?? 0),
+          })),
+        },
+      },
+      select: QUOTATION_SELECT,
+    });
+  }
+
+  async sendQuotation(id: number) {
+    const q = await this.getQuotation(id);
+    if (q.status !== 'DRAFT') throw new BadRequestException('Only DRAFT quotations can be sent');
+    return this.prisma.quotation.update({ where: { id }, data: { status: 'SENT' }, select: QUOTATION_SELECT });
+  }
+
+  async confirmQuotation(id: number) {
+    const q = await this.getQuotation(id);
+    if (!['DRAFT', 'SENT'].includes(q.status ?? '')) throw new BadRequestException('Quotation cannot be confirmed');
+
+    const orderNumber = await this.generateOrderNumber();
+    const { subtotal, taxAmount, totalAmount } = this.calcTotals(q.items.map((i) => ({
+      quantity: Number(i.quantity), unitPrice: Number(i.unitPrice), discountAmount: Number(i.discountAmount),
+    })));
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.quotation.update({ where: { id }, data: { status: 'CONFIRMED' } });
+      return tx.salesOrder.create({
+        data: {
+          orderNumber,
+          customerId: (q as any).customer.id,
+          quotationId: id,
+          status: 'CONFIRMED',
+          subtotal, taxAmount, totalAmount,
+          orderedAt: new Date(),
+          confirmedAt: new Date(),
+          items: {
+            create: q.items.map((i) => ({
+              productId: i.product.id,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discountAmount: i.discountAmount,
+              totalAmount: i.totalAmount,
+              deliveredQuantity: 0,
+            })),
+          },
+        },
+        select: ORDER_SELECT,
+      });
+    });
+  }
+
+  async cancelQuotation(id: number) {
+    const q = await this.getQuotation(id);
+    if (q.status === 'CANCELLED') throw new BadRequestException('Quotation already cancelled');
+    return this.prisma.quotation.update({ where: { id }, data: { status: 'CANCELLED' }, select: QUOTATION_SELECT });
+  }
+
+  // ─── Sales Orders ─────────────────────────────────────────────────────────
+
+  async listOrders(query: SalesOrderQueryDto, currentUser?: AuthUser) {
+    const { page = 1, limit = 20, customerId, status, search } = query;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (status) where.status = status;
+    if (search) where.orderNumber = { contains: search, mode: 'insensitive' };
+
+    const scope = this.resolveOrderScope(currentUser);
+    if (scope === 'own') return { items: [], total: 0, page, limit, totalPages: 0 };
+    if (scope === 'assigned') {
+      const ids = await this.getAssignedCustomerIds(currentUser!.id);
+      where.customerId = ids.length ? { in: ids } : { in: [] };
+    } else {
+      if (customerId) where.customerId = customerId;
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.salesOrder.findMany({
+        where, skip, take: limit, orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, orderNumber: true, status: true, totalAmount: true, orderedAt: true, confirmedAt: true, createdAt: true,
+          customer: { select: { id: true, companyName: true, customerCode: true } },
+          quotation: { select: { id: true, quotationNumber: true } },
+          _count: { select: { items: true, deliveries: true } },
+        },
+      }),
+      this.prisma.salesOrder.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getOrder(id: number, currentUser?: AuthUser) {
+    const o = await this.prisma.salesOrder.findUnique({ where: { id }, select: ORDER_SELECT });
+    if (!o) throw new NotFoundException(`Sales Order #${id} not found`);
+
+    const scope = this.resolveOrderScope(currentUser);
+    if (scope === 'own') throw new NotFoundException(`Sales Order #${id} not found`);
+    if (scope === 'assigned') {
+      const ids = await this.getAssignedCustomerIds(currentUser!.id);
+      if (!ids.includes((o as any).customer.id)) throw new NotFoundException(`Sales Order #${id} not found`);
+    }
+
+    return o;
+  }
+
+  async createOrder(dto: CreateSalesOrderDto) {
+    await this.ensureCustomerExists(dto.customerId);
+    const orderNumber = await this.generateOrderNumber();
+    const { items, ...data } = dto;
+    const { subtotal, taxAmount, totalAmount } = this.calcTotals(items);
+
+    return this.prisma.salesOrder.create({
+      data: {
+        ...data,
+        orderNumber,
+        status: 'DRAFT',
+        subtotal, taxAmount, totalAmount,
+        orderedAt: new Date(),
+        items: {
+          create: items.map((i) => ({
+            productId: i.productId,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            discountAmount: i.discountAmount ?? 0,
+            totalAmount: i.quantity * i.unitPrice - (i.discountAmount ?? 0),
+            deliveredQuantity: 0,
+          })),
+        },
+      },
+      select: ORDER_SELECT,
+    });
+  }
+
+  async confirmOrder(id: number) {
+    const o = await this.getOrder(id);
+    if (o.status !== 'DRAFT') throw new BadRequestException('Only DRAFT orders can be confirmed');
+    return this.prisma.salesOrder.update({
+      where: { id }, data: { status: 'CONFIRMED', confirmedAt: new Date() }, select: ORDER_SELECT,
+    });
+  }
+
+  async cancelOrder(id: number) {
+    const o = await this.getOrder(id);
+    if (['CANCELLED', 'DELIVERED'].includes(o.status ?? '')) throw new BadRequestException('Order cannot be cancelled');
+    return this.prisma.salesOrder.update({ where: { id }, data: { status: 'CANCELLED' }, select: ORDER_SELECT });
+  }
+
+  // ─── Deliveries ───────────────────────────────────────────────────────────
+
+  async listDeliveries(query: DeliveryQueryDto, currentUser?: AuthUser) {
+    const { page = 1, limit = 20, salesOrderId, status } = query;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (salesOrderId) where.salesOrderId = salesOrderId;
+    if (status) where.status = status;
+
+    const perms = currentUser?.permissions ?? [];
+    if (!perms.includes('sales.delivery.view')) {
+      // view_own: customer user has no linked customer entity — return empty
+      return { items: [], total: 0, page, limit, totalPages: 0 };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.delivery.findMany({
+        where, skip, take: limit, orderBy: { createdAt: 'desc' },
+        include: {
+          salesOrder: { select: { id: true, orderNumber: true } },
+          warehouse: { select: { id: true, warehouseName: true } },
+          _count: { select: { items: true } },
+        },
+      }),
+      this.prisma.delivery.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async createDelivery(dto: CreateDeliveryDto) {
+    const order = await this.prisma.salesOrder.findUnique({
+      where: { id: dto.salesOrderId },
+      include: { items: true },
+    });
+    if (!order) throw new NotFoundException(`Sales Order #${dto.salesOrderId} not found`);
+    if (!['CONFIRMED', 'PARTIALLY_DELIVERED'].includes(order.status ?? '')) {
+      throw new BadRequestException('Order must be CONFIRMED or PARTIALLY_DELIVERED to create delivery');
+    }
+
+    const deliveryNumber = await this.generateDeliveryNumber();
+
+    return this.prisma.$transaction(async (tx) => {
+      const delivery = await tx.delivery.create({
+        data: {
+          deliveryNumber,
+          salesOrderId: dto.salesOrderId,
+          warehouseId: dto.warehouseId,
+          status: 'PENDING',
+          items: {
+            create: dto.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          },
+        },
+        include: { items: true, warehouse: { select: { id: true, warehouseName: true } } },
+      });
+
+      // Update delivered quantities on order items
+      for (const di of dto.items) {
+        const orderItem = order.items.find((oi) => oi.productId === di.productId);
+        if (orderItem) {
+          await tx.salesOrderItem.update({
+            where: { id: orderItem.id },
+            data: { deliveredQuantity: { increment: di.quantity } },
+          });
+        }
+      }
+
+      // Recalculate order status
+      const updatedItems = await tx.salesOrderItem.findMany({ where: { salesOrderId: dto.salesOrderId } });
+      const allDelivered = updatedItems.every((i) => Number(i.deliveredQuantity) >= Number(i.quantity));
+      const anyDelivered = updatedItems.some((i) => Number(i.deliveredQuantity) > 0);
+      const newStatus = allDelivered ? 'DELIVERED' : anyDelivered ? 'PARTIALLY_DELIVERED' : 'CONFIRMED';
+
+      await tx.salesOrder.update({ where: { id: dto.salesOrderId }, data: { status: newStatus } });
+
+      return delivery;
+    });
+  }
+
+  async markDelivered(id: number) {
+    const d = await this.prisma.delivery.findUnique({ where: { id } });
+    if (!d) throw new NotFoundException(`Delivery #${id} not found`);
+    if (d.status === 'DELIVERED') throw new BadRequestException('Delivery already marked as delivered');
+    return this.prisma.delivery.update({
+      where: { id },
+      data: { status: 'DELIVERED', deliveredAt: new Date() },
+      include: { salesOrder: { select: { id: true, orderNumber: true } } },
+    });
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  private resolveOrderScope(user?: AuthUser): 'all' | 'assigned' | 'own' {
+    if (!user) return 'all'; // internal service call — bypass scope restriction
+    const perms = user.permissions;
+    if (perms.includes('sales.order.view_all') || perms.includes('sales.order.view_team')) return 'all';
+    if (perms.includes('sales.order.view_assigned')) return 'assigned';
+    return 'own';
+  }
+
+  private async getAssignedCustomerIds(salesUserId: number): Promise<number[]> {
+    const customers = await this.prisma.customer.findMany({
+      where: { assignedSalesUserId: salesUserId },
+      select: { id: true },
+    });
+    return customers.map((c) => c.id);
+  }
+
+  private async ensureCustomerExists(id: number) {
+    const c = await this.prisma.customer.findUnique({ where: { id }, select: { id: true, deletedAt: true } });
+    if (!c || c.deletedAt) throw new NotFoundException(`Customer #${id} not found`);
+  }
+
+  private calcTotals(items: { quantity: number; unitPrice: number; discountAmount?: number }[]) {
+    const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice - (i.discountAmount ?? 0), 0);
+    const taxAmount = Math.round(subtotal * 0.1 * 100) / 100;
+    const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
+    return { subtotal, taxAmount, totalAmount };
+  }
+
+  private async generateQuotationNumber(): Promise<string> {
+    const count = await this.prisma.quotation.count();
+    const year = new Date().getFullYear();
+    return `QUO-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  private async generateOrderNumber(): Promise<string> {
+    const count = await this.prisma.salesOrder.count();
+    const year = new Date().getFullYear();
+    return `SO-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  private async generateDeliveryNumber(): Promise<string> {
+    const count = await this.prisma.delivery.count();
+    const year = new Date().getFullYear();
+    return `DEL-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+}
