@@ -102,9 +102,14 @@ GET /health/redis   # Redis
 
 ## Default Credentials (dev only)
 
-| Account | Email                | Password     |
-|---------|----------------------|--------------|
-| Admin   | admin@mini-erp.local | Admin@123456 |
+| Role       | Email                      | Password          |
+|------------|----------------------------|-------------------|
+| Admin      | admin@mini-erp.local       | Admin@123456      |
+| Manager    | manager@mini-erp.local     | Manager@123456    |
+| Sales      | sales@mini-erp.local       | Sales@123456      |
+| Customer   | customer@mini-erp.local    | Customer@123456   |
+| Accountant | accountant@mini-erp.local  | Accountant@123456 |
+| Warehouse  | warehouse@mini-erp.local   | Warehouse@123456  |
 
 ---
 
