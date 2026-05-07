@@ -25,25 +25,25 @@ Production-ready Fullstack B2B Mini-ERP — NestJS · Next.js · PostgreSQL · P
 ## Setup
 
 ```bash
-# 1. Clone & install
-cd backend && npm install
-cd ../frontend && npm install
+# 1. Clone & install (cài cả backend + frontend cùng lúc)
+npm install
 
 # 2. Copy env
 cp backend/.env.example backend/.env
 # Edit backend/.env — change secrets before running
 
 # 3. Start infrastructure
-docker compose up -d
+npm run infra:up
 
 # 4. Run migrations
-cd backend && npm run db:migrate
+npm run db:migrate
 
 # 5. Seed database
 npm run db:seed
 
-# 6. Start backend dev
-npm run dev
+# 6. Start dev
+npm run dev       # backend
+npm run dev:fe    # frontend
 ```
 
 ---
@@ -66,25 +66,25 @@ npm run dev
 
 ```bash
 # Infrastructure
-docker compose up -d          # start all Docker services
-docker compose down           # stop services
-docker compose down -v        # stop + remove volumes
+npm run infra:up       # start all Docker services
+npm run infra:down     # stop services
+npm run infra:reset    # stop + remove volumes
 
-# Database (run from backend/)
-npm run db:migrate        # run pending migrations (dev)
-npm run db:generate       # regenerate Prisma client
-npm run db:seed           # seed roles, permissions, admin user
-npm run db:studio         # Prisma Studio UI
+# Database
+npm run db:migrate     # run pending migrations (dev)
+npm run db:generate    # regenerate Prisma client
+npm run db:seed        # seed roles, permissions, admin user
 
 # Development
-cd backend && npm run dev      # backend hot-reload
-cd frontend && npm run dev     # frontend dev server
+npm run dev            # backend hot-reload
+npm run dev:fe         # frontend dev server
 
-# Testing (run from backend/)
-npm test
-npm run test:cov
+# Build
+npm run build          # build backend
+npm run build:fe       # build frontend
 
-# Linting
+# Testing & Linting
+npm run test
 npm run lint
 ```
 
@@ -126,7 +126,7 @@ Requires a `backend/.env` with strong secrets — never commit `.env` to Git.
 ## Database Migrations
 
 ```bash
-# Create a new migration (run from backend/)
+# Create a new migration
 npm run db:migrate -- --name <migration-name>
 
 # Deploy to production (no prompt)
