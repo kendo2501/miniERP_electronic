@@ -100,10 +100,11 @@ GET /health/redis   # Redis
 
 ---
 
-## Default Credentials
+## Default Credentials (dev only)
 
-Xem file `backend/.env.example` để biết cấu hình mặc định cho môi trường dev.
-**Không bao giờ commit file `.env` lên Git.**
+| Account | Email                | Password     |
+|---------|----------------------|--------------|
+| Admin   | admin@mini-erp.local | Admin@123456 |
 
 ---
 
