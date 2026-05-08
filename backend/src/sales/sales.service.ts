@@ -4,7 +4,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import {
   CreateQuotationDto, QuotationQueryDto,
   CreateSalesOrderDto, SalesOrderQueryDto,
-  CreateDeliveryDto, DeliveryQueryDto,
+  CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
 } from './dto/sales.dto';
 
 const QUOTATION_SELECT = {
@@ -280,6 +280,7 @@ export class SalesService {
           salesOrderId: dto.salesOrderId,
           warehouseId: dto.warehouseId,
           status: 'PENDING',
+          trackingCode: dto.trackingCode ?? null,
           items: {
             create: dto.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           },
@@ -314,11 +315,50 @@ export class SalesService {
     const d = await this.prisma.delivery.findUnique({ where: { id } });
     if (!d) throw new NotFoundException(`Delivery #${id} not found`);
     if (d.status === 'DELIVERED') throw new BadRequestException('Delivery already marked as delivered');
+    if (d.status === 'FAILED') throw new BadRequestException('Cannot mark a failed delivery as delivered');
     return this.prisma.delivery.update({
       where: { id },
       data: { status: 'DELIVERED', deliveredAt: new Date() },
       include: { salesOrder: { select: { id: true, orderNumber: true } } },
     });
+  }
+
+  async markFailed(id: number, dto: MarkDeliveryFailedDto) {
+    const d = await this.prisma.delivery.findUnique({ where: { id } });
+    if (!d) throw new NotFoundException(`Delivery #${id} not found`);
+    if (['DELIVERED', 'CANCELLED', 'FAILED'].includes(d.status ?? ''))
+      throw new BadRequestException(`Delivery already ${d.status?.toLowerCase()}`);
+    return this.prisma.delivery.update({
+      where: { id },
+      data: { status: 'FAILED', failedAt: new Date(), failureReason: dto.failureReason ?? null },
+      include: { salesOrder: { select: { id: true, orderNumber: true } } },
+    });
+  }
+
+  async getCustomerBalance(customerId: number) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, companyName: true, customerCode: true, creditLimit: true },
+    });
+    if (!customer) throw new NotFoundException(`Customer #${customerId} not found`);
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: { customerId },
+      select: {
+        id: true, invoiceNumber: true, status: true,
+        totalAmount: true, outstandingAmount: true,
+        issueDate: true, dueDate: true,
+        salesOrder: { select: { id: true, orderNumber: true } },
+      },
+      orderBy: { issueDate: 'desc' },
+    });
+
+    const totalDebt = invoices.reduce((s, i) => s + Number(i.outstandingAmount ?? 0), 0);
+    const overdueDebt = invoices
+      .filter((i) => i.status !== 'PAID' && i.dueDate && new Date(i.dueDate) < new Date())
+      .reduce((s, i) => s + Number(i.outstandingAmount ?? 0), 0);
+
+    return { customer, invoices, totalDebt, overdueDebt };
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

@@ -4,34 +4,58 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Building2, Phone, Mail } from "lucide-react";
+import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { listCustomers, createCustomer } from "@/lib/api/sales";
+import { listCustomers, createCustomer, getCustomerBalance } from "@/lib/api/sales";
+import type { CustomerType, CustomerBalanceInvoice } from "@/types/sales";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 
 const schema = z.object({
-  companyName: z.string().min(1, "Company name is required"),
+  companyName: z.string().min(1, "Bắt buộc"),
   contactName: z.string().optional(),
   email: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
   taxCode: z.string().optional(),
   creditLimit: z.string().optional(),
-  notes: z.string().optional(),
+  customerType: z.enum(["RETAIL", "WHOLESALE"]).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+function vnd(amount: number) {
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+}
+
+function TypeBadge({ type }: { type?: CustomerType | null }) {
+  if (!type) return <span className="text-muted-foreground text-xs">—</span>;
+  return (
+    <Badge variant={type === "WHOLESALE" ? "default" : "secondary"} className="text-xs">
+      {type === "WHOLESALE" ? "Bán buôn" : "Bán lẻ"}
+    </Badge>
+  );
+}
+
+function InvoiceStatusBadge({ status, dueDate }: { status: string; dueDate?: string }) {
+  const overdue = status !== "PAID" && dueDate && new Date(dueDate) < new Date();
+  if (status === "PAID") return <Badge variant="outline" className="text-xs text-green-600">Đã trả</Badge>;
+  if (overdue) return <Badge variant="destructive" className="text-xs">Quá hạn</Badge>;
+  return <Badge variant="secondary" className="text-xs">Chưa trả</Badge>;
+}
 
 export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [balanceCustomer, setBalanceCustomer] = useState<{ id: number; name: string } | null>(null);
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
@@ -42,7 +66,13 @@ export default function CustomersPage() {
     placeholderData: (prev) => prev,
   });
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
+  const { data: balanceData, isLoading: balanceLoading } = useQuery({
+    queryKey: ["customer-balance", balanceCustomer?.id],
+    queryFn: () => getCustomerBalance(balanceCustomer!.id).then((r) => r.data),
+    enabled: !!balanceCustomer,
+  });
+
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
 
@@ -56,7 +86,7 @@ export default function CustomersPage() {
         address: values.address || undefined,
         taxCode: values.taxCode || undefined,
         creditLimit: values.creditLimit ? parseFloat(values.creditLimit) : undefined,
-        notes: values.notes || undefined,
+        customerType: values.customerType,
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success(t.customers.customerCreated);
@@ -112,11 +142,12 @@ export default function CustomersPage() {
                   <tr className="border-b bg-muted/50">
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.customers.customerCode}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.customers.companyName}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.customers.customerType}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.customers.contactName}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.customers.phone}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.email}</th>
-                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">Credit Limit</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.date}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -128,6 +159,9 @@ export default function CustomersPage() {
                           <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           {c.companyName}
                         </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <TypeBadge type={c.customerType as CustomerType} />
                       </td>
                       <td className="px-6 py-3 text-muted-foreground">{c.contactName ?? "—"}</td>
                       <td className="px-6 py-3">
@@ -144,17 +178,24 @@ export default function CustomersPage() {
                           </span>
                         ) : "—"}
                       </td>
-                      <td className="px-6 py-3 text-right">
-                        {c.creditLimit != null ? `$${Number(c.creditLimit).toLocaleString()}` : "—"}
-                      </td>
                       <td className="px-6 py-3 text-muted-foreground text-xs">
-                        {new Date(c.createdAt).toLocaleDateString()}
+                        {new Date(c.createdAt).toLocaleDateString("vi-VN")}
+                      </td>
+                      <td className="px-6 py-3">
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                          onClick={() => setBalanceCustomer({ id: c.id, name: c.companyName })}
+                        >
+                          <TrendingDown className="h-3 w-3" />
+                          {t.customers.viewBalance}
+                        </Button>
                       </td>
                     </tr>
                   ))}
                   {data?.items.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted-foreground">{t.customers.noCustomers}</td>
+                      <td colSpan={8} className="py-12 text-center text-muted-foreground">{t.customers.noCustomers}</td>
                     </tr>
                   )}
                 </tbody>
@@ -174,6 +215,7 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
+      {/* Create Dialog */}
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) reset(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -195,27 +237,35 @@ export default function CustomersPage() {
                 <Input placeholder={t.customers.phonePlaceholder} {...register("phone")} />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>{t.common.email}</Label>
-              <Input type="email" placeholder={t.customers.emailPlaceholder} {...register("email")} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>{t.common.email}</Label>
+                <Input type="email" placeholder={t.customers.emailPlaceholder} {...register("email")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t.customers.customerType}</Label>
+                <Select onValueChange={(v) => setValue("customerType", v as "RETAIL" | "WHOLESALE")} defaultValue="RETAIL">
+                  <SelectTrigger><SelectValue placeholder={t.customers.selectType} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RETAIL">{t.customers.retail}</SelectItem>
+                    <SelectItem value="WHOLESALE">{t.customers.wholesale}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Tax Code</Label>
+                <Label>{t.customers.taxCode}</Label>
                 <Input placeholder="0123456789" {...register("taxCode")} />
               </div>
               <div className="space-y-1.5">
-                <Label>Credit Limit ($)</Label>
-                <Input type="number" min="0" placeholder="5000" {...register("creditLimit")} />
+                <Label>{t.customers.creditLimit} (₫)</Label>
+                <Input type="number" min="0" step="1000" placeholder="5000000" {...register("creditLimit")} />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label>{t.common.address}</Label>
               <Input placeholder={t.customers.addressPlaceholder} {...register("address")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>{t.common.notes}</Label>
-              <Input placeholder={t.catalog.descriptionPlaceholder} {...register("notes")} />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { setShowCreate(false); reset(); }}>{t.common.cancel}</Button>
@@ -225,6 +275,79 @@ export default function CustomersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Balance Dialog */}
+      <Dialog open={!!balanceCustomer} onOpenChange={(v) => { if (!v) setBalanceCustomer(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-orange-500" />
+              {t.customers.balanceTitle} — {balanceCustomer?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          {balanceLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : balanceData ? (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-1">{t.customers.totalDebt}</p>
+                  <p className={`text-lg font-bold ${balanceData.totalDebt > 0 ? "text-orange-600" : "text-green-600"}`}>
+                    {vnd(balanceData.totalDebt)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-1">{t.customers.overdueDebt}</p>
+                  <p className={`text-lg font-bold ${balanceData.overdueDebt > 0 ? "text-red-600" : "text-green-600"}`}>
+                    {balanceData.overdueDebt > 0 && <AlertCircle className="inline h-4 w-4 mr-1" />}
+                    {vnd(balanceData.overdueDebt)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Invoice list */}
+              {balanceData.invoices.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">{t.customers.noInvoices}</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="h-8 px-3 text-left font-medium text-muted-foreground text-xs">Số HĐ</th>
+                      <th className="h-8 px-3 text-left font-medium text-muted-foreground text-xs">Đơn hàng</th>
+                      <th className="h-8 px-3 text-left font-medium text-muted-foreground text-xs">Trạng thái</th>
+                      <th className="h-8 px-3 text-right font-medium text-muted-foreground text-xs">Tổng tiền</th>
+                      <th className="h-8 px-3 text-right font-medium text-muted-foreground text-xs">Còn nợ</th>
+                      <th className="h-8 px-3 text-left font-medium text-muted-foreground text-xs">Hạn TT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {balanceData.invoices.map((inv: CustomerBalanceInvoice) => (
+                      <tr key={inv.id} className="border-b last:border-0">
+                        <td className="px-3 py-2 font-mono text-xs">{inv.invoiceNumber}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{inv.salesOrder?.orderNumber ?? "—"}</td>
+                        <td className="px-3 py-2">
+                          <InvoiceStatusBadge status={inv.status} dueDate={inv.dueDate} />
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-xs">{vnd(Number(inv.totalAmount))}</td>
+                        <td className="px-3 py-2 text-right text-xs font-semibold text-orange-600">
+                          {Number(inv.outstandingAmount) > 0 ? vnd(Number(inv.outstandingAmount)) : <span className="text-green-600">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("vi-VN") : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
 import {
   CreateQuotationDto, QuotationQueryDto,
   CreateSalesOrderDto, SalesOrderQueryDto,
-  CreateDeliveryDto, DeliveryQueryDto,
+  CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
 } from './dto/sales.dto';
 import { RequirePermissions, AnyPermission } from '../common/decorators/permissions.decorator';
 
@@ -61,4 +61,12 @@ export class SalesController {
 
   @Post('deliveries/:id/deliver') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.create') @ApiOperation({ summary: 'Mark delivery as delivered' })
   markDelivered(@Param('id', ParseIntPipe) id: number) { return this.service.markDelivered(id); }
+
+  @Patch('deliveries/:id/fail') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.create') @ApiOperation({ summary: 'Mark delivery as failed' })
+  markFailed(@Param('id', ParseIntPipe) id: number, @Body() dto: MarkDeliveryFailedDto) { return this.service.markFailed(id, dto); }
+
+  // ─── Customer balance ─────────────────────────────────────────────────────
+
+  @Get('customers/:id/balance') @AnyPermission('customer.view_assigned', 'customers.customer.view') @ApiOperation({ summary: 'Get customer outstanding balance and invoices' })
+  getCustomerBalance(@Param('id', ParseIntPipe) id: number) { return this.service.getCustomerBalance(id); }
 }

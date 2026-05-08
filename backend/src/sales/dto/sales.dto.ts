@@ -64,8 +64,13 @@ export class DeliveryItemDto {
 export class CreateDeliveryDto {
   @ApiProperty() @IsInt() @Type(() => Number) salesOrderId!: number;
   @ApiProperty() @IsInt() @Type(() => Number) warehouseId!: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() trackingCode?: string;
   @ApiProperty({ type: [DeliveryItemDto] })
   @IsArray() @ValidateNested({ each: true }) @Type(() => DeliveryItemDto) items!: DeliveryItemDto[];
+}
+
+export class MarkDeliveryFailedDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() failureReason?: string;
 }
 
 export class DeliveryQueryDto {

@@ -5,7 +5,7 @@ import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto } from './dto/cu
 const SELECT_CUSTOMER = {
   id: true, customerCode: true, companyName: true, contactName: true,
   phone: true, email: true, address: true, taxCode: true,
-  creditLimit: true, status: true, createdAt: true, updatedAt: true,
+  creditLimit: true, customerType: true, status: true, createdAt: true, updatedAt: true,
   organizationId: true, assignedSalesUserId: true,
   assignedSales: { select: { id: true, fullName: true, email: true } },
 };

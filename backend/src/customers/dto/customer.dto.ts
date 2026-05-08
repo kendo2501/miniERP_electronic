@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsInt, MaxLength, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, MaxLength, Min, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -10,6 +10,7 @@ export class CreateCustomerDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) taxCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) creditLimit?: number;
+  @ApiPropertyOptional({ enum: ['RETAIL', 'WHOLESALE'] }) @IsOptional() @IsIn(['RETAIL', 'WHOLESALE']) customerType?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Type(() => Number) assignedSalesUserId?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Type(() => Number) organizationId?: number;
 }
@@ -22,6 +23,7 @@ export class UpdateCustomerDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) taxCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) creditLimit?: number;
+  @ApiPropertyOptional({ enum: ['RETAIL', 'WHOLESALE'] }) @IsOptional() @IsIn(['RETAIL', 'WHOLESALE']) customerType?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Type(() => Number) assignedSalesUserId?: number;
 }

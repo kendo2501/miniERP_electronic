@@ -168,6 +168,7 @@ model Customer {
   address             String?   @db.Text
   taxCode             String?   @map("tax_code") @db.VarChar(100)
   creditLimit         Decimal   @default(0) @map("credit_limit") @db.Decimal(18, 2)
+  customerType        String?   @default("RETAIL") @map("customer_type") @db.VarChar(20)
   status              String?   @db.VarChar(50)
   assignedSalesUserId Int?      @map("assigned_sales_user_id")
   createdAt           DateTime  @default(now()) @map("created_at")
@@ -406,6 +407,9 @@ model Delivery {
   salesOrderId   Int?      @map("sales_order_id")
   warehouseId    Int?      @map("warehouse_id")
   status         String?   @db.VarChar(50)
+  trackingCode   String?   @map("tracking_code") @db.VarChar(100)
+  failedAt       DateTime? @map("failed_at")
+  failureReason  String?   @map("failure_reason") @db.Text
   deliveredAt    DateTime? @map("delivered_at")
   createdAt      DateTime  @default(now()) @map("created_at")
 

@@ -1,3 +1,5 @@
+export type CustomerType = 'RETAIL' | 'WHOLESALE';
+
 export interface Customer {
   id: number;
   customerCode: string;
@@ -8,9 +10,29 @@ export interface Customer {
   address?: string;
   taxCode?: string;
   creditLimit?: number;
+  customerType?: CustomerType;
+  status?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CustomerBalanceInvoice {
+  id: number;
+  invoiceNumber: string;
+  status: string;
+  totalAmount: number;
+  outstandingAmount: number;
+  issueDate: string;
+  dueDate?: string;
+  salesOrder?: { id: number; orderNumber: string };
+}
+
+export interface CustomerBalance {
+  customer: Pick<Customer, 'id' | 'companyName' | 'customerCode' | 'creditLimit'>;
+  invoices: CustomerBalanceInvoice[];
+  totalDebt: number;
+  overdueDebt: number;
 }
 
 export interface CustomerListResponse {
@@ -29,6 +51,7 @@ export interface CreateCustomerPayload {
   address?: string;
   taxCode?: string;
   creditLimit?: number;
+  customerType?: CustomerType;
   notes?: string;
 }
 
@@ -148,7 +171,7 @@ export interface CreateSalesOrderPayload {
 
 // ─── Delivery ─────────────────────────────────────────────────────────────────
 
-export type DeliveryStatus = 'PENDING' | 'DELIVERED' | 'CANCELLED';
+export type DeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
 
 export interface DeliveryItem {
   id: number;
@@ -160,6 +183,9 @@ export interface Delivery {
   id: number;
   deliveryNumber: string;
   status: DeliveryStatus;
+  trackingCode?: string;
+  failureReason?: string;
+  failedAt?: string;
   deliveredAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -185,5 +211,6 @@ export interface DeliveryItemPayload {
 export interface CreateDeliveryPayload {
   salesOrderId: number;
   warehouseId: number;
+  trackingCode?: string;
   items: DeliveryItemPayload[];
 }

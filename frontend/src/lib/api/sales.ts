@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import type {
-  Customer, CustomerListResponse, CreateCustomerPayload, UpdateCustomerPayload,
+  Customer, CustomerListResponse, CreateCustomerPayload, UpdateCustomerPayload, CustomerBalance,
   Quotation, QuotationListResponse, CreateQuotationPayload,
   SalesOrder, SalesOrderListResponse, CreateSalesOrderPayload,
   Delivery, DeliveryListResponse, CreateDeliveryPayload,
@@ -70,3 +70,9 @@ export const createDelivery = (data: CreateDeliveryPayload) =>
 
 export const markDelivered = (id: number) =>
   apiClient.post<Delivery>(`/sales/deliveries/${id}/deliver`);
+
+export const markDeliveryFailed = (id: number, failureReason?: string) =>
+  apiClient.patch<Delivery>(`/sales/deliveries/${id}/fail`, { failureReason });
+
+export const getCustomerBalance = (customerId: number) =>
+  apiClient.get<CustomerBalance>(`/sales/customers/${customerId}/balance`);
