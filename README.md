@@ -19,91 +19,185 @@ Production-ready Fullstack B2B Mini-ERP — NestJS · Next.js · PostgreSQL · P
 
 Trước khi bắt đầu, cần cài sẵn các phần mềm sau:
 
-| Phần mềm       | Phiên bản tối thiểu | Tải về                                      |
-|----------------|---------------------|---------------------------------------------|
-| Node.js        | >= 22               | https://nodejs.org                          |
+| Phần mềm       | Phiên bản tối thiểu | Tải về                                         |
+|----------------|---------------------|------------------------------------------------|
+| Node.js        | >= 22               | https://nodejs.org                             |
 | Docker Desktop | mới nhất            | https://www.docker.com/products/docker-desktop |
+| Git            | mới nhất            | https://git-scm.com                            |
 
-> Kiểm tra đã cài chưa:
-> ```bash
-> node -v      # phải >= v22.x.x
-> docker -v    # phải có output
-> ```
+Kiểm tra đã cài đúng chưa (chạy trong terminal):
+
+```powershell
+node -v     # phải in ra v22.x.x trở lên
+docker -v   # phải in ra Docker version ...
+git --version
+```
 
 ---
 
-## Hướng dẫn cài đặt cho máy mới
+## Hướng dẫn cài đặt cho máy mới (từng bước chi tiết)
 
-### Bước 1 — Clone project
+### Bước 1 — Mở Docker Desktop
 
-```bash
+**Quan trọng:** Docker Desktop phải đang **chạy** (không chỉ cài), biểu tượng Docker phải xuất hiện ở system tray (góc dưới bên phải màn hình Windows).
+
+Nếu chưa mở: tìm **Docker Desktop** trong Start Menu và mở lên, chờ đến khi icon Docker không còn loading.
+
+---
+
+### Bước 2 — Clone project
+
+```powershell
 git clone https://github.com/kendo2501/miniERP_electronic.git
 cd miniERP_electronic
 ```
 
-### Bước 2 — Cài dependencies
+---
+
+### Bước 3 — Cài dependencies
 
 Chạy 1 lệnh ở root, npm tự cài cho cả backend lẫn frontend:
 
-```bash
+```powershell
 npm install
 ```
 
-### Bước 3 — Tạo file cấu hình môi trường
+> Quá trình này mất 1–3 phút lần đầu.
 
+---
+
+### Bước 4 — Tạo file cấu hình môi trường
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item backend\.env.example backend\.env
+```
+
+**macOS / Linux:**
 ```bash
 cp backend/.env.example backend/.env
 ```
 
-File `backend/.env` đã có sẵn giá trị mặc định cho môi trường dev, **không cần chỉnh sửa gì** để chạy local.
+File `backend/.env` đã có sẵn giá trị mặc định cho môi trường dev — **không cần chỉnh sửa gì** để chạy local.
 
-### Bước 4 — Khởi động hạ tầng (Docker)
+---
 
-```bash
+### Bước 5 — Khởi động hạ tầng (Docker)
+
+```powershell
 npm run infra:up
 ```
 
-Lệnh này khởi động toàn bộ services: PostgreSQL, Redis, MinIO, Mailpit, PgAdmin.
+Lệnh này pull images (lần đầu) và khởi động: PostgreSQL · Redis · MinIO · Mailpit · PgAdmin.
 
-> Lần đầu chạy Docker sẽ pull images — có thể mất vài phút tùy tốc độ mạng.
+> **Lần đầu chạy** Docker sẽ tải images về — có thể mất 3–10 phút tùy tốc độ mạng.
 
-Kiểm tra services đã lên chưa:
+Kiểm tra tất cả containers đã lên và **healthy** chưa:
 
-```bash
+```powershell
 docker ps
 ```
 
-Phải thấy các container: `mini-erp-postgres`, `mini-erp-redis`, `mini-erp-minio`, `mini-erp-mailpit`, `mini-erp-pgadmin`.
+Chờ đến khi cột `STATUS` của `mini-erp-postgres` hiển thị `healthy` (không phải `starting`):
 
-### Bước 5 — Tạo bảng database (Migration)
+```
+CONTAINER ID   IMAGE              ...   STATUS
+xxxxxxxxxxxx   postgres:16-alpine ...   Up 30 seconds (healthy)   ← phải thấy (healthy)
+xxxxxxxxxxxx   redis:7-alpine     ...   Up 30 seconds (healthy)
+...
+```
 
-```bash
+> Nếu PostgreSQL vẫn `starting` sau 30 giây, chạy `docker ps` lại sau vài giây.
+
+---
+
+### Bước 6 — Tạo bảng database (Migration)
+
+**Chỉ chạy bước này sau khi `mini-erp-postgres` đã `healthy`.**
+
+```powershell
 npm run db:migrate
 ```
 
-### Bước 6 — Tạo dữ liệu mẫu (Seed)
+Prisma sẽ tạo toàn bộ bảng trong database `mini_erp`.
 
-```bash
+---
+
+### Bước 7 — Tạo dữ liệu mẫu (Seed)
+
+```powershell
 npm run db:seed
 ```
 
 Lệnh này tạo: 6 tài khoản người dùng, roles, permissions, sản phẩm mẫu, kho hàng, đơn hàng, hoá đơn...
 
-### Bước 7 — Chạy dự án
+---
 
-Mở **2 terminal riêng biệt**:
+### Bước 8 — Chạy dự án
+
+Mở **2 terminal riêng biệt** (cả 2 đều ở thư mục root của project):
 
 **Terminal 1 — Backend:**
-```bash
+```powershell
 npm run dev
 ```
 Backend chạy tại: http://localhost:3000
 
 **Terminal 2 — Frontend:**
-```bash
+```powershell
 npm run dev:fe
 ```
 Frontend chạy tại: http://localhost:3001
+
+---
+
+## Xử lý lỗi thường gặp khi cài máy mới
+
+### Lỗi: `P1000: Authentication failed` khi chạy `db:migrate`
+
+**Nguyên nhân:** Docker chưa chạy hoặc container PostgreSQL chưa healthy.
+
+**Cách fix:**
+1. Kiểm tra Docker Desktop đang mở
+2. Chạy `docker ps` — xem `mini-erp-postgres` có STATUS `healthy` chưa
+3. Nếu chưa có container nào, chạy lại: `npm run infra:up`
+4. Chờ healthy rồi mới chạy `npm run db:migrate`
+
+---
+
+### Lỗi: `address already in use` hoặc port conflict khi `infra:up`
+
+**Nguyên nhân:** Máy đang có PostgreSQL local hoặc dịch vụ khác chiếm port 5433.
+
+**Cách kiểm tra (PowerShell):**
+```powershell
+netstat -ano | findstr :5433
+netstat -ano | findstr :6379
+```
+
+Nếu có process lạ giữ port, dừng dịch vụ đó hoặc báo lại với team để chỉnh port trong `docker-compose.yml` và `backend/.env`.
+
+---
+
+### Lỗi: `Cannot find module` sau khi `npm install`
+
+```powershell
+npm run db:generate
+```
+
+Lệnh này tái tạo Prisma client. Chạy lại `npm run dev` sau đó.
+
+---
+
+### Reset hoàn toàn (khi muốn làm mới từ đầu)
+
+```powershell
+npm run infra:reset   # xoá toàn bộ Docker volumes (mất data)
+npm run infra:up      # khởi động lại
+# chờ postgres healthy
+npm run db:migrate
+npm run db:seed
+```
 
 ---
 
