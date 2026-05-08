@@ -47,6 +47,7 @@ export class JwtAuthGuard {
     }
 
     const perms = await this.getPermissions(payload.sub);
+    const linkedCustomerId = await this.getLinkedCustomerId(payload.sub);
 
     const authUser: AuthUser = {
       id: payload.sub,
@@ -56,6 +57,7 @@ export class JwtAuthGuard {
       sessionIdentifier: payload.sid,
       roles: perms.roles,
       permissions: perms.permissions,
+      linkedCustomerId,
     };
 
     request.user = authUser;
@@ -128,5 +130,13 @@ export class JwtAuthGuard {
     const data = { roles, permissions: Array.from(permSet) };
     await this.redis.setex(key, 300, JSON.stringify(data));
     return data;
+  }
+
+  private async getLinkedCustomerId(userId: number): Promise<number | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { linkedCustomerId: true },
+    });
+    return user?.linkedCustomerId ?? null;
   }
 }

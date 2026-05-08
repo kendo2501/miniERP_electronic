@@ -187,7 +187,7 @@ export default function DeliveriesPage() {
                         {d.deliveredAt ? new Date(d.deliveredAt).toLocaleDateString("vi-VN") : "—"}
                       </td>
                       <td className="px-6 py-3">
-                        {d.status === "PENDING" && (
+                        {canCreate && d.status === "PENDING" && (
                           <div className="flex items-center gap-1">
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
                               onClick={() => markMut.mutate(d.id)} disabled={markMut.isPending}>

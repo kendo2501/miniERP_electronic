@@ -221,8 +221,11 @@ export class SalesService {
     if (search) where.orderNumber = { contains: search, mode: 'insensitive' };
 
     const scope = this.resolveOrderScope(currentUser);
-    if (scope === 'own') return { items: [], total: 0, page, limit, totalPages: 0 };
-    if (scope === 'assigned') {
+    if (scope === 'own') {
+      const cid = currentUser?.linkedCustomerId;
+      if (!cid) return { items: [], total: 0, page, limit, totalPages: 0 };
+      where.customerId = cid;
+    } else if (scope === 'assigned') {
       const ids = await this.getAssignedCustomerIds(currentUser!.id);
       where.customerId = ids.length ? { in: ids } : { in: [] };
     } else {
@@ -311,8 +314,10 @@ export class SalesService {
 
     const perms = currentUser?.permissions ?? [];
     if (!perms.includes('sales.delivery.view')) {
-      // view_own: customer user has no linked customer entity — return empty
-      return { items: [], total: 0, page, limit, totalPages: 0 };
+      const cid = currentUser?.linkedCustomerId;
+      if (!cid) return { items: [], total: 0, page, limit, totalPages: 0 };
+      // Filter deliveries for the customer's own orders
+      where.salesOrder = { customerId: cid };
     }
 
     const [items, total] = await Promise.all([

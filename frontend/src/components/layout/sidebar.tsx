@@ -16,6 +16,7 @@ import {
   Bell,
   Settings,
   Languages,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { href: "/inventory",     labelKey: "inventory"    as const, icon: Package,         permission: "inventory.stock.view" },
   { href: "/customers",     labelKey: "customers"    as const, icon: UserRound,       permission: "customer.view_assigned" },
   { href: "/sales",         labelKey: "sales"        as const, icon: ShoppingCart,    permission: "sales.delivery.view" },
+  { href: "/my-orders",     labelKey: "myOrders"     as const, icon: ClipboardList,   permission: "sales.order.view_own" },
   { href: "/finance",       labelKey: "finance"      as const, icon: DollarSign,      permission: "finance.invoice.view" },
   { href: "/audit",         labelKey: "auditLog"     as const, icon: Shield,          permission: "audit.security.view" },
   { href: "/notifications", labelKey: "notifications"as const, icon: Bell,            permission: null },

@@ -90,6 +90,7 @@ const en = {
     notifications: "Notifications",
     settings: "Settings",
     users: "Users",
+    myOrders: "My Orders",
     switchLang: "Switch to Vietnamese",
   },
 
@@ -606,6 +607,7 @@ const vi: typeof en = {
     notifications: "Thông báo",
     settings: "Cài đặt",
     users: "Người dùng",
+    myOrders: "Đơn hàng của tôi",
     switchLang: "Chuyển sang tiếng Anh",
   },
 

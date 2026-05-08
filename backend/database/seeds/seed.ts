@@ -426,6 +426,12 @@ async function main() {
   const cust2 = custMap['CUST-002'].id;
   const cust3 = custMap['CUST-003'].id;
 
+  // Link customer portal user to CUST-001
+  await prisma.user.update({
+    where: { id: userMap['CUSTOMER'].id },
+    data: { linkedCustomerId: cust1 },
+  });
+
   // ── Settings ──────────────────────────────────────────
   const settingsToSeed = [
     { key: 'system.company_name',             value: 'Demo Organization', category: 'system',        valueType: 'string',  isSensitive: false, isReadonly: false },

@@ -22,6 +22,7 @@ model User {
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until")
   lastLoginAt         DateTime? @map("last_login_at")
+  linkedCustomerId    Int?      @unique @map("linked_customer_id")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at")
@@ -35,6 +36,7 @@ model User {
   notifications         Notification[]
   attachments           Attachment[]
   assignedCustomers     Customer[]             @relation("AssignedSales")
+  linkedCustomer        Customer?              @relation("CustomerUser", fields: [linkedCustomerId], references: [id])
   settingsUpdated       Setting[]
   generatedReports      GeneratedReport[]
   scheduledReports      ScheduledReport[]
@@ -177,6 +179,7 @@ model Customer {
 
   organization  Organization?            @relation(fields: [organizationId], references: [id])
   assignedSales User?                    @relation("AssignedSales", fields: [assignedSalesUserId], references: [id])
+  linkedUser    User?                    @relation("CustomerUser")
   quotations    Quotation[]
   salesOrders   SalesOrder[]
   invoices      Invoice[]

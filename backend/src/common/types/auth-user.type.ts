@@ -6,4 +6,5 @@ export interface AuthUser {
   sessionIdentifier: string;
   roles: string[];
   permissions: string[];
+  linkedCustomerId?: number | null;
 }
