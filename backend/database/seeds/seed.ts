@@ -132,7 +132,6 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'catalog.product.view', 'catalog.search',
     'inventory.stock.view', 'inventory.adjust.approve', 'inventory.transfer.approve', 'inventory.low_stock.view',
     'customer.view_assigned',
-    'sales.quotation.approve',
     'sales.order.view_team', 'sales.order.approve', 'sales.order.cancel_approve', 'sales.pricing.override_approve',
     'sales.delivery.view',
     'finance.invoice.view', 'finance.payment.view', 'finance.credit_limit.override_approve', 'finance.aging_report.view',
@@ -147,7 +146,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'inventory.stock.view', 'inventory.availability.check',
     'customer.view_assigned', 'customer.create', 'customer.update_assigned',
     'sales.quotation.create', 'sales.quotation.update_own',
-    'sales.order.create', 'sales.order.view_assigned', 'sales.order.cancel_request', 'sales.delivery.view',
+    'sales.order.view_assigned', 'sales.order.cancel_request', 'sales.delivery.view',
     'finance.invoice.view_assigned', 'finance.payment_status.view_assigned', 'finance.outstanding.view_assigned',
     'reporting.dashboard.view_self', 'reporting.sales_kpi.view_self', 'reporting.export_self',
     'notification.preferences.manage_self',
@@ -227,14 +226,12 @@ async function main() {
   for (const [roleCode, permCodes] of Object.entries(ROLE_PERMISSIONS)) {
     const role = createdRoles[roleCode];
     if (!role) continue;
+    // Full sync: delete existing then recreate to remove stale permissions
+    await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
     for (const permCode of permCodes) {
       const perm = await prisma.permission.findUnique({ where: { code: permCode } });
       if (!perm) continue;
-      await prisma.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId: role.id, permissionId: perm.id } },
-        update: {},
-        create: { roleId: role.id, permissionId: perm.id },
-      });
+      await prisma.rolePermission.create({ data: { roleId: role.id, permissionId: perm.id } });
     }
   }
 

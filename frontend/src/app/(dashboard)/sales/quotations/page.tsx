@@ -125,6 +125,7 @@ export default function QuotationsPage() {
   });
 
   const canCreate = hasPermission("sales.quotation.create");
+  const canApprove = hasPermission("sales.quotation.approve");
   const items = watch("items");
 
   function handleProductChange(idx: number, productId: string, product?: Product) {
@@ -243,7 +244,7 @@ export default function QuotationsPage() {
                                 <Send className="h-3 w-3" /> Gửi KH
                               </Button>
                             )}
-                            {(q.status === "DRAFT" || q.status === "SENT") && (
+                            {canApprove && (q.status === "DRAFT" || q.status === "SENT") && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
                                 onClick={() => confirmMut.mutate(q.id)} disabled={confirmMut.isPending}>
                                 <CheckCircle className="h-3 w-3" /> Tạo đơn
