@@ -146,7 +146,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'inventory.stock.view', 'inventory.availability.check',
     'customer.view_assigned', 'customer.create', 'customer.update_assigned',
     'sales.quotation.create', 'sales.quotation.update_own',
-    'sales.order.view_assigned', 'sales.order.cancel_request', 'sales.delivery.view',
+    'sales.order.create', 'sales.order.view_assigned', 'sales.order.cancel_request', 'sales.delivery.view',
     'finance.invoice.view_assigned', 'finance.payment_status.view_assigned', 'finance.outstanding.view_assigned',
     'reporting.dashboard.view_self', 'reporting.sales_kpi.view_self', 'reporting.export_self',
     'notification.preferences.manage_self',
