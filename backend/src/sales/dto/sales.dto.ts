@@ -73,6 +73,13 @@ export class MarkDeliveryFailedDto {
   @ApiPropertyOptional() @IsOptional() @IsString() failureReason?: string;
 }
 
+// ─── Counter Offer ────────────────────────────────────────────────────────
+
+export class SubmitCounterOfferDto {
+  @ApiProperty() @IsNumber() @Min(0) @Type(() => Number) proposedAmount!: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() note?: string;
+}
+
 export class DeliveryQueryDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) page?: number = 1;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) limit?: number = 20;

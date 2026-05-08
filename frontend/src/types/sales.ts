@@ -60,6 +60,7 @@ export interface UpdateCustomerPayload extends Partial<CreateCustomerPayload> {}
 // ─── Quotation ────────────────────────────────────────────────────────────────
 
 export type QuotationStatus = 'DRAFT' | 'SENT' | 'CONFIRMED' | 'CANCELLED';
+export type NegotiationStatus = 'NONE' | 'PROPOSED' | 'ACCEPTED' | 'REJECTED';
 
 export interface QuotationItem {
   id: number;
@@ -79,6 +80,10 @@ export interface Quotation {
   totalAmount: number;
   validUntil?: string;
   notes?: string;
+  negotiationStatus?: NegotiationStatus;
+  counterOfferAmount?: number;
+  counterOfferNote?: string;
+  counterOfferAt?: string;
   createdAt: string;
   updatedAt: string;
   customer: { id: number; companyName: string; customerCode: string };

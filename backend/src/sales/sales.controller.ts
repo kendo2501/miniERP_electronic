@@ -5,6 +5,7 @@ import {
   CreateQuotationDto, QuotationQueryDto,
   CreateSalesOrderDto, SalesOrderQueryDto,
   CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
+  SubmitCounterOfferDto,
 } from './dto/sales.dto';
 import { RequirePermissions, AnyPermission } from '../common/decorators/permissions.decorator';
 
@@ -33,6 +34,15 @@ export class SalesController {
 
   @Post('quotations/:id/cancel') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Cancel quotation' })
   cancelQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.cancelQuotation(id); }
+
+  @Post('quotations/:id/counter-offer') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Submit customer counter offer' })
+  submitCounterOffer(@Param('id', ParseIntPipe) id: number, @Body() dto: SubmitCounterOfferDto) { return this.service.submitCounterOffer(id, dto); }
+
+  @Post('quotations/:id/accept-offer') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Admin accepts counter offer → creates order' })
+  acceptCounterOffer(@Param('id', ParseIntPipe) id: number) { return this.service.acceptCounterOffer(id); }
+
+  @Post('quotations/:id/reject-offer') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Admin rejects counter offer' })
+  rejectCounterOffer(@Param('id', ParseIntPipe) id: number) { return this.service.rejectCounterOffer(id); }
 
   // ─── Sales Orders ─────────────────────────────────────────────────────────
 

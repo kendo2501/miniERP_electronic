@@ -43,6 +43,15 @@ export const confirmQuotation = (id: number) =>
 export const cancelQuotation = (id: number) =>
   apiClient.post<Quotation>(`/sales/quotations/${id}/cancel`);
 
+export const submitCounterOffer = (id: number, data: { proposedAmount: number; note?: string }) =>
+  apiClient.post<Quotation>(`/sales/quotations/${id}/counter-offer`, data);
+
+export const acceptCounterOffer = (id: number) =>
+  apiClient.post<SalesOrder>(`/sales/quotations/${id}/accept-offer`);
+
+export const rejectCounterOffer = (id: number) =>
+  apiClient.post<Quotation>(`/sales/quotations/${id}/reject-offer`);
+
 // ─── Sales Orders ─────────────────────────────────────────────────────────────
 
 export const listOrders = (params?: Record<string, unknown>) =>

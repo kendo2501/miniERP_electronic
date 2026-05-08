@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Trash2, Send, CheckCircle, XCircle, FileText } from "lucide-react";
+import { Search, Plus, Loader2, Trash2, Send, CheckCircle, XCircle, FileText, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   listQuotations, createQuotation, sendQuotation, confirmQuotation, cancelQuotation, listCustomers,
+  submitCounterOffer, acceptCounterOffer, rejectCounterOffer,
 } from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
@@ -59,6 +60,9 @@ export default function QuotationsPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [counterOfferTarget, setCounterOfferTarget] = useState<{ id: number; original: number } | null>(null);
+  const [counterAmount, setCounterAmount] = useState("");
+  const [counterNote, setCounterNote] = useState("");
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
@@ -124,8 +128,38 @@ export default function QuotationsPage() {
     onError: () => toast.error("Hủy báo giá thất bại"),
   });
 
+  const counterOfferMut = useMutation({
+    mutationFn: ({ id, proposedAmount, note }: { id: number; proposedAmount: number; note?: string }) =>
+      submitCounterOffer(id, { proposedAmount, note }),
+    onSuccess: () => {
+      toast.success("Đã ghi nhận đề xuất giá — chờ Admin xác nhận");
+      qc.invalidateQueries({ queryKey: ["quotations"] });
+      setCounterOfferTarget(null);
+      setCounterAmount("");
+      setCounterNote("");
+    },
+    onError: () => toast.error("Gửi đề xuất giá thất bại"),
+  });
+
+  const acceptOfferMut = useMutation({
+    mutationFn: (id: number) => acceptCounterOffer(id),
+    onSuccess: () => {
+      toast.success("Đã chấp nhận giá đề xuất → Tạo đơn hàng thành công");
+      qc.invalidateQueries({ queryKey: ["quotations"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+    },
+    onError: () => toast.error("Chấp nhận giá thất bại"),
+  });
+
+  const rejectOfferMut = useMutation({
+    mutationFn: (id: number) => rejectCounterOffer(id),
+    onSuccess: () => { toast.success("Đã từ chối giá đề xuất"); qc.invalidateQueries({ queryKey: ["quotations"] }); },
+    onError: () => toast.error("Từ chối giá thất bại"),
+  });
+
   const canCreate = hasPermission("sales.quotation.create");
   const canApprove = hasPermission("sales.quotation.approve");
+  const canUpdateOwn = hasPermission("sales.quotation.update_own");
   const items = watch("items");
 
   function handleProductChange(idx: number, productId: string, product?: Product) {
@@ -217,9 +251,26 @@ export default function QuotationsPage() {
                           <div className="text-xs text-muted-foreground">{q.customer.customerCode}</div>
                         </td>
                         <td className="px-6 py-3">
-                          <Badge variant={STATUS_VARIANTS[q.status]} className={STATUS_COLORS[q.status]}>
-                            {STATUS_LABELS[q.status]}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={STATUS_VARIANTS[q.status]} className={STATUS_COLORS[q.status]}>
+                              {STATUS_LABELS[q.status]}
+                            </Badge>
+                            {q.negotiationStatus === "PROPOSED" && (
+                              <Badge variant="secondary" className="text-xs text-purple-700 bg-purple-50 border border-purple-200 w-fit">
+                                💬 Đề xuất: {vnd(Number(q.counterOfferAmount))}
+                              </Badge>
+                            )}
+                            {q.negotiationStatus === "ACCEPTED" && (
+                              <Badge variant="secondary" className="text-xs text-green-700 bg-green-50 border border-green-200 w-fit">
+                                ✓ Giá đã duyệt
+                              </Badge>
+                            )}
+                            {q.negotiationStatus === "REJECTED" && (
+                              <Badge variant="secondary" className="text-xs text-orange-700 bg-orange-50 border border-orange-200 w-fit">
+                                ✗ Giá bị từ chối
+                              </Badge>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-3 text-right font-semibold tabular-nums">
                           {vnd(Number(q.totalAmount))}
@@ -244,7 +295,28 @@ export default function QuotationsPage() {
                                 <Send className="h-3 w-3" /> Gửi KH
                               </Button>
                             )}
-                            {canApprove && (q.status === "DRAFT" || q.status === "SENT") && (
+                            {/* Sales: submit counter offer when SENT and no pending offer */}
+                            {canUpdateOwn && q.status === "SENT" && (!q.negotiationStatus || q.negotiationStatus === "NONE" || q.negotiationStatus === "REJECTED") && (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-purple-600 hover:text-purple-700"
+                                onClick={() => { setCounterOfferTarget({ id: q.id, original: Number(q.totalAmount) }); setCounterAmount(String(q.totalAmount)); setCounterNote(""); }}>
+                                <MessageSquare className="h-3 w-3" /> Đề xuất giá
+                              </Button>
+                            )}
+                            {/* Admin: accept or reject pending counter offer */}
+                            {canApprove && q.negotiationStatus === "PROPOSED" && (
+                              <>
+                                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
+                                  onClick={() => acceptOfferMut.mutate(q.id)} disabled={acceptOfferMut.isPending}>
+                                  <CheckCircle className="h-3 w-3" /> Chấp nhận giá
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                                  onClick={() => rejectOfferMut.mutate(q.id)} disabled={rejectOfferMut.isPending}>
+                                  <XCircle className="h-3 w-3" /> Từ chối
+                                </Button>
+                              </>
+                            )}
+                            {/* Admin: confirm at original price (only when no pending offer) */}
+                            {canApprove && (q.status === "DRAFT" || q.status === "SENT") && q.negotiationStatus !== "PROPOSED" && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
                                 onClick={() => confirmMut.mutate(q.id)} disabled={confirmMut.isPending}>
                                 <CheckCircle className="h-3 w-3" /> Tạo đơn
@@ -280,6 +352,51 @@ export default function QuotationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Counter Offer Dialog */}
+      <Dialog open={!!counterOfferTarget} onOpenChange={(v) => { if (!v) { setCounterOfferTarget(null); setCounterAmount(""); setCounterNote(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Nhập giá đề xuất của khách hàng</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            {counterOfferTarget && (
+              <p className="text-sm text-muted-foreground">
+                Giá gốc: <span className="font-semibold text-foreground">{vnd(counterOfferTarget.original)}</span>
+              </p>
+            )}
+            <div className="space-y-1.5">
+              <Label>Giá đề xuất (₫) *</Label>
+              <Input
+                type="number" min="0" step="1000"
+                value={counterAmount}
+                onChange={(e) => setCounterAmount(e.target.value)}
+                placeholder="Nhập số tiền khách đề xuất..."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ghi chú</Label>
+              <Input
+                value={counterNote}
+                onChange={(e) => setCounterNote(e.target.value)}
+                placeholder="Lý do / điều kiện khách hàng..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCounterOfferTarget(null); setCounterAmount(""); setCounterNote(""); }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              disabled={!counterAmount || Number(counterAmount) <= 0 || counterOfferMut.isPending}
+              onClick={() => {
+                if (!counterOfferTarget) return;
+                counterOfferMut.mutate({ id: counterOfferTarget.id, proposedAmount: Number(counterAmount), note: counterNote || undefined });
+              }}>
+              {counterOfferMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Gửi đề xuất
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog */}
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] }); }}>

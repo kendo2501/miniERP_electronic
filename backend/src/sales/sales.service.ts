@@ -5,11 +5,13 @@ import {
   CreateQuotationDto, QuotationQueryDto,
   CreateSalesOrderDto, SalesOrderQueryDto,
   CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
+  SubmitCounterOfferDto,
 } from './dto/sales.dto';
 
 const QUOTATION_SELECT = {
   id: true, quotationNumber: true, status: true, subtotal: true,
   taxAmount: true, totalAmount: true, validUntil: true, notes: true,
+  negotiationStatus: true, counterOfferAmount: true, counterOfferNote: true, counterOfferAt: true,
   createdAt: true, updatedAt: true,
   customer: { select: { id: true, companyName: true, customerCode: true } },
   items: {
@@ -53,6 +55,7 @@ export class SalesService {
         where, skip, take: limit, orderBy: { createdAt: 'desc' },
         select: {
           id: true, quotationNumber: true, status: true, totalAmount: true, validUntil: true, createdAt: true,
+          negotiationStatus: true, counterOfferAmount: true, counterOfferNote: true,
           customer: { select: { id: true, companyName: true, customerCode: true } },
           _count: { select: { items: true } },
         },
@@ -141,6 +144,71 @@ export class SalesService {
     const q = await this.getQuotation(id);
     if (q.status === 'CANCELLED') throw new BadRequestException('Quotation already cancelled');
     return this.prisma.quotation.update({ where: { id }, data: { status: 'CANCELLED' }, select: QUOTATION_SELECT });
+  }
+
+  async submitCounterOffer(id: number, dto: SubmitCounterOfferDto) {
+    const q = await this.getQuotation(id);
+    if (!['DRAFT', 'SENT'].includes(q.status ?? '')) throw new BadRequestException('Counter offer only allowed on DRAFT or SENT quotations');
+    return this.prisma.quotation.update({
+      where: { id },
+      data: {
+        negotiationStatus: 'PROPOSED',
+        counterOfferAmount: dto.proposedAmount,
+        counterOfferNote: dto.note ?? null,
+        counterOfferAt: new Date(),
+      },
+      select: QUOTATION_SELECT,
+    });
+  }
+
+  async acceptCounterOffer(id: number) {
+    const q = await this.getQuotation(id);
+    if ((q as any).negotiationStatus !== 'PROPOSED') throw new BadRequestException('No pending counter offer to accept');
+
+    const orderNumber = await this.generateOrderNumber();
+    const acceptedTotal = (q as any).counterOfferAmount;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.quotation.update({
+        where: { id },
+        data: { status: 'CONFIRMED', negotiationStatus: 'ACCEPTED' },
+      });
+      return tx.salesOrder.create({
+        data: {
+          orderNumber,
+          customerId: (q as any).customer.id,
+          quotationId: id,
+          status: 'CONFIRMED',
+          subtotal: acceptedTotal,
+          taxAmount: 0,
+          totalAmount: acceptedTotal,
+          orderedAt: new Date(),
+          confirmedAt: new Date(),
+          notes: `Giá được xác nhận theo đề xuất: ${acceptedTotal}`,
+          items: {
+            create: q.items.map((i) => ({
+              productId: i.product.id,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discountAmount: i.discountAmount,
+              totalAmount: i.totalAmount,
+              deliveredQuantity: 0,
+            })),
+          },
+        },
+        select: ORDER_SELECT,
+      });
+    });
+  }
+
+  async rejectCounterOffer(id: number) {
+    const q = await this.getQuotation(id);
+    if ((q as any).negotiationStatus !== 'PROPOSED') throw new BadRequestException('No pending counter offer to reject');
+    return this.prisma.quotation.update({
+      where: { id },
+      data: { negotiationStatus: 'REJECTED' },
+      select: QUOTATION_SELECT,
+    });
   }
 
   // ─── Sales Orders ─────────────────────────────────────────────────────────
