@@ -141,13 +141,13 @@ Mở **2 terminal riêng biệt** (cả 2 đều ở thư mục root của proje
 ```powershell
 npm run dev
 ```
-Backend chạy tại: http://localhost:3000
+Backend chạy tại: http://localhost:3001
 
 **Terminal 2 — Frontend:**
 ```powershell
 npm run dev:fe
 ```
-Frontend chạy tại: http://localhost:3001
+Frontend chạy tại: http://localhost:3000
 
 ---
 
@@ -275,9 +275,9 @@ Quyền hạn: xem & điều chỉnh tồn kho, chuyển kho, duyệt điều ch
 
 | Service    | URL                              | Tài khoản                        |
 |------------|----------------------------------|----------------------------------|
-| Frontend   | http://localhost:3001            | Xem bảng tài khoản ở trên        |
-| Backend API| http://localhost:3000            | —                                |
-| Swagger    | http://localhost:3000/api/docs   | —                                |
+| Frontend   | http://localhost:3000            | Xem bảng tài khoản ở trên        |
+| Backend API| http://localhost:3001            | —                                |
+| Swagger    | http://localhost:3001/api/docs   | —                                |
 | PgAdmin    | http://localhost:5050            | admin@example.com / admin        |
 | MinIO      | http://localhost:9001            | minioadmin / minioadmin          |
 | Mailpit    | http://localhost:8025            | —                                |
@@ -317,9 +317,9 @@ npm run lint
 ## Health Check API
 
 ```
-GET http://localhost:3000/health        # kiểm tra bộ nhớ
-GET http://localhost:3000/health/db     # kiểm tra kết nối PostgreSQL
-GET http://localhost:3000/health/redis  # kiểm tra kết nối Redis
+GET http://localhost:3001/health        # kiểm tra bộ nhớ
+GET http://localhost:3001/health/db     # kiểm tra kết nối PostgreSQL
+GET http://localhost:3001/health/redis  # kiểm tra kết nối Redis
 ```
 
 ---
