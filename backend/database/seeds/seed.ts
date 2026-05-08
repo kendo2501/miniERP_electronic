@@ -102,6 +102,8 @@ const PERMISSIONS = [
   { code: 'users.team.performance.view',       description: 'View team performance' },
   { code: 'reporting.dashboard.view_finance',  description: 'View finance/accountant dashboard' },
   { code: 'reporting.dashboard.view_warehouse',description: 'View warehouse dashboard' },
+  { code: 'inventory.stock.request',          description: 'Create stock availability requests' },
+  { code: 'inventory.stock.respond',          description: 'Respond to stock availability requests' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -147,6 +149,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'customer.view_assigned', 'customer.create', 'customer.update_assigned',
     'sales.quotation.create', 'sales.quotation.update_own',
     'sales.order.create', 'sales.order.view_assigned', 'sales.order.cancel_request', 'sales.delivery.view',
+    'inventory.stock.request',
     'finance.invoice.view_assigned', 'finance.payment_status.view_assigned', 'finance.outstanding.view_assigned',
     'reporting.dashboard.view_self', 'reporting.sales_kpi.view_self', 'reporting.export_self',
     'notification.preferences.manage_self',
@@ -177,6 +180,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'inventory.stock.view', 'inventory.adjust', 'inventory.adjust.approve',
     'inventory.transfer', 'inventory.transfer.approve', 'inventory.warehouse.manage',
     'inventory.availability.check', 'inventory.low_stock.view',
+    'inventory.stock.respond',
     'sales.delivery.view',
     'reporting.dashboard.view_warehouse', 'reporting.kpi.view',
     'notification.preferences.manage_self',
@@ -319,17 +323,17 @@ async function main() {
 
   // ── Products ──────────────────────────────────────────
   const productsData = [
-    { sku: 'IPH-15-PRO',  productName: 'iPhone 15 Pro',   categoryId: catPhones.id,  brandId: brandMap['APPLE'].id,   standardPrice: 999.00,  unit: 'Unit', description: 'Apple iPhone 15 Pro 256GB Titanium' },
-    { sku: 'SAM-S24',     productName: 'Samsung Galaxy S24', categoryId: catPhones.id, brandId: brandMap['SAMSUNG'].id, standardPrice: 899.00, unit: 'Unit', description: 'Samsung Galaxy S24 128GB' },
-    { sku: 'MBP-14',      productName: 'MacBook Pro 14"', categoryId: catLaptops.id, brandId: brandMap['APPLE'].id,   standardPrice: 1999.00, unit: 'Unit', description: 'Apple MacBook Pro 14" M3 Pro 18GB' },
-    { sku: 'DXP-15',      productName: 'Dell XPS 15',     categoryId: catLaptops.id, brandId: brandMap['DELL'].id,    standardPrice: 1499.00, unit: 'Unit', description: 'Dell XPS 15 Intel Core i7 RTX 4060' },
-    { sku: 'SAM-TAB-S9',  productName: 'Samsung Tab S9',  categoryId: catTablets.id, brandId: brandMap['SAMSUNG'].id, standardPrice: 699.00,  unit: 'Unit', description: 'Samsung Galaxy Tab S9 256GB WiFi' },
+    { sku: 'IPH-15-PRO',  productName: 'iPhone 15 Pro',   categoryId: catPhones.id,  brandId: brandMap['APPLE'].id,   standardPrice: 999.00,  minPrice: 850.00,  unit: 'Unit', description: 'Apple iPhone 15 Pro 256GB Titanium' },
+    { sku: 'SAM-S24',     productName: 'Samsung Galaxy S24', categoryId: catPhones.id, brandId: brandMap['SAMSUNG'].id, standardPrice: 899.00, minPrice: 750.00, unit: 'Unit', description: 'Samsung Galaxy S24 128GB' },
+    { sku: 'MBP-14',      productName: 'MacBook Pro 14"', categoryId: catLaptops.id, brandId: brandMap['APPLE'].id,   standardPrice: 1999.00, minPrice: 1750.00, unit: 'Unit', description: 'Apple MacBook Pro 14" M3 Pro 18GB' },
+    { sku: 'DXP-15',      productName: 'Dell XPS 15',     categoryId: catLaptops.id, brandId: brandMap['DELL'].id,    standardPrice: 1499.00, minPrice: 1300.00, unit: 'Unit', description: 'Dell XPS 15 Intel Core i7 RTX 4060' },
+    { sku: 'SAM-TAB-S9',  productName: 'Samsung Tab S9',  categoryId: catTablets.id, brandId: brandMap['SAMSUNG'].id, standardPrice: 699.00,  minPrice: 600.00,  unit: 'Unit', description: 'Samsung Galaxy Tab S9 256GB WiFi' },
   ];
   const productMap: Record<string, { id: number }> = {};
   for (const p of productsData) {
     productMap[p.sku] = await prisma.product.upsert({
       where: { sku: p.sku },
-      update: { productName: p.productName, standardPrice: p.standardPrice },
+      update: { productName: p.productName, standardPrice: p.standardPrice, minPrice: (p as any).minPrice },
       create: { ...p, isActive: true },
     });
   }

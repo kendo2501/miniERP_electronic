@@ -83,5 +83,21 @@ export const markDelivered = (id: number) =>
 export const markDeliveryFailed = (id: number, failureReason?: string) =>
   apiClient.patch<Delivery>(`/sales/deliveries/${id}/fail`, { failureReason });
 
+// ─── Stock Inquiries ──────────────────────────────────────────────────────────
+
+export const listStockInquiries = (params?: Record<string, unknown>) =>
+  apiClient.get<any>('/stock-inquiries', { params });
+
+export const getStockInquiry = (id: number) =>
+  apiClient.get<any>(`/stock-inquiries/${id}`);
+
+export const createStockInquiry = (data: { notes?: string; items: { productId: number; requestedQuantity: number }[] }) =>
+  apiClient.post<any>('/stock-inquiries', data);
+
+export const respondToInquiry = (id: number, data: {
+  responseNotes?: string;
+  items: { itemId: number; isAvailable: boolean; availableQuantity?: number; warehouseNote?: string }[];
+}) => apiClient.post<any>(`/stock-inquiries/${id}/respond`, data);
+
 export const getCustomerBalance = (customerId: number) =>
   apiClient.get<CustomerBalance>(`/sales/customers/${customerId}/balance`);

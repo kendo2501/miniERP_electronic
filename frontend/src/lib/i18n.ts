@@ -91,6 +91,7 @@ const en = {
     settings: "Settings",
     users: "Users",
     myOrders: "My Orders",
+    stockInquiries: "Stock Check",
     switchLang: "Switch to Vietnamese",
   },
 
@@ -608,6 +609,7 @@ const vi: typeof en = {
     settings: "Cài đặt",
     users: "Người dùng",
     myOrders: "Đơn hàng của tôi",
+    stockInquiries: "Kiểm tra kho",
     switchLang: "Chuyển sang tiếng Anh",
   },
 

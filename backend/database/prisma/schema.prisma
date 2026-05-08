@@ -35,9 +35,11 @@ model User {
   auditLogs             AuditLog[]
   notifications         Notification[]
   attachments           Attachment[]
-  assignedCustomers     Customer[]             @relation("AssignedSales")
-  linkedCustomer        Customer?              @relation("CustomerUser", fields: [linkedCustomerId], references: [id])
-  settingsUpdated       Setting[]
+  assignedCustomers         Customer[]             @relation("AssignedSales")
+  linkedCustomer            Customer?              @relation("CustomerUser", fields: [linkedCustomerId], references: [id])
+  stockInquiriesRequested   StockInquiry[]         @relation("InquiryRequester")
+  stockInquiriesResponded   StockInquiry[]         @relation("InquiryResponder")
+  settingsUpdated           Setting[]
   generatedReports      GeneratedReport[]
   scheduledReports      ScheduledReport[]
 
@@ -231,6 +233,7 @@ model Product {
   description   String?   @db.Text
   unit          String?   @db.VarChar(50)
   standardPrice Decimal?  @map("standard_price") @db.Decimal(18, 2)
+  minPrice      Decimal?  @map("min_price") @db.Decimal(18, 2)
   weight        Decimal?  @db.Decimal(18, 2)
   isActive      Boolean   @default(true) @map("is_active")
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -245,6 +248,7 @@ model Product {
   quotationItems        QuotationItem[]
   salesOrderItems       SalesOrderItem[]
   deliveryItems         DeliveryItem[]
+  stockInquiryItems     StockInquiryItem[]
 
   @@index([sku])
   @@map("products")
@@ -673,4 +677,39 @@ model ScheduledReport {
   creator User? @relation(fields: [createdBy], references: [id])
 
   @@map("scheduled_reports")
+}
+
+model StockInquiry {
+  id              Int       @id @default(autoincrement())
+  inquiryNumber   String    @unique @map("inquiry_number") @db.VarChar(100)
+  requestedById   Int       @map("requested_by_id")
+  status          String    @default("PENDING") @db.VarChar(20)
+  notes           String?   @db.Text
+  responseNotes   String?   @map("response_notes") @db.Text
+  respondedById   Int?      @map("responded_by_id")
+  respondedAt     DateTime? @map("responded_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  requestedBy User               @relation("InquiryRequester", fields: [requestedById], references: [id])
+  respondedBy User?              @relation("InquiryResponder", fields: [respondedById], references: [id])
+  items       StockInquiryItem[]
+
+  @@index([requestedById])
+  @@map("stock_inquiries")
+}
+
+model StockInquiryItem {
+  id                Int      @id @default(autoincrement())
+  inquiryId         Int      @map("inquiry_id")
+  productId         Int      @map("product_id")
+  requestedQuantity Decimal  @map("requested_quantity") @db.Decimal(18, 2)
+  availableQuantity Decimal? @map("available_quantity") @db.Decimal(18, 2)
+  isAvailable       Boolean?
+  warehouseNote     String?  @map("warehouse_note") @db.Text
+
+  inquiry StockInquiry @relation(fields: [inquiryId], references: [id])
+  product Product      @relation(fields: [productId], references: [id])
+
+  @@map("stock_inquiry_items")
 }

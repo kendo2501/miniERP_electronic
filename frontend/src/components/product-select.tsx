@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, ChevronDown, X } from "lucide-react";
 import { listProducts } from "@/lib/api/catalog";
 import type { Product } from "@/types/catalog";
+import { vnd } from "@/lib/format";
 
 interface Props {
   value?: string;
@@ -78,6 +79,7 @@ export function ProductSelect({ value, onChange, placeholder = "Nhập SKU hoặ
             <span className="font-mono text-xs text-blue-600 shrink-0 bg-blue-50 px-1 rounded">{selected.sku}</span>
             <span className="truncate text-sm">{selected.productName}</span>
             {selected.unit && <span className="text-xs text-muted-foreground shrink-0">/{selected.unit}</span>}
+            {selected.minPrice && <span className="text-xs text-orange-600 shrink-0">min {vnd(selected.minPrice)}</span>}
           </span>
         ) : (
           <span className="text-muted-foreground text-sm">{placeholder}</span>
@@ -132,6 +134,7 @@ export function ProductSelect({ value, onChange, placeholder = "Nhập SKU hoặ
                     {highlight(p.productName, search)}
                   </span>
                   {p.unit && <span className="text-xs text-muted-foreground shrink-0">{p.unit}</span>}
+                  {p.minPrice && <span className="text-xs text-orange-600 shrink-0 font-medium">min {vnd(p.minPrice)}</span>}
                 </li>
               ))
             )}

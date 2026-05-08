@@ -22,6 +22,7 @@ export interface Product {
   description?: string;
   unit?: string;
   standardPrice?: number;
+  minPrice?: number;
   weight?: number;
   isActive: boolean;
   imageUrls?: string[];

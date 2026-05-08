@@ -16,6 +16,7 @@ import { AuditModule } from './audit/audit.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
 import { ReportingModule } from './reporting/reporting.module';
+import { StockInquiryModule } from './stock-inquiry/stock-inquiry.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -44,6 +45,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     NotificationsModule,
     SettingsModule,
     ReportingModule,
+    StockInquiryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

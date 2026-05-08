@@ -117,7 +117,7 @@ export class CatalogService {
         orderBy: { [sortBy]: sortOrder },
         select: {
           id: true, sku: true, productName: true, unit: true,
-          standardPrice: true, isActive: true, createdAt: true,
+          standardPrice: true, minPrice: true, isActive: true, createdAt: true,
           category: { select: { id: true, name: true } },
           brand: { select: { id: true, name: true } },
           images: { select: { imageUrl: true, sortOrder: true }, orderBy: { sortOrder: 'asc' }, take: 1 },
@@ -161,6 +161,7 @@ export class CatalogService {
       data: {
         ...data,
         standardPrice: data.standardPrice ? data.standardPrice : undefined,
+        minPrice: data.minPrice ? data.minPrice : undefined,
         weight: data.weight ? data.weight : undefined,
         ...(imageUrls?.length
           ? { images: { create: imageUrls.map((url, i) => ({ imageUrl: url, sortOrder: i })) } }
@@ -184,6 +185,7 @@ export class CatalogService {
       data: {
         ...data,
         standardPrice: data.standardPrice ? data.standardPrice : undefined,
+        minPrice: data.minPrice ? data.minPrice : undefined,
         weight: data.weight ? data.weight : undefined,
       },
       include: {

@@ -32,6 +32,11 @@ export class CreateProductDto {
   @IsDecimal()
   standardPrice?: string;
 
+  @ApiPropertyOptional({ type: String, example: '80.00' })
+  @IsOptional()
+  @IsDecimal()
+  minPrice?: string;
+
   @ApiPropertyOptional({ type: String, example: '0.5' })
   @IsOptional()
   @IsDecimal()
