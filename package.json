@@ -16,10 +16,11 @@
     "db:migrate": "npm run db:migrate -w @mini-erp/backend",
     "db:generate": "npm run db:generate -w @mini-erp/backend",
     "db:seed": "npm run db:seed -w @mini-erp/backend",
-    "infra:up": "docker compose --env-file backend/.env up -d",
+    "infra:up": "docker compose --env-file backend/.env up -d --wait",
     "infra:down": "docker compose --env-file backend/.env down",
     "infra:logs": "docker compose --env-file backend/.env logs -f",
-    "infra:reset": "docker compose --env-file backend/.env down -v",
+    "infra:reset": "docker compose --env-file backend/.env down -v && docker compose --env-file backend/.env up -d --wait",
+    "infra:fresh": "npm run infra:reset && npm run db:migrate && npm run db:seed",
     "setup": "npm install && npm run infra:up && npm run db:migrate && npm run db:seed"
   },
   "devDependencies": {
