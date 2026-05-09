@@ -1,10 +1,14 @@
 {
   "name": "mini-erp",
   "private": true,
-  "workspaces": ["backend", "frontend"],
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
     "dev": "npm run dev -w @mini-erp/backend",
     "dev:fe": "npm run dev -w @mini-erp/frontend",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:fe\"",
     "build": "npm run build -w @mini-erp/backend",
     "build:fe": "npm run build -w @mini-erp/frontend",
     "lint": "npm run lint -w @mini-erp/backend",
@@ -15,9 +19,12 @@
     "infra:up": "docker compose --env-file backend/.env up -d",
     "infra:down": "docker compose --env-file backend/.env down",
     "infra:logs": "docker compose --env-file backend/.env logs -f",
-    "infra:reset": "docker compose --env-file backend/.env down -v"
+    "infra:reset": "docker compose --env-file backend/.env down -v",
+    "setup": "npm install && npm run infra:up && npm run db:migrate && npm run db:seed"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
   "engines": {
     "node": ">=22"
   }

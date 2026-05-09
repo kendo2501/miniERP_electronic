@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { AuthGuard } from "@/components/layout/auth-guard";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { PageTransition } from "@/components/layout/page-transition";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,7 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <NotificationBell />
           </header>
           <main className="flex-1 overflow-y-auto bg-background p-8">
-            {children}
+            <PageTransition>{children}</PageTransition>
           </main>
         </div>
       </div>

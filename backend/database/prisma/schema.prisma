@@ -187,9 +187,113 @@ model Customer {
   invoices      Invoice[]
   payments      Payment[]
   arLedger      AccountsReceivableLedger[]
+  addresses     CustomerAddress[]
+  priceLists    PriceList[]
 
   @@index([organizationId])
   @@map("customers")
+}
+
+model CustomerAddress {
+  id         Int     @id @default(autoincrement())
+  customerId Int     @map("customer_id")
+  label      String? @db.VarChar(100)
+  address    String  @db.Text
+  isDefault  Boolean @default(false) @map("is_default")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("customer_addresses")
+}
+
+// ============================================================
+// SUPPLIER & PURCHASE
+// ============================================================
+
+model Supplier {
+  id           Int       @id @default(autoincrement())
+  supplierCode String?   @unique @map("supplier_code") @db.VarChar(100)
+  companyName  String    @map("company_name") @db.VarChar(255)
+  contactName  String?   @map("contact_name") @db.VarChar(255)
+  phone        String?   @db.VarChar(50)
+  email        String?   @db.VarChar(255)
+  address      String?   @db.Text
+  taxCode      String?   @map("tax_code") @db.VarChar(100)
+  rating       Int?      @default(0)
+  status       String?   @db.VarChar(50)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  purchaseOrders   PurchaseOrder[]
+  apLedger         AccountsPayableLedger[]
+  supplierPayments SupplierPayment[]
+
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id          Int       @id @default(autoincrement())
+  poNumber    String    @unique @map("po_number") @db.VarChar(100)
+  supplierId  Int       @map("supplier_id")
+  status      String?   @db.VarChar(50)
+  totalAmount Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  notes       String?   @db.Text
+  expectedAt  DateTime? @map("expected_at") @db.Date
+  createdBy   Int?      @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  supplier Supplier           @relation(fields: [supplierId], references: [id])
+  items    PurchaseOrderItem[]
+  receipts GoodsReceipt[]
+
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               Int     @id @default(autoincrement())
+  purchaseOrderId  Int     @map("purchase_order_id")
+  productId        Int     @map("product_id")
+  quantity         Decimal @db.Decimal(18, 2)
+  receivedQuantity Decimal @default(0) @map("received_quantity") @db.Decimal(18, 2)
+  unitPrice        Decimal @map("unit_price") @db.Decimal(18, 2)
+  totalAmount      Decimal @map("total_amount") @db.Decimal(18, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+model GoodsReceipt {
+  id              Int       @id @default(autoincrement())
+  grnNumber       String    @unique @map("grn_number") @db.VarChar(100)
+  purchaseOrderId Int?      @map("purchase_order_id")
+  warehouseId     Int?      @map("warehouse_id")
+  status          String?   @db.VarChar(50)
+  receivedAt      DateTime? @map("received_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  purchaseOrder PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  warehouse     Warehouse?       @relation(fields: [warehouseId], references: [id])
+  items         GoodsReceiptItem[]
+
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id             Int     @id @default(autoincrement())
+  goodsReceiptId Int     @map("goods_receipt_id")
+  productId      Int     @map("product_id")
+  quantity       Decimal @db.Decimal(18, 2)
+
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id])
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@map("goods_receipt_items")
 }
 
 // ============================================================
@@ -249,9 +353,70 @@ model Product {
   salesOrderItems       SalesOrderItem[]
   deliveryItems         DeliveryItem[]
   stockInquiryItems     StockInquiryItem[]
+  attributes            ProductAttribute[]
+  uomConversions        UomConversion[]
+  priceListItems        PriceListItem[]
+  purchaseOrderItems    PurchaseOrderItem[]
+  goodsReceiptItems     GoodsReceiptItem[]
+  stockCountItems       StockCountItem[]
+  salesReturnItems      SalesReturnItem[]
 
   @@index([sku])
   @@map("products")
+}
+
+model ProductAttribute {
+  id         Int    @id @default(autoincrement())
+  productId  Int    @map("product_id")
+  attrKey    String @map("attr_key") @db.VarChar(100)
+  attrValue  String @map("attr_value") @db.Text
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@map("product_attributes")
+}
+
+model UomConversion {
+  id             Int     @id @default(autoincrement())
+  productId      Int     @map("product_id")
+  fromUnit       String  @map("from_unit") @db.VarChar(50)
+  toUnit         String  @map("to_unit") @db.VarChar(50)
+  conversionRate Decimal @map("conversion_rate") @db.Decimal(18, 6)
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("uom_conversions")
+}
+
+model PriceList {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(255)
+  applyTo      String?   @map("apply_to") @db.VarChar(50)
+  customerTier String?   @map("customer_tier") @db.VarChar(50)
+  customerId   Int?      @map("customer_id")
+  validFrom    DateTime? @map("valid_from") @db.Date
+  validTo      DateTime? @map("valid_to") @db.Date
+  isDefault    Boolean   @default(false) @map("is_default")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  customer Customer?       @relation(fields: [customerId], references: [id])
+  items    PriceListItem[]
+
+  @@map("price_lists")
+}
+
+model PriceListItem {
+  id          Int     @id @default(autoincrement())
+  priceListId Int     @map("price_list_id")
+  productId   Int     @map("product_id")
+  unitPrice   Decimal @map("unit_price") @db.Decimal(18, 2)
+  minQuantity Decimal @default(1) @map("min_quantity") @db.Decimal(18, 2)
+
+  priceList PriceList @relation(fields: [priceListId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@map("price_list_items")
 }
 
 model ProductImage {
@@ -282,6 +447,8 @@ model Warehouse {
   inventoryStocks       InventoryStock[]
   inventoryTransactions InventoryTransaction[]
   deliveries            Delivery[]
+  goodsReceipts         GoodsReceipt[]
+  stockCounts           StockCount[]
 
   @@map("warehouses")
 }
@@ -323,6 +490,36 @@ model InventoryTransaction {
   @@index([productId])
   @@index([warehouseId])
   @@map("inventory_transactions")
+}
+
+model StockCount {
+  id          Int      @id @default(autoincrement())
+  countNumber String   @unique @map("count_number") @db.VarChar(100)
+  warehouseId Int      @map("warehouse_id")
+  status      String?  @db.VarChar(50)
+  createdBy   Int?     @map("created_by")
+  approvedBy  Int?     @map("approved_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  items     StockCountItem[]
+
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id              Int     @id @default(autoincrement())
+  stockCountId    Int     @map("stock_count_id")
+  productId       Int     @map("product_id")
+  systemQuantity  Decimal @map("system_quantity") @db.Decimal(18, 2)
+  countedQuantity Decimal @map("counted_quantity") @db.Decimal(18, 2)
+  difference      Decimal @db.Decimal(18, 2)
+
+  stockCount StockCount @relation(fields: [stockCountId], references: [id])
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@map("stock_count_items")
 }
 
 // ============================================================
@@ -386,11 +583,12 @@ model SalesOrder {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  customer   Customer         @relation(fields: [customerId], references: [id])
-  quotation  Quotation?       @relation(fields: [quotationId], references: [id])
-  items      SalesOrderItem[]
-  deliveries Delivery[]
-  invoices   Invoice[]
+  customer      Customer         @relation(fields: [customerId], references: [id])
+  quotation     Quotation?       @relation(fields: [quotationId], references: [id])
+  items         SalesOrderItem[]
+  deliveries    Delivery[]
+  invoices      Invoice[]
+  salesReturns  SalesReturn[]
 
   @@index([customerId])
   @@map("sales_orders")
@@ -441,6 +639,33 @@ model DeliveryItem {
   product  Product?  @relation(fields: [productId], references: [id])
 
   @@map("delivery_items")
+}
+
+model SalesReturn {
+  id           Int      @id @default(autoincrement())
+  returnNumber String   @unique @map("return_number") @db.VarChar(100)
+  salesOrderId Int      @map("sales_order_id")
+  reason       String?  @db.Text
+  status       String?  @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  salesOrder SalesOrder       @relation(fields: [salesOrderId], references: [id])
+  items      SalesReturnItem[]
+
+  @@map("sales_returns")
+}
+
+model SalesReturnItem {
+  id            Int     @id @default(autoincrement())
+  salesReturnId Int     @map("sales_return_id")
+  productId     Int     @map("product_id")
+  quantity      Decimal @db.Decimal(18, 2)
+
+  salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+
+  @@map("sales_return_items")
 }
 
 // ============================================================
@@ -517,6 +742,40 @@ model AccountsReceivableLedger {
 
   @@index([customerId])
   @@map("accounts_receivable_ledger")
+}
+
+model AccountsPayableLedger {
+  id              Int      @id @default(autoincrement())
+  supplierId      Int?     @map("supplier_id")
+  transactionType String   @map("transaction_type") @db.VarChar(100)
+  referenceType   String?  @map("reference_type") @db.VarChar(100)
+  referenceId     Int?     @map("reference_id")
+  debitAmount     Decimal  @default(0) @map("debit_amount") @db.Decimal(18, 2)
+  creditAmount    Decimal  @default(0) @map("credit_amount") @db.Decimal(18, 2)
+  balanceAfter    Decimal? @map("balance_after") @db.Decimal(18, 2)
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+  @@map("accounts_payable_ledger")
+}
+
+model SupplierPayment {
+  id              Int       @id @default(autoincrement())
+  paymentNumber   String    @unique @map("payment_number") @db.VarChar(100)
+  supplierId      Int?      @map("supplier_id")
+  totalAmount     Decimal   @map("total_amount") @db.Decimal(18, 2)
+  paymentDate     DateTime? @map("payment_date") @db.Date
+  referenceNumber String?   @map("reference_number") @db.VarChar(255)
+  status          String?   @db.VarChar(50)
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@map("supplier_payments")
 }
 
 // ============================================================
