@@ -13,10 +13,10 @@ const USERS = [
   { email: 'warehouse2@mini-erp.local', password: 'Warehouse@123456', fullName: 'Phạm Thị Mai',     roleCode: 'WAREHOUSE'  },
   // Accountant
   { email: 'accountant2@mini-erp.local', password: 'Accountant@123456', fullName: 'Hoàng Văn Nam',  roleCode: 'ACCOUNTANT' },
-  // Customer portal — linked to Digital Corp (CUST-002)
-  { email: 'digitalcorp@portal.local', password: 'Customer@123456',  fullName: 'Trần Thị Bích',     roleCode: 'CUSTOMER', linkCustomerCode: 'CUST-002' },
-  // Customer portal — linked to Smart Electronics (CUST-003)
-  { email: 'smartelec@portal.local',   password: 'Customer@123456',  fullName: 'Lê Văn Cường',      roleCode: 'CUSTOMER', linkCustomerCode: 'CUST-003' },
+  // Customer portal — linked to Điện Nhật Minh (CUST-002)
+  { email: 'nhatminh@portal.local', password: 'Customer@123456',  fullName: 'Trần Thị Bích',     roleCode: 'CUSTOMER', linkCustomerCode: 'CUST-002' },
+  // Customer portal — linked to Cơ Điện Phú Long (CUST-003)
+  { email: 'phulong@portal.local',  password: 'Customer@123456',  fullName: 'Lê Văn Cường',      roleCode: 'CUSTOMER', linkCustomerCode: 'CUST-003' },
 ];
 
 async function main() {

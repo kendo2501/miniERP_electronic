@@ -197,12 +197,12 @@ async function main() {
 
   // ── Organization ──────────────────────────────────────
   const org = await prisma.organization.upsert({
-    where: { code: 'DEMO_ORG' },
+    where: { code: 'MINHERP' },
     update: {},
     create: {
-      code: 'DEMO_ORG',
-      name: 'Demo Organization',
-      email: 'info@demo-org.com',
+      code: 'MINHERP',
+      name: 'Công ty TNHH Thiết Bị Điện Minh Phát',
+      email: 'info@minhphatelectric.vn',
       status: 'ACTIVE',
     },
   });
@@ -230,7 +230,6 @@ async function main() {
   for (const [roleCode, permCodes] of Object.entries(ROLE_PERMISSIONS)) {
     const role = createdRoles[roleCode];
     if (!role) continue;
-    // Full sync: delete existing then recreate to remove stale permissions
     await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
     for (const permCode of permCodes) {
       const perm = await prisma.permission.findUnique({ where: { code: permCode } });
@@ -239,14 +238,14 @@ async function main() {
     }
   }
 
-  // ── Users (4 roles) ───────────────────────────────────
+  // ── Users ─────────────────────────────────────────────
   const usersToSeed = [
-    { email: 'admin@mini-erp.local',      password: 'Admin@123456',      fullName: 'System Administrator', roleCode: 'ADMIN'      },
-    { email: 'manager@mini-erp.local',    password: 'Manager@123456',    fullName: 'Alice Manager',        roleCode: 'MANAGER'    },
-    { email: 'sales@mini-erp.local',      password: 'Sales@123456',      fullName: 'Bob Sales',            roleCode: 'SALES'      },
-    { email: 'customer@mini-erp.local',   password: 'Customer@123456',   fullName: 'Carol Customer',       roleCode: 'CUSTOMER'   },
-    { email: 'accountant@mini-erp.local', password: 'Accountant@123456', fullName: 'David Accountant',     roleCode: 'ACCOUNTANT' },
-    { email: 'warehouse@mini-erp.local',  password: 'Warehouse@123456',  fullName: 'Eve Warehouse',        roleCode: 'WAREHOUSE'  },
+    { email: 'admin@mini-erp.local',      password: 'Admin@123456',      fullName: 'Quản Trị Hệ Thống',   roleCode: 'ADMIN'      },
+    { email: 'manager@mini-erp.local',    password: 'Manager@123456',    fullName: 'Nguyễn Thị Hương',    roleCode: 'MANAGER'    },
+    { email: 'sales@mini-erp.local',      password: 'Sales@123456',      fullName: 'Trần Văn Bình',        roleCode: 'SALES'      },
+    { email: 'customer@mini-erp.local',   password: 'Customer@123456',   fullName: 'Lê Văn Thắng',         roleCode: 'CUSTOMER'   },
+    { email: 'accountant@mini-erp.local', password: 'Accountant@123456', fullName: 'Phạm Thị Lan',         roleCode: 'ACCOUNTANT' },
+    { email: 'warehouse@mini-erp.local',  password: 'Warehouse@123456',  fullName: 'Hoàng Văn Đức',        roleCode: 'WAREHOUSE'  },
   ];
 
   const userMap: Record<string, { id: number }> = {};
@@ -254,12 +253,7 @@ async function main() {
     const hash = await bcrypt.hash(u.password, 12);
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {
-        passwordHash: hash,
-        status: 'ACTIVE',
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-      },
+      update: { passwordHash: hash, status: 'ACTIVE', failedLoginAttempts: 0, lockedUntil: null },
       create: {
         organizationId: org.id,
         email: u.email,
@@ -281,59 +275,92 @@ async function main() {
     }
   }
 
-  const adminId   = userMap['ADMIN'].id;
-  const salesId   = userMap['SALES'].id;
+  const adminId = userMap['ADMIN'].id;
+  const salesId = userMap['SALES'].id;
 
   // ── Brands ────────────────────────────────────────────
   const brandsData = [
-    { code: 'APPLE',   name: 'Apple',   description: 'Apple Inc.' },
-    { code: 'SAMSUNG', name: 'Samsung', description: 'Samsung Electronics' },
-    { code: 'DELL',    name: 'Dell',    description: 'Dell Technologies' },
+    { code: 'SCHNEIDER', name: 'Schneider Electric', description: 'Thiết bị điện công nghiệp và dân dụng Pháp' },
+    { code: 'ABB',       name: 'ABB',               description: 'Thiết bị điện công nghiệp Thụy Điển' },
+    { code: 'SIEMENS',   name: 'Siemens',            description: 'Thiết bị điện & tự động hóa Đức' },
+    { code: 'CADIVI',    name: 'CADIVI',             description: 'Dây & cáp điện Việt Nam' },
+    { code: 'RANGDONG',  name: 'Rạng Đông',          description: 'Thiết bị chiếu sáng Việt Nam' },
   ];
   const brandMap: Record<string, { id: number }> = {};
   for (const b of brandsData) {
     brandMap[b.code] = await prisma.brand.upsert({
       where: { code: b.code },
-      update: { name: b.name },
+      update: { name: b.name, description: b.description },
       create: b,
     });
   }
 
   // ── Categories ────────────────────────────────────────
-  const catElec = await prisma.category.upsert({
-    where: { code: 'ELEC' },
+  const catRoot = await prisma.category.upsert({
+    where: { code: 'THIET_BI_DIEN' },
     update: {},
-    create: { code: 'ELEC', name: 'Electronics', isActive: true },
+    create: { code: 'THIET_BI_DIEN', name: 'Thiết bị điện', isActive: true },
   });
-  const catPhones = await prisma.category.upsert({
-    where: { code: 'SMARTPHONES' },
+  const catDongCat = await prisma.category.upsert({
+    where: { code: 'DONG_CAT' },
     update: {},
-    create: { code: 'SMARTPHONES', name: 'Smartphones', parentId: catElec.id, isActive: true },
+    create: { code: 'DONG_CAT', name: 'Thiết bị đóng cắt', parentId: catRoot.id, isActive: true },
   });
-  const catLaptops = await prisma.category.upsert({
-    where: { code: 'LAPTOPS' },
+  const catCapDien = await prisma.category.upsert({
+    where: { code: 'CAP_DIEN' },
     update: {},
-    create: { code: 'LAPTOPS', name: 'Laptops', parentId: catElec.id, isActive: true },
+    create: { code: 'CAP_DIEN', name: 'Cáp & dây điện', parentId: catRoot.id, isActive: true },
   });
-  const catTablets = await prisma.category.upsert({
-    where: { code: 'TABLETS' },
+  const catChieuSang = await prisma.category.upsert({
+    where: { code: 'CHIEU_SANG' },
     update: {},
-    create: { code: 'TABLETS', name: 'Tablets', parentId: catElec.id, isActive: true },
+    create: { code: 'CHIEU_SANG', name: 'Chiếu sáng', parentId: catRoot.id, isActive: true },
   });
 
   // ── Products ──────────────────────────────────────────
+  // Prices in VND
   const productsData = [
-    { sku: 'IPH-15-PRO',  productName: 'iPhone 15 Pro',   categoryId: catPhones.id,  brandId: brandMap['APPLE'].id,   standardPrice: 999.00,  minPrice: 850.00,  unit: 'Unit', description: 'Apple iPhone 15 Pro 256GB Titanium' },
-    { sku: 'SAM-S24',     productName: 'Samsung Galaxy S24', categoryId: catPhones.id, brandId: brandMap['SAMSUNG'].id, standardPrice: 899.00, minPrice: 750.00, unit: 'Unit', description: 'Samsung Galaxy S24 128GB' },
-    { sku: 'MBP-14',      productName: 'MacBook Pro 14"', categoryId: catLaptops.id, brandId: brandMap['APPLE'].id,   standardPrice: 1999.00, minPrice: 1750.00, unit: 'Unit', description: 'Apple MacBook Pro 14" M3 Pro 18GB' },
-    { sku: 'DXP-15',      productName: 'Dell XPS 15',     categoryId: catLaptops.id, brandId: brandMap['DELL'].id,    standardPrice: 1499.00, minPrice: 1300.00, unit: 'Unit', description: 'Dell XPS 15 Intel Core i7 RTX 4060' },
-    { sku: 'SAM-TAB-S9',  productName: 'Samsung Tab S9',  categoryId: catTablets.id, brandId: brandMap['SAMSUNG'].id, standardPrice: 699.00,  minPrice: 600.00,  unit: 'Unit', description: 'Samsung Galaxy Tab S9 256GB WiFi' },
+    {
+      sku: 'MCB-SCH-1P-16A',
+      productName: 'Aptomat MCB 1P 16A Schneider iC60N',
+      categoryId: catDongCat.id, brandId: brandMap['SCHNEIDER'].id,
+      standardPrice: 185000, minPrice: 155000, unit: 'Cái',
+      description: 'Cầu dao tự động 1 pha 16A Schneider iC60N — cắt ngắn mạch 6kA',
+    },
+    {
+      sku: 'MCCB-ABB-3P-100A',
+      productName: 'MCCB 3P 100A ABB Tmax T3',
+      categoryId: catDongCat.id, brandId: brandMap['ABB'].id,
+      standardPrice: 3200000, minPrice: 2800000, unit: 'Cái',
+      description: 'Cầu dao khối MCCB 3 pha 100A ABB Tmax T3 — Icu 36kA',
+    },
+    {
+      sku: 'CAP-CADIVI-CVV-2x2.5',
+      productName: 'Cáp điện CVV 2×2,5mm² CADIVI',
+      categoryId: catCapDien.id, brandId: brandMap['CADIVI'].id,
+      standardPrice: 28000, minPrice: 22000, unit: 'Mét',
+      description: 'Cáp điện lực hạ thế CVV 2×2,5mm² CADIVI — vỏ PVC chịu nhiệt 70°C',
+    },
+    {
+      sku: 'CONT-SIE-3RT-22A',
+      productName: 'Khởi động từ Siemens 3RT 22A',
+      categoryId: catDongCat.id, brandId: brandMap['SIEMENS'].id,
+      standardPrice: 450000, minPrice: 380000, unit: 'Cái',
+      description: 'Contactor 3 pha 22A Siemens 3RT2026 — cuộn dây 220VAC',
+    },
+    {
+      sku: 'DEN-LED-RD-18W',
+      productName: 'Đèn LED Panel 18W Rạng Đông',
+      categoryId: catChieuSang.id, brandId: brandMap['RANGDONG'].id,
+      standardPrice: 145000, minPrice: 115000, unit: 'Cái',
+      description: 'Đèn LED âm trần panel vuông 18W Rạng Đông — 4000K, CRI>80, tuổi thọ 25.000h',
+    },
   ];
   const productMap: Record<string, { id: number }> = {};
   for (const p of productsData) {
     productMap[p.sku] = await prisma.product.upsert({
       where: { sku: p.sku },
-      update: { productName: p.productName, standardPrice: p.standardPrice, minPrice: (p as any).minPrice },
+      update: { productName: p.productName, standardPrice: p.standardPrice, minPrice: p.minPrice },
       create: { ...p, isActive: true },
     });
   }
@@ -344,20 +371,20 @@ async function main() {
     update: {},
     create: {
       code: 'WH-001',
-      warehouseName: 'Main Warehouse',
-      address: '123 Industrial Zone, Thu Duc, Ho Chi Minh City',
+      warehouseName: 'Kho Thiết Bị Điện Chính',
+      address: '123 Đường Tân Thới Nhất, KCN Tân Bình, Quận 12, TP. Hồ Chí Minh',
       status: 'ACTIVE',
     },
   });
 
   // ── Inventory Stock ───────────────────────────────────
-  // Samsung Tab S9 is intentionally low (triggers low-stock alert on dashboard)
+  // Đèn LED 18W tồn kho thấp (8 cái < ngưỡng cảnh báo 10) → kích hoạt cảnh báo
   const stockData = [
-    { sku: 'IPH-15-PRO', qty: 50 },
-    { sku: 'SAM-S24',    qty: 45 },
-    { sku: 'MBP-14',     qty: 20 },
-    { sku: 'DXP-15',     qty: 15 },
-    { sku: 'SAM-TAB-S9', qty: 8  },
+    { sku: 'MCB-SCH-1P-16A',      qty: 530 },
+    { sku: 'MCCB-ABB-3P-100A',    qty: 25  },
+    { sku: 'CAP-CADIVI-CVV-2x2.5', qty: 1000 },
+    { sku: 'CONT-SIE-3RT-22A',    qty: 75  },
+    { sku: 'DEN-LED-RD-18W',      qty: 8   },
   ];
   for (const s of stockData) {
     await prisma.inventoryStock.upsert({
@@ -367,21 +394,24 @@ async function main() {
     });
   }
 
-  // ── Inventory Transactions (history) ──────────────────
-  // Only create if there are none yet
+  // ── Inventory Transactions ─────────────────────────────
   const txCount = await prisma.inventoryTransaction.count({ where: { warehouseId: warehouse.id } });
   if (txCount === 0) {
     const txData = [
-      { sku: 'IPH-15-PRO', qty: 60, type: 'INITIAL_IN',   notes: 'Opening stock — iPhone 15 Pro' },
-      { sku: 'SAM-S24',    qty: 50, type: 'INITIAL_IN',   notes: 'Opening stock — Samsung Galaxy S24' },
-      { sku: 'MBP-14',     qty: 25, type: 'INITIAL_IN',   notes: 'Opening stock — MacBook Pro 14"' },
-      { sku: 'DXP-15',     qty: 18, type: 'INITIAL_IN',   notes: 'Opening stock — Dell XPS 15' },
-      { sku: 'SAM-TAB-S9', qty: 15, type: 'INITIAL_IN',   notes: 'Opening stock — Samsung Tab S9' },
-      { sku: 'IPH-15-PRO', qty: -2, type: 'DELIVERY_OUT', notes: 'DEL-2026-00002 — Delivery to Digital Corp' },
-      { sku: 'SAM-S24',    qty: -1, type: 'DELIVERY_OUT', notes: 'DEL-2026-00002 — Delivery to Digital Corp' },
-      { sku: 'MBP-14',     qty: -2, type: 'DELIVERY_OUT', notes: 'DEL-2026-00001 — Delivery to Tech Solutions Ltd' },
-      { sku: 'DXP-15',     qty: -3, type: 'ADJUST_OUT',   notes: 'Inventory adjustment — damaged units' },
-      { sku: 'SAM-TAB-S9', qty: -7, type: 'DELIVERY_OUT', notes: 'DEL-2026-00003 — Delivery to Smart Electronics' },
+      { sku: 'MCB-SCH-1P-16A',       qty:  600, type: 'INITIAL_IN',   notes: 'Nhập kho ban đầu — Aptomat MCB 1P 16A Schneider' },
+      { sku: 'MCCB-ABB-3P-100A',     qty:   35, type: 'INITIAL_IN',   notes: 'Nhập kho ban đầu — MCCB 3P 100A ABB Tmax T3' },
+      { sku: 'CAP-CADIVI-CVV-2x2.5', qty: 1200, type: 'INITIAL_IN',   notes: 'Nhập kho ban đầu — Cáp CVV 2×2,5mm² CADIVI' },
+      { sku: 'CONT-SIE-3RT-22A',     qty:   80, type: 'INITIAL_IN',   notes: 'Nhập kho ban đầu — Khởi động từ Siemens 3RT 22A' },
+      { sku: 'DEN-LED-RD-18W',       qty:   20, type: 'INITIAL_IN',   notes: 'Nhập kho ban đầu — Đèn LED Panel 18W Rạng Đông' },
+      // DEL-2026-00001: SO1 → Xây Dựng Hoàng Phát
+      { sku: 'MCCB-ABB-3P-100A',     qty:  -10, type: 'DELIVERY_OUT', notes: 'DEL-2026-00001 — Xuất kho cho Xây Dựng Hoàng Phát' },
+      { sku: 'MCB-SCH-1P-16A',       qty:  -50, type: 'DELIVERY_OUT', notes: 'DEL-2026-00001 — Xuất kho cho Xây Dựng Hoàng Phát' },
+      // DEL-2026-00002: SO2 → Điện Nhật Minh
+      { sku: 'CAP-CADIVI-CVV-2x2.5', qty: -200, type: 'DELIVERY_OUT', notes: 'DEL-2026-00002 — Xuất kho cho Điện Nhật Minh' },
+      { sku: 'MCB-SCH-1P-16A',       qty:  -20, type: 'DELIVERY_OUT', notes: 'DEL-2026-00002 — Xuất kho cho Điện Nhật Minh' },
+      // Kiểm kê điều chỉnh
+      { sku: 'CONT-SIE-3RT-22A',     qty:   -5, type: 'ADJUST_OUT',   notes: 'Điều chỉnh kiểm kê — Khởi động từ bị hỏng' },
+      { sku: 'DEN-LED-RD-18W',       qty:  -12, type: 'ADJUST_OUT',   notes: 'Điều chỉnh kiểm kê — Đèn LED hỏng vỡ' },
     ];
     for (const t of txData) {
       await prisma.inventoryTransaction.create({
@@ -402,26 +432,41 @@ async function main() {
   // ── Customers ─────────────────────────────────────────
   const customersData = [
     {
-      customerCode: 'CUST-001', companyName: 'Tech Solutions Ltd',
-      contactName: 'Nguyen Van An', phone: '0901234567', email: 'contact@techsolutions.vn',
-      address: '456 Le Van Viet, District 9, Ho Chi Minh City', creditLimit: 50000, status: 'ACTIVE',
+      customerCode: 'CUST-001',
+      companyName: 'Công ty TNHH Xây Dựng Hoàng Phát',
+      contactName: 'Nguyễn Văn Thắng',
+      phone: '0901234567',
+      email: 'hoangphat@xaydunghoangphat.vn',
+      address: '456 Lê Văn Việt, Phường Hiệp Phú, TP. Thủ Đức, TP. Hồ Chí Minh',
+      creditLimit: 150000000, status: 'ACTIVE',
+      customerType: 'WHOLESALE',
     },
     {
-      customerCode: 'CUST-002', companyName: 'Digital Corp',
-      contactName: 'Tran Thi Bich', phone: '0912345678', email: 'info@digitalcorp.vn',
-      address: '789 Nguyen Van Linh, District 7, Ho Chi Minh City', creditLimit: 30000, status: 'ACTIVE',
+      customerCode: 'CUST-002',
+      companyName: 'Công ty CP Điện Nhật Minh',
+      contactName: 'Trần Thị Thanh',
+      phone: '0912345678',
+      email: 'nhatminh@diennhatminh.vn',
+      address: '789 Nguyễn Văn Linh, Phường Tân Phong, Quận 7, TP. Hồ Chí Minh',
+      creditLimit: 100000000, status: 'ACTIVE',
+      customerType: 'WHOLESALE',
     },
     {
-      customerCode: 'CUST-003', companyName: 'Smart Electronics',
-      contactName: 'Le Van Cuong', phone: '0923456789', email: 'contact@smartelectronics.vn',
-      address: '321 Pham Van Dong, Thu Duc, Ho Chi Minh City', creditLimit: 20000, status: 'ACTIVE',
+      customerCode: 'CUST-003',
+      companyName: 'Công ty TNHH Cơ Điện Phú Long',
+      contactName: 'Lê Văn Bình',
+      phone: '0923456789',
+      email: 'phulong@codienphulong.vn',
+      address: '321 Phạm Văn Đồng, Phường Hiệp Bình Chánh, TP. Thủ Đức, TP. Hồ Chí Minh',
+      creditLimit: 80000000, status: 'ACTIVE',
+      customerType: 'RETAIL',
     },
   ];
   const custMap: Record<string, { id: number }> = {};
   for (const c of customersData) {
     custMap[c.customerCode] = await prisma.customer.upsert({
       where: { customerCode: c.customerCode },
-      update: { companyName: c.companyName },
+      update: { companyName: c.companyName, email: c.email },
       create: { ...c, organizationId: org.id, assignedSalesUserId: salesId },
     });
   }
@@ -430,7 +475,7 @@ async function main() {
   const cust2 = custMap['CUST-002'].id;
   const cust3 = custMap['CUST-003'].id;
 
-  // Link customer portal user to CUST-001
+  // Link customer portal user (customer@mini-erp.local) to CUST-001
   await prisma.user.update({
     where: { id: userMap['CUSTOMER'].id },
     data: { linkedCustomerId: cust1 },
@@ -438,16 +483,16 @@ async function main() {
 
   // ── Settings ──────────────────────────────────────────
   const settingsToSeed = [
-    { key: 'system.company_name',             value: 'Demo Organization', category: 'system',        valueType: 'string',  isSensitive: false, isReadonly: false },
-    { key: 'system.currency',                 value: 'USD',               category: 'system',        valueType: 'string',  isSensitive: false, isReadonly: false },
-    { key: 'system.timezone',                 value: 'Asia/Ho_Chi_Minh',  category: 'system',        valueType: 'string',  isSensitive: false, isReadonly: false },
-    { key: 'finance.default_payment_terms',   value: 30,                  category: 'finance',       valueType: 'number',  isSensitive: false, isReadonly: false },
-    { key: 'finance.tax_rate_percent',        value: 10,                  category: 'finance',       valueType: 'number',  isSensitive: false, isReadonly: true  },
-    { key: 'inventory.low_stock_threshold',   value: 10,                  category: 'inventory',     valueType: 'number',  isSensitive: false, isReadonly: false },
-    { key: 'sales.quotation_valid_days',      value: 30,                  category: 'sales',         valueType: 'number',  isSensitive: false, isReadonly: false },
-    { key: 'notifications.email_enabled',     value: true,                category: 'notifications', valueType: 'boolean', isSensitive: false, isReadonly: false },
-    { key: 'auth.max_login_attempts',         value: 5,                   category: 'security',      valueType: 'number',  isSensitive: false, isReadonly: true  },
-    { key: 'auth.session_secret',             value: '***',               category: 'security',      valueType: 'string',  isSensitive: true,  isReadonly: true  },
+    { key: 'system.company_name',           value: 'Thiết Bị Điện Minh Phát',  category: 'system',        valueType: 'string',  isSensitive: false, isReadonly: false },
+    { key: 'system.currency',               value: 'VND',                      category: 'system',        valueType: 'string',  isSensitive: false, isReadonly: false },
+    { key: 'system.timezone',               value: 'Asia/Ho_Chi_Minh',         category: 'system',        valueType: 'string',  isSensitive: false, isReadonly: false },
+    { key: 'finance.default_payment_terms', value: 30,                         category: 'finance',       valueType: 'number',  isSensitive: false, isReadonly: false },
+    { key: 'finance.tax_rate_percent',      value: 10,                         category: 'finance',       valueType: 'number',  isSensitive: false, isReadonly: true  },
+    { key: 'inventory.low_stock_threshold', value: 10,                         category: 'inventory',     valueType: 'number',  isSensitive: false, isReadonly: false },
+    { key: 'sales.quotation_valid_days',    value: 30,                         category: 'sales',         valueType: 'number',  isSensitive: false, isReadonly: false },
+    { key: 'notifications.email_enabled',   value: true,                       category: 'notifications', valueType: 'boolean', isSensitive: false, isReadonly: false },
+    { key: 'auth.max_login_attempts',       value: 5,                          category: 'security',      valueType: 'number',  isSensitive: false, isReadonly: true  },
+    { key: 'auth.session_secret',           value: '***',                      category: 'security',      valueType: 'string',  isSensitive: true,  isReadonly: true  },
   ];
   for (const s of settingsToSeed) {
     const existing = await prisma.setting.findFirst({ where: { key: s.key } });
@@ -464,127 +509,150 @@ async function main() {
   }
 
   // ── Quotations ────────────────────────────────────────
+  // QUO-001: CUST-001 xin báo giá MCCB số lượng lớn, trạng thái SENT
   const quo1 = await prisma.quotation.upsert({
     where: { quotationNumber: 'QUO-2026-00001' },
     update: {},
     create: {
       quotationNumber: 'QUO-2026-00001', customerId: cust1, salesUserId: salesId,
-      subtotal: 1999.00, taxAmount: 199.90, totalAmount: 2198.90,
-      status: 'SENT', validUntil: new Date('2026-03-31'),
-      notes: 'Quotation for MacBook Pro upgrade',
+      subtotal: 64000000, taxAmount: 6400000, totalAmount: 70400000,
+      status: 'SENT', validUntil: new Date('2026-04-30'),
+      notes: 'Báo giá MCCB 100A cho dự án tòa nhà văn phòng Q.9',
       createdAt: new Date('2026-03-01'),
     },
   });
   await prisma.quotationItem.deleteMany({ where: { quotationId: quo1.id } });
   await prisma.quotationItem.createMany({
-    data: [{ quotationId: quo1.id, productId: productMap['MBP-14'].id, quantity: 1, unitPrice: 1999.00, discountAmount: 0, totalAmount: 1999.00 }],
+    data: [
+      { quotationId: quo1.id, productId: productMap['MCCB-ABB-3P-100A'].id, quantity: 20, unitPrice: 3200000, discountAmount: 0, totalAmount: 64000000 },
+    ],
   });
 
+  // QUO-002: CUST-003 xin báo giá đèn LED + cáp, trạng thái DRAFT
   const quo2 = await prisma.quotation.upsert({
     where: { quotationNumber: 'QUO-2026-00002' },
     update: {},
     create: {
       quotationNumber: 'QUO-2026-00002', customerId: cust3, salesUserId: salesId,
-      subtotal: 1398.00, taxAmount: 139.80, totalAmount: 1537.80,
-      status: 'DRAFT', validUntil: new Date('2026-05-31'),
-      notes: 'Tablet order for retail display',
+      subtotal: 10050000, taxAmount: 1005000, totalAmount: 11055000,
+      status: 'DRAFT', validUntil: new Date('2026-06-30'),
+      notes: 'Báo giá chiếu sáng + cáp điện cho xưởng sản xuất',
       createdAt: new Date('2026-04-28'),
     },
   });
   await prisma.quotationItem.deleteMany({ where: { quotationId: quo2.id } });
   await prisma.quotationItem.createMany({
-    data: [{ quotationId: quo2.id, productId: productMap['SAM-TAB-S9'].id, quantity: 2, unitPrice: 699.00, discountAmount: 0, totalAmount: 1398.00 }],
+    data: [
+      { quotationId: quo2.id, productId: productMap['DEN-LED-RD-18W'].id,       quantity: 50,  unitPrice: 145000, discountAmount: 0, totalAmount: 7250000 },
+      { quotationId: quo2.id, productId: productMap['CAP-CADIVI-CVV-2x2.5'].id, quantity: 100, unitPrice: 28000,  discountAmount: 0, totalAmount: 2800000 },
+    ],
   });
 
   // ── Sales Orders ──────────────────────────────────────
-  // SO1 — March, Customer 1, DELIVERED
+
+  // SO1 — Tháng 3, CUST-001, DELIVERED — MCCB + MCB
+  // Subtotal: 10×3,200,000 + 50×185,000 = 32,000,000 + 9,250,000 = 41,250,000
   const so1 = await prisma.salesOrder.upsert({
     where: { orderNumber: 'SO-2026-00001' },
     update: {},
     create: {
       orderNumber: 'SO-2026-00001', customerId: cust1, salesUserId: salesId,
-      subtotal: 3998.00, taxAmount: 399.80, totalAmount: 4397.80,
+      subtotal: 41250000, taxAmount: 4125000, totalAmount: 45375000,
       status: 'DELIVERED', orderedAt: new Date('2026-03-01'), confirmedAt: new Date('2026-03-02'),
-      notes: 'Urgent order — MacBook for new developers',
+      notes: 'Cung cấp thiết bị đóng cắt cho dự án tòa nhà Q.9',
       createdAt: new Date('2026-03-01'),
     },
   });
   await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: so1.id } });
   await prisma.salesOrderItem.createMany({
-    data: [{ salesOrderId: so1.id, productId: productMap['MBP-14'].id, quantity: 2, deliveredQuantity: 2, unitPrice: 1999.00, discountAmount: 0, totalAmount: 3998.00 }],
+    data: [
+      { salesOrderId: so1.id, productId: productMap['MCCB-ABB-3P-100A'].id, quantity: 10, deliveredQuantity: 10, unitPrice: 3200000, discountAmount: 0, totalAmount: 32000000 },
+      { salesOrderId: so1.id, productId: productMap['MCB-SCH-1P-16A'].id,   quantity: 50, deliveredQuantity: 50, unitPrice: 185000,  discountAmount: 0, totalAmount: 9250000  },
+    ],
   });
 
-  // SO2 — March, Customer 2, DELIVERED
+  // SO2 — Tháng 3, CUST-002, DELIVERED — Cáp + MCB
+  // Subtotal: 200×28,000 + 20×185,000 = 5,600,000 + 3,700,000 = 9,300,000
   const so2 = await prisma.salesOrder.upsert({
     where: { orderNumber: 'SO-2026-00002' },
     update: {},
     create: {
       orderNumber: 'SO-2026-00002', customerId: cust2, salesUserId: salesId,
-      subtotal: 2897.00, taxAmount: 289.70, totalAmount: 3186.70,
+      subtotal: 9300000, taxAmount: 930000, totalAmount: 10230000,
       status: 'DELIVERED', orderedAt: new Date('2026-03-10'), confirmedAt: new Date('2026-03-11'),
-      notes: 'Staff phones and laptop package',
+      notes: 'Cung cấp cáp điện + aptomat cho kho xưởng mới',
       createdAt: new Date('2026-03-10'),
     },
   });
   await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: so2.id } });
   await prisma.salesOrderItem.createMany({
     data: [
-      { salesOrderId: so2.id, productId: productMap['IPH-15-PRO'].id, quantity: 2, deliveredQuantity: 2, unitPrice: 999.00, discountAmount: 0, totalAmount: 1998.00 },
-      { salesOrderId: so2.id, productId: productMap['SAM-S24'].id,    quantity: 1, deliveredQuantity: 1, unitPrice: 899.00, discountAmount: 0, totalAmount: 899.00  },
+      { salesOrderId: so2.id, productId: productMap['CAP-CADIVI-CVV-2x2.5'].id, quantity: 200, deliveredQuantity: 200, unitPrice: 28000, discountAmount: 0, totalAmount: 5600000 },
+      { salesOrderId: so2.id, productId: productMap['MCB-SCH-1P-16A'].id,        quantity: 20,  deliveredQuantity: 20,  unitPrice: 185000, discountAmount: 0, totalAmount: 3700000 },
     ],
   });
 
-  // SO3 — April, Customer 3, CONFIRMED
+  // SO3 — Tháng 4, CUST-003, CONFIRMED — MCCB + Contactor
+  // Subtotal: 5×3,200,000 + 10×450,000 = 16,000,000 + 4,500,000 = 20,500,000
   const so3 = await prisma.salesOrder.upsert({
     where: { orderNumber: 'SO-2026-00003' },
     update: {},
     create: {
       orderNumber: 'SO-2026-00003', customerId: cust3, salesUserId: salesId,
-      subtotal: 1499.00, taxAmount: 149.90, totalAmount: 1648.90,
+      subtotal: 20500000, taxAmount: 2050000, totalAmount: 22550000,
       status: 'CONFIRMED', orderedAt: new Date('2026-04-05'), confirmedAt: new Date('2026-04-06'),
+      notes: 'Cung cấp thiết bị tủ điện công nghiệp cho nhà máy',
       createdAt: new Date('2026-04-05'),
     },
   });
   await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: so3.id } });
   await prisma.salesOrderItem.createMany({
-    data: [{ salesOrderId: so3.id, productId: productMap['DXP-15'].id, quantity: 1, deliveredQuantity: 0, unitPrice: 1499.00, discountAmount: 0, totalAmount: 1499.00 }],
+    data: [
+      { salesOrderId: so3.id, productId: productMap['MCCB-ABB-3P-100A'].id, quantity: 5,  deliveredQuantity: 0, unitPrice: 3200000, discountAmount: 0, totalAmount: 16000000 },
+      { salesOrderId: so3.id, productId: productMap['CONT-SIE-3RT-22A'].id, quantity: 10, deliveredQuantity: 0, unitPrice: 450000,  discountAmount: 0, totalAmount: 4500000  },
+    ],
   });
 
-  // SO4 — April, Customer 1, CONFIRMED
+  // SO4 — Tháng 4, CUST-001, CONFIRMED — Đèn LED + Cáp
+  // Subtotal: 100×145,000 + 200×28,000 = 14,500,000 + 5,600,000 = 20,100,000
   const so4 = await prisma.salesOrder.upsert({
     where: { orderNumber: 'SO-2026-00004' },
     update: {},
     create: {
       orderNumber: 'SO-2026-00004', customerId: cust1, salesUserId: salesId,
-      subtotal: 2797.00, taxAmount: 279.70, totalAmount: 3076.70,
+      subtotal: 20100000, taxAmount: 2010000, totalAmount: 22110000,
       status: 'CONFIRMED', orderedAt: new Date('2026-04-15'), confirmedAt: new Date('2026-04-16'),
-      notes: 'Mixed phone order for sales team',
+      notes: 'Chiếu sáng + cáp điện cho khu văn phòng tầng 5-8',
       createdAt: new Date('2026-04-15'),
     },
   });
   await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: so4.id } });
   await prisma.salesOrderItem.createMany({
     data: [
-      { salesOrderId: so4.id, productId: productMap['SAM-S24'].id,    quantity: 2, deliveredQuantity: 0, unitPrice: 899.00, discountAmount: 0, totalAmount: 1798.00 },
-      { salesOrderId: so4.id, productId: productMap['IPH-15-PRO'].id, quantity: 1, deliveredQuantity: 0, unitPrice: 999.00, discountAmount: 0, totalAmount: 999.00  },
+      { salesOrderId: so4.id, productId: productMap['DEN-LED-RD-18W'].id,       quantity: 100, deliveredQuantity: 0, unitPrice: 145000, discountAmount: 0, totalAmount: 14500000 },
+      { salesOrderId: so4.id, productId: productMap['CAP-CADIVI-CVV-2x2.5'].id, quantity: 200, deliveredQuantity: 0, unitPrice: 28000,  discountAmount: 0, totalAmount: 5600000  },
     ],
   });
 
-  // SO5 — May, Customer 2, CONFIRMED
+  // SO5 — Tháng 5, CUST-002, CONFIRMED — MCCB + Contactor số lượng lớn
+  // Subtotal: 15×3,200,000 + 30×450,000 = 48,000,000 + 13,500,000 = 61,500,000
   const so5 = await prisma.salesOrder.upsert({
     where: { orderNumber: 'SO-2026-00005' },
     update: {},
     create: {
       orderNumber: 'SO-2026-00005', customerId: cust2, salesUserId: salesId,
-      subtotal: 3998.00, taxAmount: 399.80, totalAmount: 4397.80,
+      subtotal: 61500000, taxAmount: 6150000, totalAmount: 67650000,
       status: 'CONFIRMED', orderedAt: new Date('2026-05-02'), confirmedAt: new Date('2026-05-03'),
-      notes: 'MacBook order for engineering team expansion',
+      notes: 'Cung cấp tủ MCC cho nhà máy sản xuất mở rộng — đợt 2',
       createdAt: new Date('2026-05-02'),
     },
   });
   await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: so5.id } });
   await prisma.salesOrderItem.createMany({
-    data: [{ salesOrderId: so5.id, productId: productMap['MBP-14'].id, quantity: 2, deliveredQuantity: 0, unitPrice: 1999.00, discountAmount: 0, totalAmount: 3998.00 }],
+    data: [
+      { salesOrderId: so5.id, productId: productMap['MCCB-ABB-3P-100A'].id, quantity: 15, deliveredQuantity: 0, unitPrice: 3200000, discountAmount: 0, totalAmount: 48000000 },
+      { salesOrderId: so5.id, productId: productMap['CONT-SIE-3RT-22A'].id, quantity: 30, deliveredQuantity: 0, unitPrice: 450000,  discountAmount: 0, totalAmount: 13500000 },
+    ],
   });
 
   // ── Deliveries ────────────────────────────────────────
@@ -599,7 +667,10 @@ async function main() {
   });
   await prisma.deliveryItem.deleteMany({ where: { deliveryId: del1.id } });
   await prisma.deliveryItem.createMany({
-    data: [{ deliveryId: del1.id, productId: productMap['MBP-14'].id, quantity: 2 }],
+    data: [
+      { deliveryId: del1.id, productId: productMap['MCCB-ABB-3P-100A'].id, quantity: 10 },
+      { deliveryId: del1.id, productId: productMap['MCB-SCH-1P-16A'].id,   quantity: 50 },
+    ],
   });
 
   const del2 = await prisma.delivery.upsert({
@@ -614,8 +685,8 @@ async function main() {
   await prisma.deliveryItem.deleteMany({ where: { deliveryId: del2.id } });
   await prisma.deliveryItem.createMany({
     data: [
-      { deliveryId: del2.id, productId: productMap['IPH-15-PRO'].id, quantity: 2 },
-      { deliveryId: del2.id, productId: productMap['SAM-S24'].id,    quantity: 1 },
+      { deliveryId: del2.id, productId: productMap['CAP-CADIVI-CVV-2x2.5'].id, quantity: 200 },
+      { deliveryId: del2.id, productId: productMap['MCB-SCH-1P-16A'].id,        quantity: 20  },
     ],
   });
 
@@ -630,53 +701,53 @@ async function main() {
   });
   await prisma.deliveryItem.deleteMany({ where: { deliveryId: del3.id } });
   await prisma.deliveryItem.createMany({
-    data: [{ deliveryId: del3.id, productId: productMap['DXP-15'].id, quantity: 1 }],
+    data: [{ deliveryId: del3.id, productId: productMap['MCCB-ABB-3P-100A'].id, quantity: 5 }],
   });
 
   // ── Invoices ──────────────────────────────────────────
-  // INV1 — Customer 1, SO1, PAID
+  // INV1 — CUST-001, SO1, PAID
   const inv1 = await prisma.invoice.upsert({
     where: { invoiceNumber: 'INV-2026-00001' },
     update: {},
     create: {
       invoiceNumber: 'INV-2026-00001', customerId: cust1, salesOrderId: so1.id,
-      subtotal: 3998.00, taxAmount: 399.80, totalAmount: 4397.80, outstandingAmount: 0,
+      subtotal: 41250000, taxAmount: 4125000, totalAmount: 45375000, outstandingAmount: 0,
       issueDate: new Date('2026-03-06'), dueDate: new Date('2026-04-06'),
       status: 'PAID', createdAt: new Date('2026-03-06'),
     },
   });
 
-  // INV2 — Customer 2, SO2, SENT (overdue — dueDate in April, now May)
+  // INV2 — CUST-002, SO2, SENT (quá hạn — hạn tháng 4, nay tháng 5)
   const inv2 = await prisma.invoice.upsert({
     where: { invoiceNumber: 'INV-2026-00002' },
     update: {},
     create: {
       invoiceNumber: 'INV-2026-00002', customerId: cust2, salesOrderId: so2.id,
-      subtotal: 2897.00, taxAmount: 289.70, totalAmount: 3186.70, outstandingAmount: 3186.70,
+      subtotal: 9300000, taxAmount: 930000, totalAmount: 10230000, outstandingAmount: 10230000,
       issueDate: new Date('2026-03-16'), dueDate: new Date('2026-04-15'),
       status: 'SENT', createdAt: new Date('2026-03-16'),
     },
   });
 
-  // INV3 — Customer 1, SO4, SENT
+  // INV3 — CUST-001, SO4, SENT
   const inv3 = await prisma.invoice.upsert({
     where: { invoiceNumber: 'INV-2026-00003' },
     update: {},
     create: {
       invoiceNumber: 'INV-2026-00003', customerId: cust1, salesOrderId: so4.id,
-      subtotal: 2797.00, taxAmount: 279.70, totalAmount: 3076.70, outstandingAmount: 3076.70,
+      subtotal: 20100000, taxAmount: 2010000, totalAmount: 22110000, outstandingAmount: 22110000,
       issueDate: new Date('2026-04-17'), dueDate: new Date('2026-05-17'),
       status: 'SENT', createdAt: new Date('2026-04-17'),
     },
   });
 
-  // INV4 — Customer 2, SO5, SENT
+  // INV4 — CUST-002, SO5, SENT
   const inv4 = await prisma.invoice.upsert({
     where: { invoiceNumber: 'INV-2026-00004' },
     update: {},
     create: {
       invoiceNumber: 'INV-2026-00004', customerId: cust2, salesOrderId: so5.id,
-      subtotal: 3998.00, taxAmount: 399.80, totalAmount: 4397.80, outstandingAmount: 4397.80,
+      subtotal: 61500000, taxAmount: 6150000, totalAmount: 67650000, outstandingAmount: 67650000,
       issueDate: new Date('2026-05-04'), dueDate: new Date('2026-06-03'),
       status: 'SENT', createdAt: new Date('2026-05-04'),
     },
@@ -688,24 +759,23 @@ async function main() {
     update: {},
     create: {
       paymentNumber: 'PAY-2026-00001', customerId: cust1,
-      paymentMethod: 'BANK_TRANSFER', totalAmount: 4397.80,
-      paymentDate: new Date('2026-03-20'), referenceNumber: 'TRF-20260320-001',
-      status: 'ALLOCATED', notes: 'Payment for MacBook Pro order',
+      paymentMethod: 'BANK_TRANSFER', totalAmount: 45375000,
+      paymentDate: new Date('2026-03-20'), referenceNumber: 'CK-VCB-20260320-001',
+      status: 'ALLOCATED', notes: 'Thanh toán đơn hàng SO-2026-00001 — Xây Dựng Hoàng Phát',
       createdAt: new Date('2026-03-20'),
     },
   });
 
-  // Allocation: pay1 → inv1
   const existingAlloc = await prisma.paymentAllocation.findFirst({
     where: { paymentId: pay1.id, invoiceId: inv1.id },
   });
   if (!existingAlloc) {
     await prisma.paymentAllocation.create({
-      data: { paymentId: pay1.id, invoiceId: inv1.id, allocatedAmount: 4397.80 },
+      data: { paymentId: pay1.id, invoiceId: inv1.id, allocatedAmount: 45375000 },
     });
   }
 
-  // ── AR Ledger (immutable — skip if already exists) ───
+  // ── AR Ledger ─────────────────────────────────────────
   async function ensureLedger(
     customerId: number, transactionType: string, refType: string, refId: number,
     debit: number, credit: number, balance: number, notes: string, createdAt: Date,
@@ -720,14 +790,14 @@ async function main() {
     }
   }
 
-  // Customer 1 (Tech Solutions)
-  await ensureLedger(cust1, 'INVOICE_CREATED',     'INVOICE', inv1.id, 4397.80, 0,       4397.80, 'Invoice INV-2026-00001 created', new Date('2026-03-06'));
-  await ensureLedger(cust1, 'INVOICE_CREATED',     'INVOICE', inv3.id, 3076.70, 0,       7474.50, 'Invoice INV-2026-00003 created', new Date('2026-04-17'));
-  await ensureLedger(cust1, 'PAYMENT_ALLOCATED',   'PAYMENT', pay1.id, 0,       4397.80, 3076.70, 'Payment PAY-2026-00001 allocated to INV-2026-00001', new Date('2026-03-20'));
+  // CUST-001 (Xây Dựng Hoàng Phát)
+  await ensureLedger(cust1, 'INVOICE_CREATED',   'INVOICE', inv1.id, 45375000, 0,        45375000, 'Phát sinh INV-2026-00001', new Date('2026-03-06'));
+  await ensureLedger(cust1, 'INVOICE_CREATED',   'INVOICE', inv3.id, 22110000, 0,        67485000, 'Phát sinh INV-2026-00003', new Date('2026-04-17'));
+  await ensureLedger(cust1, 'PAYMENT_ALLOCATED', 'PAYMENT', pay1.id, 0,        45375000, 22110000, 'Thanh toán PAY-2026-00001 → INV-2026-00001', new Date('2026-03-20'));
 
-  // Customer 2 (Digital Corp)
-  await ensureLedger(cust2, 'INVOICE_CREATED',     'INVOICE', inv2.id, 3186.70, 0,       3186.70, 'Invoice INV-2026-00002 created', new Date('2026-03-16'));
-  await ensureLedger(cust2, 'INVOICE_CREATED',     'INVOICE', inv4.id, 4397.80, 0,       7584.50, 'Invoice INV-2026-00004 created', new Date('2026-05-04'));
+  // CUST-002 (Điện Nhật Minh)
+  await ensureLedger(cust2, 'INVOICE_CREATED',   'INVOICE', inv2.id, 10230000, 0,        10230000, 'Phát sinh INV-2026-00002', new Date('2026-03-16'));
+  await ensureLedger(cust2, 'INVOICE_CREATED',   'INVOICE', inv4.id, 67650000, 0,        77880000, 'Phát sinh INV-2026-00004', new Date('2026-05-04'));
 
   // ── Notifications ─────────────────────────────────────
   const notifsExist = await prisma.notification.count({ where: { recipientId: adminId } });
@@ -736,50 +806,50 @@ async function main() {
       data: [
         {
           recipientId: adminId, channel: 'IN_APP', notificationType: 'ORDER_RECEIVED',
-          subject: 'New large order received',
-          content: 'SO-2026-00005 from Digital Corp for $4,397.80 has been confirmed.',
+          subject: 'Đơn hàng lớn mới — Điện Nhật Minh',
+          content: 'SO-2026-00005 từ Công ty CP Điện Nhật Minh — 67.650.000 ₫ đã được xác nhận.',
           status: 'READ', priority: 'HIGH',
           createdAt: new Date('2026-05-03'), readAt: new Date('2026-05-03'),
         },
         {
           recipientId: adminId, channel: 'IN_APP', notificationType: 'LOW_STOCK_ALERT',
-          subject: 'Low stock alert — Samsung Tab S9',
-          content: 'Samsung Tab S9 has only 8 units in Main Warehouse (threshold: 10).',
+          subject: 'Cảnh báo tồn kho thấp — Đèn LED Panel 18W',
+          content: 'Đèn LED Panel 18W Rạng Đông chỉ còn 8 cái tại Kho Thiết Bị Điện Chính (ngưỡng: 10).',
           status: 'UNREAD', priority: 'MEDIUM',
           createdAt: new Date('2026-05-07'),
         },
         {
           recipientId: userMap['MANAGER'].id, channel: 'IN_APP', notificationType: 'APPROVAL_REQUIRED',
-          subject: 'Quotation pending your approval',
-          content: 'QUO-2026-00001 from Tech Solutions Ltd ($2,198.90) is awaiting approval.',
+          subject: 'Báo giá chờ duyệt — QUO-2026-00001',
+          content: 'Báo giá QUO-2026-00001 từ Xây Dựng Hoàng Phát (70.400.000 ₫) đang chờ duyệt.',
           status: 'UNREAD', priority: 'HIGH',
           createdAt: new Date('2026-03-01'),
         },
         {
           recipientId: userMap['MANAGER'].id, channel: 'IN_APP', notificationType: 'INVOICE_OVERDUE',
-          subject: 'Overdue invoice — INV-2026-00002',
-          content: 'Invoice INV-2026-00002 from Digital Corp ($3,186.70) is 22 days overdue.',
+          subject: 'Hóa đơn quá hạn — INV-2026-00002',
+          content: 'Hóa đơn INV-2026-00002 từ Điện Nhật Minh (10.230.000 ₫) đã quá hạn 28 ngày.',
           status: 'UNREAD', priority: 'HIGH',
           createdAt: new Date('2026-05-07'),
         },
         {
           recipientId: salesId, channel: 'IN_APP', notificationType: 'INVOICE_OVERDUE',
-          subject: 'Invoice overdue — action required',
-          content: 'INV-2026-00002 ($3,186.70) from Digital Corp is overdue. Please follow up.',
+          subject: 'Hóa đơn quá hạn — cần xử lý ngay',
+          content: 'INV-2026-00002 (10.230.000 ₫) từ Điện Nhật Minh đã quá hạn. Vui lòng liên hệ khách hàng.',
           status: 'UNREAD', priority: 'HIGH',
           createdAt: new Date('2026-05-07'),
         },
         {
           recipientId: salesId, channel: 'IN_APP', notificationType: 'ORDER_CONFIRMED',
-          subject: 'Order SO-2026-00005 confirmed',
-          content: 'Sales order SO-2026-00005 for Digital Corp has been confirmed.',
+          subject: 'Đơn hàng SO-2026-00005 đã xác nhận',
+          content: 'Đơn hàng SO-2026-00005 từ Điện Nhật Minh đã được xác nhận thành công.',
           status: 'READ', priority: 'NORMAL',
           createdAt: new Date('2026-05-03'), readAt: new Date('2026-05-03'),
         },
         {
           recipientId: userMap['CUSTOMER'].id, channel: 'IN_APP', notificationType: 'ORDER_STATUS',
-          subject: 'Welcome to miniERP Portal',
-          content: 'Your account has been activated. You can now view your orders and invoices.',
+          subject: 'Chào mừng đến miniERP Portal',
+          content: 'Tài khoản của bạn đã được kích hoạt. Bạn có thể xem đơn hàng và hóa đơn trên hệ thống.',
           status: 'UNREAD', priority: 'NORMAL',
           createdAt: new Date('2026-05-07'),
         },
@@ -788,13 +858,13 @@ async function main() {
   }
 
   // ── Summary ───────────────────────────────────────────
-  console.log('\n✔ Seed complete.\n');
-  console.log('  Organization : Demo Organization');
+  console.log('\n✔ Seed hoàn tất.\n');
+  console.log('  Công ty      : Công ty TNHH Thiết Bị Điện Minh Phát');
   console.log(`  Permissions  : ${PERMISSIONS.length}`);
   console.log(`  Roles        : ${ROLES.length}`);
   console.log('');
   console.log('  ┌─────────────────────────────────────────────────────────────┐');
-  console.log('  │                  LOGIN CREDENTIALS                          │');
+  console.log('  │                  TÀI KHOẢN ĐĂNG NHẬP                       │');
   console.log('  ├─────────────┬────────────────────────────┬──────────────────┤');
   console.log('  │ Role        │ Email                      │ Password         │');
   console.log('  ├─────────────┼────────────────────────────┼──────────────────┤');
@@ -806,19 +876,19 @@ async function main() {
   console.log('  │ Warehouse   │ warehouse@mini-erp.local   │ Warehouse@123456 │');
   console.log('  └─────────────┴────────────────────────────┴──────────────────┘');
   console.log('');
-  console.log('  Sample Data:');
-  console.log('  - Brands: Apple, Samsung, Dell');
-  console.log('  - Categories: Electronics > Smartphones, Laptops, Tablets');
-  console.log('  - Products: 5 (iPhone 15 Pro, Galaxy S24, MacBook Pro, Dell XPS, Tab S9)');
-  console.log('  - Warehouse: Main Warehouse + inventory stock');
-  console.log('  - Customers: Tech Solutions Ltd, Digital Corp, Smart Electronics');
-  console.log('  - Quotations: 2 (QUO-2026-00001, QUO-2026-00002)');
-  console.log('  - Sales Orders: 5 (Mar–May 2026, mix of DELIVERED/CONFIRMED)');
-  console.log('  - Deliveries: 3 (2 delivered, 1 pending)');
-  console.log('  - Invoices: 4 (1 PAID, 3 SENT — INV-2026-00002 is overdue)');
-  console.log('  - Payments: 1 (PAY-2026-00001, allocated to INV-2026-00001)');
-  console.log('  - Notifications: 7 across all users');
-  console.log('  - Settings: 10 system settings');
+  console.log('  Dữ liệu mẫu:');
+  console.log('  - Thương hiệu: Schneider Electric, ABB, Siemens, CADIVI, Rạng Đông');
+  console.log('  - Danh mục: Thiết bị điện > Đóng cắt, Cáp & dây, Chiếu sáng');
+  console.log('  - Sản phẩm: 5 (MCB Schneider, MCCB ABB, Cáp CADIVI, Contactor Siemens, Đèn LED Rạng Đông)');
+  console.log('  - Kho: Kho Thiết Bị Điện Chính + tồn kho (Đèn LED tồn kho thấp: 8 cái)');
+  console.log('  - Khách hàng: Xây Dựng Hoàng Phát, Điện Nhật Minh, Cơ Điện Phú Long');
+  console.log('  - Báo giá: 2 (QUO-2026-00001, QUO-2026-00002)');
+  console.log('  - Đơn hàng: 5 (Mar–May 2026, 2 DELIVERED / 3 CONFIRMED)');
+  console.log('  - Xuất kho: 3 (2 đã giao, 1 đang chờ)');
+  console.log('  - Hóa đơn: 4 (1 PAID, 3 SENT — INV-2026-00002 quá hạn 28 ngày)');
+  console.log('  - Thanh toán: 1 (PAY-2026-00001, đã phân bổ vào INV-2026-00001)');
+  console.log('  - Thông báo: 7 cho các user');
+  console.log('  - Cài đặt: 10 (tiền tệ VND)');
 }
 
 main()

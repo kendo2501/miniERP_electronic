@@ -246,20 +246,21 @@ Quyền hạn: tạo báo giá, tạo đơn hàng, quản lý khách hàng đư�
 |----------|---------------------------|
 | Email    | customer@mini-erp.local   |
 | Password | Customer@123456           |
+| Liên kết | Xây Dựng Hoàng Phát (CUST-001) |
 
-| Trường      | Giá trị                      |
-|-------------|------------------------------|
-| Email       | digitalcorp@portal.local     |
-| Password    | Customer@123456              |
-| Họ tên      | Trần Thị Bích                |
-| Liên kết    | Digital Corp (CUST-002)      |
+| Trường      | Giá trị                             |
+|-------------|-------------------------------------|
+| Email       | nhatminh@portal.local               |
+| Password    | Customer@123456                     |
+| Họ tên      | Trần Thị Bích                       |
+| Liên kết    | Điện Nhật Minh (CUST-002)           |
 
-| Trường      | Giá trị                      |
-|-------------|------------------------------|
-| Email       | smartelec@portal.local       |
-| Password    | Customer@123456              |
-| Họ tên      | Lê Văn Cường                 |
-| Liên kết    | Smart Electronics (CUST-003) |
+| Trường      | Giá trị                             |
+|-------------|-------------------------------------|
+| Email       | phulong@portal.local                |
+| Password    | Customer@123456                     |
+| Họ tên      | Lê Văn Cường                        |
+| Liên kết    | Cơ Điện Phú Long (CUST-003)         |
 
 Quyền hạn: xem đơn hàng của mình, xem báo giá của mình, xem hoá đơn & trạng thái thanh toán của mình, tải file đính kèm.
 
