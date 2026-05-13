@@ -66,23 +66,7 @@ npm install
 
 ---
 
-### Bước 4 — Tạo file cấu hình môi trường
-
-**Windows (PowerShell):**
-```powershell
-Copy-Item backend\.env.example backend\.env
-```
-
-**macOS / Linux:**
-```bash
-cp backend/.env.example backend/.env
-```
-
-File `backend/.env` đã có sẵn giá trị mặc định cho môi trường dev — **không cần chỉnh sửa gì** để chạy local.
-
----
-
-### Bước 5 — Khởi động hạ tầng (Docker)
+### Bước 4 — Khởi động hạ tầng (Docker)
 
 ```powershell
 npm run infra:up
@@ -111,7 +95,7 @@ xxxxxxxxxxxx   redis:7-alpine     ...   Up 30 seconds (healthy)
 
 ---
 
-### Bước 6 — Tạo bảng database (Migration)
+### Bước 5 — Tạo bảng database (Migration)
 
 **Chỉ chạy bước này sau khi `mini-erp-postgres` đã `healthy`.**
 
@@ -123,7 +107,7 @@ Prisma sẽ tạo toàn bộ bảng trong database `mini_erp`.
 
 ---
 
-### Bước 7 — Tạo dữ liệu mẫu (Seed)
+### Bước 6 — Tạo dữ liệu mẫu (Seed)
 
 ```powershell
 npm run db:seed
@@ -133,7 +117,7 @@ Lệnh này tạo: 6 tài khoản người dùng, roles, permissions, sản ph�
 
 ---
 
-### Bước 8 — Chạy dự án
+### Bước 7 — Chạy dự án
 
 Mở **2 terminal riêng biệt** (cả 2 đều ở thư mục root của project):
 
@@ -223,6 +207,12 @@ Quyền hạn: quản lý users, roles, permissions, toàn bộ catalog, invento
 | Email    | manager@mini-erp.local   |
 | Password | Manager@123456           |
 
+| Trường   | Giá trị                  |
+|----------|--------------------------|
+| Email    | manager2@mini-erp.local  |
+| Password | Manager@123456           |
+| Họ tên   | Lê Văn Đức               |
+
 Quyền hạn: duyệt báo giá, duyệt đơn hàng, xem báo cáo team, xem tồn kho, xem hoá đơn & công nợ.
 
 ---
@@ -233,6 +223,18 @@ Quyền hạn: duyệt báo giá, duyệt đơn hàng, xem báo cáo team, xem t
 |----------|-----------------------|
 | Email    | sales@mini-erp.local  |
 | Password | Sales@123456          |
+
+| Trường   | Giá trị                 |
+|----------|-------------------------|
+| Email    | sales2@mini-erp.local   |
+| Password | Sales@123456            |
+| Họ tên   | Nguyễn Văn Hùng         |
+
+| Trường   | Giá trị                 |
+|----------|-------------------------|
+| Email    | sales3@mini-erp.local   |
+| Password | Sales@123456            |
+| Họ tên   | Trần Thị Lan            |
 
 Quyền hạn: tạo báo giá, tạo đơn hàng, quản lý khách hàng được phân công, xem hoá đơn & thanh toán của khách hàng mình phụ trách.
 
@@ -245,6 +247,20 @@ Quyền hạn: tạo báo giá, tạo đơn hàng, quản lý khách hàng đư�
 | Email    | customer@mini-erp.local   |
 | Password | Customer@123456           |
 
+| Trường      | Giá trị                      |
+|-------------|------------------------------|
+| Email       | digitalcorp@portal.local     |
+| Password    | Customer@123456              |
+| Họ tên      | Trần Thị Bích                |
+| Liên kết    | Digital Corp (CUST-002)      |
+
+| Trường      | Giá trị                      |
+|-------------|------------------------------|
+| Email       | smartelec@portal.local       |
+| Password    | Customer@123456              |
+| Họ tên      | Lê Văn Cường                 |
+| Liên kết    | Smart Electronics (CUST-003) |
+
 Quyền hạn: xem đơn hàng của mình, xem báo giá của mình, xem hoá đơn & trạng thái thanh toán của mình, tải file đính kèm.
 
 ---
@@ -256,6 +272,12 @@ Quyền hạn: xem đơn hàng của mình, xem báo giá của mình, xem hoá 
 | Email    | accountant@mini-erp.local  |
 | Password | Accountant@123456          |
 
+| Trường   | Giá trị                    |
+|----------|----------------------------|
+| Email    | accountant2@mini-erp.local |
+| Password | Accountant@123456          |
+| Họ tên   | Hoàng Văn Nam              |
+
 Quyền hạn: xem & xuất hoá đơn, quản lý thanh toán, hoàn trả thanh toán, xem báo cáo tài chính, xem aging report (công nợ quá hạn).
 
 ---
@@ -266,6 +288,12 @@ Quyền hạn: xem & xuất hoá đơn, quản lý thanh toán, hoàn trả than
 |----------|---------------------------|
 | Email    | warehouse@mini-erp.local  |
 | Password | Warehouse@123456          |
+
+| Trường   | Giá trị                   |
+|----------|---------------------------|
+| Email    | warehouse2@mini-erp.local |
+| Password | Warehouse@123456          |
+| Họ tên   | Phạm Thị Mai              |
 
 Quyền hạn: xem & điều chỉnh tồn kho, chuyển kho, duyệt điều chỉnh/chuyển kho, quản lý nhà kho, xem cảnh báo hàng sắp hết.
 
