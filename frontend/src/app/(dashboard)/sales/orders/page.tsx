@@ -93,8 +93,8 @@ export default function SalesOrdersPage() {
         notes: v.notes || undefined,
         items: v.items.map((i) => ({
           productId: parseInt(i.productId),
-          quantity: parseFloat(i.quantity),
-          unitPrice: parseFloat(i.unitPrice),
+          quantity: parseInt(i.quantity, 10),
+          unitPrice: parseInt(i.unitPrice, 10),
           discountAmount: i.discountAmount ? parseFloat(i.discountAmount) : undefined,
         })),
       }).then((r) => r.data),

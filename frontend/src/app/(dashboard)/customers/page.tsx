@@ -97,7 +97,7 @@ export default function CustomersPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? t.customers.errorCreate),
   });
 
-  const canCreate = hasPermission("customers.customer.create");
+  const canCreate = hasPermission("customer.create");
 
   return (
     <div className="space-y-6">

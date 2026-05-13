@@ -49,4 +49,14 @@ export class ProductQueryDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
+
+  @ApiPropertyOptional({ description: 'Filter by attribute key (use with attrValue)' })
+  @IsOptional()
+  @IsString()
+  attrKey?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by attribute value (use with attrKey)' })
+  @IsOptional()
+  @IsString()
+  attrValue?: string;
 }

@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete,
+  Controller, Get, Post, Patch, Delete, Put,
   Body, Param, ParseIntPipe, Query,
   HttpCode, HttpStatus,
 } from '@nestjs/common';
@@ -9,6 +9,8 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
+import { UpsertProductAttributesDto } from './dto/product-attribute.dto';
+import { UpsertUomConversionsDto } from './dto/uom-conversion.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 
 @ApiTags('Catalog')
@@ -131,5 +133,25 @@ export class CatalogController {
   @ApiOperation({ summary: 'Soft-delete product' })
   deleteProduct(@Param('id', ParseIntPipe) id: number) {
     return this.service.deleteProduct(id);
+  }
+
+  @Put('products/:id/attributes')
+  @RequirePermissions('catalog.product.update')
+  @ApiOperation({ summary: 'Replace all dynamic attributes for a product' })
+  upsertProductAttributes(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpsertProductAttributesDto,
+  ) {
+    return this.service.upsertProductAttributes(id, dto.attributes);
+  }
+
+  @Put('products/:id/uom-conversions')
+  @RequirePermissions('catalog.product.update')
+  @ApiOperation({ summary: 'Replace all UoM conversions for a product' })
+  upsertUomConversions(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpsertUomConversionsDto,
+  ) {
+    return this.service.upsertUomConversions(id, dto.conversions);
   }
 }

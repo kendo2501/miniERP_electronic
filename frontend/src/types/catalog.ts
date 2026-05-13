@@ -15,6 +15,19 @@ export interface Brand {
   description?: string;
 }
 
+export interface ProductAttribute {
+  id: number;
+  attrKey: string;
+  attrValue: string;
+}
+
+export interface UomConversion {
+  id: number;
+  fromUnit: string;
+  toUnit: string;
+  conversionRate: number;
+}
+
 export interface Product {
   id: number;
   sku: string;
@@ -30,6 +43,8 @@ export interface Product {
   updatedAt: string;
   category?: { id: number; name: string };
   brand?: { id: number; name: string };
+  attributes?: ProductAttribute[];
+  uomConversions?: UomConversion[];
   stockSummary?: { warehouseName: string; availableQuantity: number }[];
 }
 
@@ -64,4 +79,33 @@ export interface CreateBrandPayload {
   name: string;
   code?: string;
   description?: string;
+}
+
+export interface PriceListItem {
+  id: number;
+  priceListId: number;
+  productId: number;
+  unitPrice: string;
+  minQuantity: string;
+  product?: { id: number; sku: string; productName: string; unit?: string };
+}
+
+export interface PriceList {
+  id: number;
+  name: string;
+  applyTo?: string;
+  customerTier?: string;
+  customerId?: number;
+  validFrom?: string;
+  validTo?: string;
+  isDefault: boolean;
+  createdAt: string;
+  items?: PriceListItem[];
+  customer?: { id: number; companyName: string };
+  _count?: { items: number };
+}
+
+export interface PriceListLookupResult {
+  unitPrice: string;
+  source: 'customer-specific' | 'tier' | 'default' | 'fallback-minprice';
 }

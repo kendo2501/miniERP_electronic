@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import type {
-  Category, Brand, Product, ProductListResponse,
+  Category, Brand, Product, ProductAttribute, UomConversion, ProductListResponse,
   CreateProductPayload, CreateCategoryPayload, CreateBrandPayload,
 } from '@/types/catalog';
 
@@ -51,3 +51,15 @@ export const deactivateProduct = (id: number) =>
 
 export const deleteProduct = (id: number) =>
   apiClient.delete(`/catalog/products/${id}`);
+
+export const updateProductAttributes = (
+  id: number,
+  attributes: { attrKey: string; attrValue: string }[],
+) =>
+  apiClient.put<ProductAttribute[]>(`/catalog/products/${id}/attributes`, { attributes });
+
+export const updateUomConversions = (
+  id: number,
+  conversions: { fromUnit: string; toUnit: string; conversionRate: number }[],
+) =>
+  apiClient.put<UomConversion[]>(`/catalog/products/${id}/uom-conversions`, { conversions });

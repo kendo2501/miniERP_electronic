@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-05-09"
-last_updated: "2026-05-09"
+last_updated: "2026-05-13"
 project: "miniERP_electronic V2"
 project_key: NOKEY
 tracking_system: file-system
@@ -43,11 +43,11 @@ story_location: "_bmad-output/implementation-artifacts"
 
 development_status:
   # ─── EPIC 1: Catalog Enhancement ───────────────────────────────────────────
-  epic-1: backlog
-  1-1-product-dynamic-attributes: backlog
-  1-2-product-unit-of-measure-conversion: backlog
-  1-3-price-list-management: backlog
-  1-4-product-image-upload: backlog
+  epic-1: in-progress
+  1-1-product-dynamic-attributes: done
+  1-2-product-unit-of-measure-conversion: done
+  1-3-price-list-management: done
+  1-4-product-image-upload: ready-for-dev
   1-5-category-and-product-excel-import-export: backlog
   epic-1-retrospective: optional
 

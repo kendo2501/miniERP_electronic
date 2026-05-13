@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Package, Power } from "lucide-react";
+import { Search, Plus, Loader2, Package, Power, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { listProducts, createProduct, deactivateProduct, listCategories, listBrands } from "@/lib/api/catalog";
+import {
+  listProducts, createProduct, deactivateProduct,
+  listCategories, listBrands, getProduct, updateProduct, updateProductAttributes,
+  updateUomConversions,
+} from "@/lib/api/catalog";
+import type { ProductAttribute } from "@/types/catalog";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 import Link from "next/link";
@@ -37,6 +42,10 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editTab, setEditTab] = useState<"general" | "attributes" | "uom">("general");
+  const [attrRows, setAttrRows] = useState<{ attrKey: string; attrValue: string }[]>([]);
+  const [uomRows, setUomRows] = useState<{ fromUnit: string; toUnit: string; conversionRate: string }[]>([]);
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
@@ -56,9 +65,17 @@ export default function ProductsPage() {
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: () => listCategories().then((r) => r.data) });
   const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: () => listBrands().then((r) => r.data) });
 
+  const { data: editProduct, isLoading: editLoading } = useQuery({
+    queryKey: ["product", editId],
+    queryFn: () => getProduct(editId!).then((r) => r.data),
+    enabled: editId !== null,
+  });
+
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
+
+  const editForm = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   const createMut = useMutation({
     mutationFn: (v: FormValues) =>
@@ -78,6 +95,46 @@ export default function ProductsPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Failed to create product"),
   });
 
+  const updateMut = useMutation({
+    mutationFn: (v: FormValues) =>
+      updateProduct(editId!, {
+        productName: v.productName,
+        description: v.description || undefined, unit: v.unit || undefined,
+        standardPrice: v.standardPrice || undefined, weight: v.weight || undefined,
+        categoryId: v.categoryId ? parseInt(v.categoryId) : undefined,
+        brandId: v.brandId ? parseInt(v.brandId) : undefined,
+      }).then((r) => r.data),
+    onSuccess: () => {
+      toast.success(t.catalog.productUpdated);
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["product", editId] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Failed to update product"),
+  });
+
+  const saveAttrsMut = useMutation({
+    mutationFn: () => updateProductAttributes(editId!, attrRows).then((r) => r.data),
+    onSuccess: () => {
+      toast.success(t.catalog.attributesSaved);
+      qc.invalidateQueries({ queryKey: ["product", editId] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Failed to save attributes"),
+  });
+
+  const saveUomMut = useMutation({
+    mutationFn: () =>
+      updateUomConversions(
+        editId!,
+        uomRows.map((r) => ({ fromUnit: r.fromUnit, toUnit: r.toUnit, conversionRate: parseFloat(r.conversionRate) })),
+      ).then((r) => r.data),
+    onSuccess: (data) => {
+      toast.success(t.catalog.conversionsSaved);
+      setUomRows(data.map((c) => ({ fromUnit: c.fromUnit, toUnit: c.toUnit, conversionRate: String(c.conversionRate) })));
+      qc.invalidateQueries({ queryKey: ["product", editId] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Failed to save UoM conversions"),
+  });
+
   const deactivateMut = useMutation({
     mutationFn: (id: number) => deactivateProduct(id),
     onSuccess: () => { toast.success(t.catalog.productDeactivated); qc.invalidateQueries({ queryKey: ["products"] }); },
@@ -86,6 +143,67 @@ export default function ProductsPage() {
 
   const canCreate = hasPermission("catalog.product.create");
   const canManage = hasPermission("catalog.product.deactivate");
+  const canUpdate = hasPermission("catalog.product.update");
+
+  function openEdit(id: number) {
+    setEditId(id);
+    setEditTab("general");
+    setAttrRows([]);
+    setUomRows([]);
+  }
+
+  function closeEdit() {
+    setEditId(null);
+    editForm.reset();
+    setAttrRows([]);
+    setUomRows([]);
+  }
+
+  useEffect(() => {
+    if (!editProduct) return;
+    editForm.reset({
+      sku: editProduct.sku,
+      productName: editProduct.productName,
+      description: editProduct.description ?? "",
+      unit: editProduct.unit ?? "",
+      standardPrice: editProduct.standardPrice != null ? String(editProduct.standardPrice) : "",
+      weight: editProduct.weight != null ? String(editProduct.weight) : "",
+      categoryId: editProduct.category ? String(editProduct.category.id) : "",
+      brandId: editProduct.brand ? String(editProduct.brand.id) : "",
+    });
+    setAttrRows(editProduct.attributes?.map((a) => ({ attrKey: a.attrKey, attrValue: a.attrValue })) ?? []);
+    setUomRows(
+      editProduct.uomConversions?.map((c) => ({
+        fromUnit: c.fromUnit,
+        toUnit: c.toUnit,
+        conversionRate: String(c.conversionRate),
+      })) ?? []
+    );
+  }, [editProduct?.id]);
+
+  function addAttrRow() {
+    setAttrRows((prev) => [...prev, { attrKey: "", attrValue: "" }]);
+  }
+
+  function removeAttrRow(idx: number) {
+    setAttrRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateAttrRow(idx: number, field: "attrKey" | "attrValue", value: string) {
+    setAttrRows((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  }
+
+  function addUomRow() {
+    setUomRows((prev) => [...prev, { fromUnit: "", toUnit: "", conversionRate: "" }]);
+  }
+
+  function removeUomRow(idx: number) {
+    setUomRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateUomRow(idx: number, field: "fromUnit" | "toUnit" | "conversionRate", value: string) {
+    setUomRows((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+  }
 
   return (
     <div className="space-y-6">
@@ -175,12 +293,20 @@ export default function ProductsPage() {
                         </Badge>
                       </td>
                       <td className="px-6 py-3">
-                        {canManage && p.isActive && (
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-destructive"
-                            onClick={() => deactivateMut.mutate(p.id)} disabled={deactivateMut.isPending}>
-                            <Power className="h-3 w-3" /> {t.catalog.deactivateProduct}
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {canUpdate && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-muted-foreground"
+                              onClick={() => openEdit(p.id)}>
+                              <Pencil className="h-3 w-3" /> {t.common.edit}
+                            </Button>
+                          )}
+                          {canManage && p.isActive && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-destructive"
+                              onClick={() => deactivateMut.mutate(p.id)} disabled={deactivateMut.isPending}>
+                              <Power className="h-3 w-3" /> {t.catalog.deactivateProduct}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -206,6 +332,7 @@ export default function ProductsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Create Dialog ── */}
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) reset(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t.catalog.newProduct}</DialogTitle></DialogHeader>
@@ -221,18 +348,15 @@ export default function ProductsPage() {
                 <Input placeholder={t.catalog.unitPlaceholder} {...register("unit")} />
               </div>
             </div>
-
             <div className="space-y-1.5">
               <Label>{t.catalog.productName} *</Label>
               <Input placeholder={t.catalog.namePlaceholder} {...register("productName")} />
               {errors.productName && <p className="text-xs text-destructive">{errors.productName.message}</p>}
             </div>
-
             <div className="space-y-1.5">
               <Label>{t.common.description}</Label>
               <Input placeholder={t.catalog.descriptionPlaceholder} {...register("description")} />
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.catalog.standardPrice} ($)</Label>
@@ -243,7 +367,6 @@ export default function ProductsPage() {
                 <Input type="number" min="0" step="0.001" placeholder={t.catalog.weightPlaceholder} {...register("weight")} />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.common.category}</Label>
@@ -264,7 +387,6 @@ export default function ProductsPage() {
                 </Select>
               </div>
             </div>
-
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { setShowCreate(false); reset(); }}>{t.common.cancel}</Button>
               <Button type="submit" disabled={createMut.isPending}>
@@ -273,6 +395,266 @@ export default function ProductsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Dialog with Tabs ── */}
+      <Dialog open={editId !== null} onOpenChange={(v) => { if (!v) closeEdit(); }}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t.catalog.editProduct}</DialogTitle>
+          </DialogHeader>
+
+          {editLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-4 pt-2">
+              {/* Tab bar */}
+              <div className="flex border-b">
+                <button
+                  type="button"
+                  onClick={() => setEditTab("general")}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    editTab === "general"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.catalog.generalInfo}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditTab("attributes")}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    editTab === "attributes"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.catalog.dynamicAttributes}
+                  {attrRows.length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-primary/10 text-primary text-xs px-1.5 py-0.5">
+                      {attrRows.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditTab("uom")}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    editTab === "uom"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.catalog.unitConversions}
+                  {uomRows.length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-primary/10 text-primary text-xs px-1.5 py-0.5">
+                      {uomRows.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Tab: Thông tin chung */}
+              {editTab === "general" && (
+                <form onSubmit={editForm.handleSubmit((v) => updateMut.mutate(v))} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>{t.catalog.sku}</Label>
+                      <Input {...editForm.register("sku")} disabled className="bg-muted" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>{t.common.unit}</Label>
+                      <Input placeholder={t.catalog.unitPlaceholder} {...editForm.register("unit")} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t.catalog.productName} *</Label>
+                    <Input placeholder={t.catalog.namePlaceholder} {...editForm.register("productName")} />
+                    {editForm.formState.errors.productName && (
+                      <p className="text-xs text-destructive">{editForm.formState.errors.productName.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t.common.description}</Label>
+                    <Input placeholder={t.catalog.descriptionPlaceholder} {...editForm.register("description")} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>{t.catalog.standardPrice} ($)</Label>
+                      <Input type="number" min="0" step="0.01" {...editForm.register("standardPrice")} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>{t.common.weight} (kg)</Label>
+                      <Input type="number" min="0" step="0.001" {...editForm.register("weight")} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>{t.common.category}</Label>
+                      <Select
+                        value={editForm.watch("categoryId") ?? ""}
+                        onValueChange={(v) => editForm.setValue("categoryId", v)}
+                      >
+                        <SelectTrigger><SelectValue placeholder={t.catalog.selectCategory} /></SelectTrigger>
+                        <SelectContent>
+                          {categories?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>{t.common.brand}</Label>
+                      <Select
+                        value={editForm.watch("brandId") ?? ""}
+                        onValueChange={(v) => editForm.setValue("brandId", v)}
+                      >
+                        <SelectTrigger><SelectValue placeholder={t.catalog.selectBrand} /></SelectTrigger>
+                        <SelectContent>
+                          {brands?.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={closeEdit}>{t.common.cancel}</Button>
+                    <Button type="submit" disabled={updateMut.isPending}>
+                      {updateMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {t.common.save}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+
+              {/* Tab: Thuộc tính động */}
+              {editTab === "attributes" && (
+                <div className="space-y-4">
+                  {attrRows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">{t.catalog.noAttributes}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs font-medium text-muted-foreground px-1">
+                        <span>{t.catalog.attributeKey}</span>
+                        <span>{t.catalog.attributeValue}</span>
+                        <span />
+                      </div>
+                      {attrRows.map((row, idx) => (
+                        <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                          <Input
+                            placeholder={t.catalog.keyPlaceholder}
+                            value={row.attrKey}
+                            onChange={(e) => updateAttrRow(idx, "attrKey", e.target.value)}
+                          />
+                          <Input
+                            placeholder={t.catalog.valuePlaceholder}
+                            value={row.attrValue}
+                            onChange={(e) => updateAttrRow(idx, "attrValue", e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeAttrRow(idx)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Button type="button" variant="outline" size="sm" onClick={addAttrRow} className="w-full">
+                    <Plus className="h-4 w-4 mr-1" />
+                    {t.catalog.addAttribute}
+                  </Button>
+
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={closeEdit}>{t.common.cancel}</Button>
+                    <Button
+                      type="button"
+                      disabled={saveAttrsMut.isPending || attrRows.some((r) => !r.attrKey.trim())}
+                      onClick={() => saveAttrsMut.mutate()}
+                    >
+                      {saveAttrsMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {t.common.save}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              )}
+
+              {/* Tab: Đơn vị tính */}
+              {editTab === "uom" && (
+                <div className="space-y-4">
+                  {uomRows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">{t.catalog.noConversions}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-xs font-medium text-muted-foreground px-1">
+                        <span>{t.catalog.fromUnit}</span>
+                        <span>{t.catalog.toUnit}</span>
+                        <span>{t.catalog.conversionRate}</span>
+                        <span />
+                      </div>
+                      {uomRows.map((row, idx) => (
+                        <div key={idx} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+                          <Input
+                            placeholder={t.catalog.fromUnitPlaceholder}
+                            value={row.fromUnit}
+                            onChange={(e) => updateUomRow(idx, "fromUnit", e.target.value)}
+                          />
+                          <Input
+                            placeholder={t.catalog.toUnitPlaceholder}
+                            value={row.toUnit}
+                            onChange={(e) => updateUomRow(idx, "toUnit", e.target.value)}
+                          />
+                          <Input
+                            type="number"
+                            min="0.000001"
+                            step="any"
+                            placeholder={t.catalog.ratePlaceholder}
+                            value={row.conversionRate}
+                            onChange={(e) => updateUomRow(idx, "conversionRate", e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeUomRow(idx)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Button type="button" variant="outline" size="sm" onClick={addUomRow} className="w-full">
+                    <Plus className="h-4 w-4 mr-1" />
+                    {t.catalog.addConversion}
+                  </Button>
+
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={closeEdit}>{t.common.cancel}</Button>
+                    <Button
+                      type="button"
+                      disabled={
+                        saveUomMut.isPending ||
+                        uomRows.some((r) => !r.fromUnit.trim() || !r.toUnit.trim() || !r.conversionRate || isNaN(parseFloat(r.conversionRate)) || parseFloat(r.conversionRate) <= 0)
+                      }
+                      onClick={() => saveUomMut.mutate()}
+                    >
+                      {saveUomMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {t.common.save}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

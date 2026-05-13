@@ -8,6 +8,8 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
+import { ProductAttributeDto } from './dto/product-attribute.dto';
+import { UomConversionDto } from './dto/uom-conversion.dto';
 
 @Injectable()
 export class CatalogService {
@@ -95,7 +97,7 @@ export class CatalogService {
   // ─── PRODUCTS ─────────────────────────────────────────────────────────────
 
   async getProducts(query: ProductQueryDto) {
-    const { page = 1, limit = 20, search, categoryId, brandId, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const { page = 1, limit = 20, search, categoryId, brandId, isActive, sortBy = 'createdAt', sortOrder = 'desc', attrKey, attrValue } = query;
     const skip = (page - 1) * limit;
 
     const where: any = { deletedAt: null };
@@ -107,6 +109,9 @@ export class CatalogService {
         { sku: { contains: search, mode: 'insensitive' } },
         { productName: { contains: search, mode: 'insensitive' } },
       ];
+    }
+    if (attrKey && attrValue) {
+      where.attributes = { some: { attrKey, attrValue } };
     }
 
     const [items, total] = await Promise.all([
@@ -143,6 +148,8 @@ export class CatalogService {
         category: true,
         brand: true,
         images: { orderBy: { sortOrder: 'asc' } },
+        attributes: { orderBy: { attrKey: 'asc' } },
+        uomConversions: { orderBy: { fromUnit: 'asc' } },
         inventoryStocks: {
           include: { warehouse: { select: { id: true, warehouseName: true } } },
         },
@@ -150,6 +157,41 @@ export class CatalogService {
     });
     if (!product || product.deletedAt) throw new NotFoundException(`Product #${id} not found`);
     return product;
+  }
+
+  async upsertProductAttributes(productId: number, attrs: ProductAttributeDto[]) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product || product.deletedAt) throw new NotFoundException(`Product #${productId} not found`);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.productAttribute.deleteMany({ where: { productId } });
+      if (attrs.length > 0) {
+        await tx.productAttribute.createMany({
+          data: attrs.map((a) => ({ productId, attrKey: a.attrKey, attrValue: a.attrValue })),
+        });
+      }
+      return tx.productAttribute.findMany({ where: { productId }, orderBy: { attrKey: 'asc' } });
+    });
+  }
+
+  async upsertUomConversions(productId: number, conversions: UomConversionDto[]) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product || product.deletedAt) throw new NotFoundException(`Product #${productId} not found`);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.uomConversion.deleteMany({ where: { productId } });
+      if (conversions.length > 0) {
+        await tx.uomConversion.createMany({
+          data: conversions.map((c) => ({
+            productId,
+            fromUnit: c.fromUnit,
+            toUnit: c.toUnit,
+            conversionRate: c.conversionRate,
+          })),
+        });
+      }
+      return tx.uomConversion.findMany({ where: { productId }, orderBy: { fromUnit: 'asc' } });
+    });
   }
 
   async createProduct(dto: CreateProductDto) {
