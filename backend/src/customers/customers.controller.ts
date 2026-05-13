@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto } from './dto/customer.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 
 @ApiTags('Customers')
@@ -24,4 +24,14 @@ export class CustomersController {
 
   @Delete(':id') @HttpCode(HttpStatus.OK) @RequirePermissions('customer.update_assigned') @ApiOperation({ summary: 'Soft-delete customer' })
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove(id); }
+
+  @Post(':id/portal-account') @RequirePermissions('customer.create') @ApiOperation({ summary: 'Create portal account for customer' })
+  createPortalAccount(@Param('id', ParseIntPipe) id: number, @Body() dto: CreatePortalAccountDto) {
+    return this.service.createPortalAccount(id, dto);
+  }
+
+  @Delete(':id/portal-account') @HttpCode(HttpStatus.OK) @RequirePermissions('customer.update_assigned') @ApiOperation({ summary: 'Unlink portal account from customer' })
+  unlinkPortalAccount(@Param('id', ParseIntPipe) id: number) {
+    return this.service.unlinkPortalAccount(id);
+  }
 }

@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto } from './dto/customer.dto';
 
 const SELECT_CUSTOMER = {
   id: true, customerCode: true, companyName: true, contactName: true,
@@ -66,6 +67,46 @@ export class CustomersService {
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.customer.update({ where: { id }, data: { deletedAt: new Date() }, select: { id: true } });
+  }
+
+  async createPortalAccount(customerId: number, dto: CreatePortalAccountDto) {
+    const customer = await this.findOne(customerId);
+    if ((customer as any).linkedUser) {
+      throw new ConflictException('Customer already has a linked portal account');
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email }, select: { id: true } });
+    if (existing) throw new ConflictException('Email đã được sử dụng');
+
+    const customerRole = await this.prisma.role.findUnique({ where: { code: 'CUSTOMER' }, select: { id: true } });
+    if (!customerRole) throw new BadRequestException('CUSTOMER role not found — run seed first');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        fullName: dto.fullName ?? customer.companyName,
+        status: 'ACTIVE',
+        linkedCustomerId: customerId,
+        userRoles: { create: [{ roleId: customerRole.id }] },
+      },
+      select: { id: true, email: true, fullName: true, status: true },
+    });
+
+    return user;
+  }
+
+  async unlinkPortalAccount(customerId: number) {
+    const customer = await this.findOne(customerId);
+    const linked = (customer as any).linkedUser as { id: number } | null;
+    if (!linked) throw new NotFoundException('Customer has no linked portal account');
+
+    await this.prisma.user.update({
+      where: { id: linked.id },
+      data: { linkedCustomerId: null },
+    });
+    return { unlinked: true };
   }
 
   private async generateCode(): Promise<string> {

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsInt, MaxLength, Min, IsIn } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, MaxLength, Min, IsIn, MinLength, IsEmail } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -26,6 +26,12 @@ export class UpdateCustomerDto {
   @ApiPropertyOptional({ enum: ['RETAIL', 'WHOLESALE'] }) @IsOptional() @IsIn(['RETAIL', 'WHOLESALE']) customerType?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Type(() => Number) assignedSalesUserId?: number;
+}
+
+export class CreatePortalAccountDto {
+  @ApiProperty() @IsEmail() email!: string;
+  @ApiProperty() @IsString() @MinLength(8) password!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(255) fullName?: string;
 }
 
 export class CustomerQueryDto {

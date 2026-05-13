@@ -23,6 +23,12 @@ export const updateCustomer = (id: number, data: UpdateCustomerPayload) =>
 export const deleteCustomer = (id: number) =>
   apiClient.delete(`/customers/${id}`);
 
+export const createPortalAccount = (customerId: number, data: { email: string; password: string; fullName?: string }) =>
+  apiClient.post(`/customers/${customerId}/portal-account`, data);
+
+export const unlinkPortalAccount = (customerId: number) =>
+  apiClient.delete(`/customers/${customerId}/portal-account`);
+
 // ─── Quotations ───────────────────────────────────────────────────────────────
 
 export const listQuotations = (params?: Record<string, unknown>) =>

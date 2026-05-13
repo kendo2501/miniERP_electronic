@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown, UserCheck } from "lucide-react";
+import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown, UserCheck, UserPlus, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,10 +13,17 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { listCustomers, createCustomer, getCustomerBalance } from "@/lib/api/sales";
+import { listCustomers, createCustomer, getCustomerBalance, createPortalAccount, unlinkPortalAccount } from "@/lib/api/sales";
 import type { CustomerType, CustomerBalanceInvoice } from "@/types/sales";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
+
+const portalSchema = z.object({
+  email: z.string().email("Email không hợp lệ"),
+  password: z.string().min(8, "Mật khẩu tối thiểu 8 ký tự"),
+  fullName: z.string().optional(),
+});
+type PortalFormValues = z.infer<typeof portalSchema>;
 
 const schema = z.object({
   companyName: z.string().min(1, "Bắt buộc"),
@@ -56,6 +63,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [balanceCustomer, setBalanceCustomer] = useState<{ id: number; name: string } | null>(null);
+  const [portalTarget, setPortalTarget] = useState<{ id: number; name: string } | null>(null);
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
@@ -95,6 +103,31 @@ export default function CustomersPage() {
       reset();
     },
     onError: (e: any) => toast.error(e.response?.data?.message ?? t.customers.errorCreate),
+  });
+
+  const { register: registerPortal, handleSubmit: handlePortalSubmit, reset: resetPortal, formState: { errors: portalErrors } } = useForm<PortalFormValues>({
+    resolver: zodResolver(portalSchema),
+  });
+
+  const portalMut = useMutation({
+    mutationFn: (values: PortalFormValues) =>
+      createPortalAccount(portalTarget!.id, { email: values.email, password: values.password, fullName: values.fullName || undefined }).then((r) => r.data),
+    onSuccess: () => {
+      toast.success("Đã tạo tài khoản portal thành công");
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      setPortalTarget(null);
+      resetPortal();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Tạo tài khoản thất bại"),
+  });
+
+  const unlinkMut = useMutation({
+    mutationFn: (id: number) => unlinkPortalAccount(id),
+    onSuccess: () => {
+      toast.success("Đã hủy liên kết tài khoản");
+      qc.invalidateQueries({ queryKey: ["customers"] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Hủy liên kết thất bại"),
   });
 
   const canCreate = hasPermission("customer.create");
@@ -181,15 +214,31 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-6 py-3">
                         {c.linkedUser ? (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             <UserCheck className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                            <div>
-                              <div className="text-xs font-medium text-green-700">{c.linkedUser.fullName}</div>
-                              <div className="text-xs text-muted-foreground">{c.linkedUser.email}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-green-700 truncate">{c.linkedUser.fullName}</div>
+                              <div className="text-xs text-muted-foreground truncate">{c.linkedUser.email}</div>
                             </div>
+                            {canCreate && (
+                              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:text-red-600 shrink-0"
+                                title="Hủy liên kết"
+                                onClick={() => unlinkMut.mutate(c.id)}
+                                disabled={unlinkMut.isPending}>
+                                <UserX className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Chưa có</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">Chưa có</span>
+                            {canCreate && (
+                              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs gap-1 text-blue-600 hover:text-blue-700"
+                                onClick={() => { setPortalTarget({ id: c.id, name: c.companyName }); resetPortal(); }}>
+                                <UserPlus className="h-3 w-3" /> Tạo
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="px-6 py-3 text-muted-foreground text-xs">
@@ -289,6 +338,45 @@ export default function CustomersPage() {
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {t.customers.newCustomer}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Portal Account Dialog */}
+      <Dialog open={!!portalTarget} onOpenChange={(v) => { if (!v) { setPortalTarget(null); resetPortal(); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-blue-600" />
+              Tạo tài khoản portal — {portalTarget?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handlePortalSubmit((v) => portalMut.mutate(v))} className="space-y-4 pt-2">
+            <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
+              Tài khoản này sẽ được gắn với khách hàng <strong>{portalTarget?.name}</strong> và có quyền xem đơn hàng, báo giá trên portal.
+            </div>
+            <div className="space-y-1.5">
+              <Label>Họ tên hiển thị</Label>
+              <Input placeholder={portalTarget?.name} {...registerPortal("fullName")} />
+              <p className="text-xs text-muted-foreground">Để trống sẽ dùng tên công ty</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email đăng nhập *</Label>
+              <Input type="email" placeholder="email@example.com" {...registerPortal("email")} />
+              {portalErrors.email && <p className="text-xs text-destructive">{portalErrors.email.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Mật khẩu *</Label>
+              <Input type="password" placeholder="Tối thiểu 8 ký tự" {...registerPortal("password")} />
+              {portalErrors.password && <p className="text-xs text-destructive">{portalErrors.password.message}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setPortalTarget(null); resetPortal(); }}>Hủy</Button>
+              <Button type="submit" disabled={portalMut.isPending}>
+                {portalMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Tạo tài khoản
               </Button>
             </DialogFooter>
           </form>
