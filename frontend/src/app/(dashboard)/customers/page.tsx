@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown } from "lucide-react";
+import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -146,6 +146,7 @@ export default function CustomersPage() {
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.customers.contactName}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.customers.phone}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.email}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Tài khoản portal</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.date}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground"></th>
                   </tr>
@@ -178,6 +179,19 @@ export default function CustomersPage() {
                           </span>
                         ) : "—"}
                       </td>
+                      <td className="px-6 py-3">
+                        {c.linkedUser ? (
+                          <div className="flex items-center gap-1.5">
+                            <UserCheck className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                            <div>
+                              <div className="text-xs font-medium text-green-700">{c.linkedUser.fullName}</div>
+                              <div className="text-xs text-muted-foreground">{c.linkedUser.email}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Chưa có</span>
+                        )}
+                      </td>
                       <td className="px-6 py-3 text-muted-foreground text-xs">
                         {new Date(c.createdAt).toLocaleDateString("vi-VN")}
                       </td>
@@ -195,7 +209,7 @@ export default function CustomersPage() {
                   ))}
                   {data?.items.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-muted-foreground">{t.customers.noCustomers}</td>
+                      <td colSpan={9} className="py-12 text-center text-muted-foreground">{t.customers.noCustomers}</td>
                     </tr>
                   )}
                 </tbody>

@@ -15,6 +15,7 @@ export interface Customer {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  linkedUser?: { id: number; fullName: string; email: string; status: string } | null;
 }
 
 export interface CustomerBalanceInvoice {

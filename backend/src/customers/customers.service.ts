@@ -8,6 +8,7 @@ const SELECT_CUSTOMER = {
   creditLimit: true, customerType: true, status: true, createdAt: true, updatedAt: true,
   organizationId: true, assignedSalesUserId: true,
   assignedSales: { select: { id: true, fullName: true, email: true } },
+  linkedUser: { select: { id: true, fullName: true, email: true, status: true } },
 };
 
 @Injectable()

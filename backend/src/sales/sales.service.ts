@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import {
   CreateQuotationDto, QuotationQueryDto,
@@ -12,7 +13,7 @@ import {
 const QUOTATION_SELECT = {
   id: true, quotationNumber: true, status: true, subtotal: true,
   taxAmount: true, totalAmount: true, validUntil: true, notes: true,
-  approvalNotes: true, cancelReason: true,
+  approvalNotes: true, cancelReason: true, salesUserId: true,
   negotiationStatus: true, counterOfferAmount: true, counterOfferNote: true, counterOfferAt: true,
   createdAt: true, updatedAt: true,
   customer: { select: { id: true, companyName: true, customerCode: true } },
@@ -40,7 +41,10 @@ const ORDER_SELECT = {
 
 @Injectable()
 export class SalesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   // ─── Quotations ───────────────────────────────────────────────────────────
 
@@ -79,7 +83,7 @@ export class SalesService {
     const { items, ...data } = dto;
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(items);
 
-    return this.prisma.quotation.create({
+    const quotation = await this.prisma.quotation.create({
       data: {
         ...data,
         quotationNumber: number,
@@ -98,6 +102,13 @@ export class SalesService {
       },
       select: QUOTATION_SELECT,
     });
+
+    this.notifyManagers(
+      `Báo giá mới cần duyệt: ${number}`,
+      `Báo giá ${number} đã được tạo và đang chờ phê duyệt.`,
+    ).catch(() => {});
+
+    return quotation;
   }
 
   async sendQuotation(id: number) {
@@ -151,28 +162,58 @@ export class SalesService {
   async approveQuotation(id: number) {
     const q = await this.getQuotation(id);
     if (q.status !== 'PENDING_APPROVAL') throw new BadRequestException('Only PENDING_APPROVAL quotations can be approved');
-    return this.prisma.quotation.update({ where: { id }, data: { status: 'APPROVED', approvalNotes: null }, select: QUOTATION_SELECT });
+    const result = await this.prisma.quotation.update({ where: { id }, data: { status: 'APPROVED', approvalNotes: null }, select: QUOTATION_SELECT });
+
+    if ((q as any).salesUserId) {
+      this.notifyUser(
+        (q as any).salesUserId,
+        `Báo giá ${(q as any).quotationNumber} đã được duyệt`,
+        `Báo giá ${(q as any).quotationNumber} đã được phê duyệt. Bạn có thể gửi cho khách hàng.`,
+      ).catch(() => {});
+    }
+
+    return result;
   }
 
   async requestRevision(id: number, dto: RequestRevisionDto) {
     const q = await this.getQuotation(id);
     if (q.status !== 'PENDING_APPROVAL') throw new BadRequestException('Only PENDING_APPROVAL quotations can request revision');
-    return this.prisma.quotation.update({
+    const result = await this.prisma.quotation.update({
       where: { id },
       data: { status: 'REVISION_REQUESTED', approvalNotes: dto.reason },
       select: QUOTATION_SELECT,
     });
+
+    if ((q as any).salesUserId) {
+      this.notifyUser(
+        (q as any).salesUserId,
+        `Báo giá ${(q as any).quotationNumber} yêu cầu chỉnh sửa`,
+        `Lý do: ${dto.reason}`,
+      ).catch(() => {});
+    }
+
+    return result;
   }
 
   async cancelWithReason(id: number, dto: CancelWithReasonDto) {
     const q = await this.getQuotation(id);
     if (q.status === 'CANCELLED') throw new BadRequestException('Quotation already cancelled');
     if (q.status === 'CONFIRMED') throw new BadRequestException('Confirmed quotations cannot be cancelled');
-    return this.prisma.quotation.update({
+    const result = await this.prisma.quotation.update({
       where: { id },
       data: { status: 'CANCELLED', cancelReason: dto.reason },
       select: QUOTATION_SELECT,
     });
+
+    if ((q as any).salesUserId) {
+      this.notifyUser(
+        (q as any).salesUserId,
+        `Báo giá ${(q as any).quotationNumber} đã bị hủy`,
+        `Lý do: ${dto.reason}`,
+      ).catch(() => {});
+    }
+
+    return result;
   }
 
   async resubmitQuotation(id: number, dto: UpdateQuotationItemsDto) {
@@ -180,7 +221,7 @@ export class SalesService {
     if (q.status !== 'REVISION_REQUESTED') throw new BadRequestException('Only REVISION_REQUESTED quotations can be resubmitted');
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(dto.items);
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.quotationItem.deleteMany({ where: { quotationId: id } });
       return tx.quotation.update({
         where: { id },
@@ -201,6 +242,13 @@ export class SalesService {
         select: QUOTATION_SELECT,
       });
     });
+
+    this.notifyManagers(
+      `Báo giá ${(q as any).quotationNumber} đã được chỉnh sửa lại`,
+      `Báo giá ${(q as any).quotationNumber} đã được điều chỉnh và đang chờ phê duyệt lại.`,
+    ).catch(() => {});
+
+    return result;
   }
 
   async confirmPayment(id: number) {
@@ -547,5 +595,46 @@ export class SalesService {
     const count = await this.prisma.delivery.count();
     const year = new Date().getFullYear();
     return `DEL-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  private async notifyManagers(subject: string, content: string): Promise<void> {
+    const managers = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        userRoles: {
+          some: {
+            role: {
+              rolePermissions: {
+                some: { permission: { code: 'sales.quotation.approve' } },
+              },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+    await Promise.all(
+      managers.map((u) =>
+        this.notifications.create({
+          recipientId: u.id,
+          channel: 'IN_APP',
+          notificationType: 'QUOTATION_EVENT',
+          subject,
+          content,
+          priority: 'NORMAL',
+        }),
+      ),
+    );
+  }
+
+  private async notifyUser(userId: number, subject: string, content: string): Promise<void> {
+    await this.notifications.create({
+      recipientId: userId,
+      channel: 'IN_APP',
+      notificationType: 'QUOTATION_EVENT',
+      subject,
+      content,
+      priority: 'NORMAL',
+    });
   }
 }
