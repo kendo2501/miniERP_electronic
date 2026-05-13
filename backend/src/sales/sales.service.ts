@@ -19,7 +19,7 @@ const QUOTATION_SELECT = {
   customer: { select: { id: true, companyName: true, customerCode: true } },
   items: {
     select: {
-      id: true, quantity: true, unitPrice: true, discountAmount: true, totalAmount: true,
+      id: true, quantity: true, unitPrice: true, discountPercent: true, discountAmount: true, totalAmount: true,
       product: { select: { id: true, sku: true, productName: true, unit: true } },
     },
   },
@@ -33,7 +33,7 @@ const ORDER_SELECT = {
   quotation: { select: { id: true, quotationNumber: true } },
   items: {
     select: {
-      id: true, quantity: true, deliveredQuantity: true, unitPrice: true, discountAmount: true, totalAmount: true,
+      id: true, quantity: true, deliveredQuantity: true, unitPrice: true, discountPercent: true, discountAmount: true, totalAmount: true,
       product: { select: { id: true, sku: true, productName: true, unit: true } },
     },
   },
@@ -91,13 +91,18 @@ export class SalesService {
         subtotal, taxAmount, totalAmount,
         validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
         items: {
-          create: items.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            discountAmount: i.discountAmount ?? 0,
-            totalAmount: i.quantity * i.unitPrice - (i.discountAmount ?? 0),
-          })),
+          create: items.map((i) => {
+            const pct = i.discountPercent ?? 0;
+            const disc = this.lineDiscount(i.quantity, i.unitPrice, pct);
+            return {
+              productId: i.productId,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discountPercent: pct,
+              discountAmount: disc,
+              totalAmount: i.quantity * i.unitPrice - disc,
+            };
+          }),
         },
       },
       select: QUOTATION_SELECT,
@@ -123,7 +128,7 @@ export class SalesService {
 
     const orderNumber = await this.generateOrderNumber();
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(q.items.map((i) => ({
-      quantity: Number(i.quantity), unitPrice: Number(i.unitPrice), discountAmount: Number(i.discountAmount),
+      quantity: Number(i.quantity), unitPrice: Number(i.unitPrice), discountPercent: Number((i as any).discountPercent ?? 0),
     })));
 
     return this.prisma.$transaction(async (tx) => {
@@ -142,6 +147,7 @@ export class SalesService {
               productId: i.product.id,
               quantity: i.quantity,
               unitPrice: i.unitPrice,
+              discountPercent: (i as any).discountPercent ?? 0,
               discountAmount: i.discountAmount,
               totalAmount: i.totalAmount,
               deliveredQuantity: 0,
@@ -230,13 +236,18 @@ export class SalesService {
           approvalNotes: null,
           subtotal, taxAmount, totalAmount,
           items: {
-            create: dto.items.map((i) => ({
-              productId: i.productId,
-              quantity: i.quantity,
-              unitPrice: i.unitPrice,
-              discountAmount: i.discountAmount ?? 0,
-              totalAmount: i.quantity * i.unitPrice - (i.discountAmount ?? 0),
-            })),
+            create: dto.items.map((i) => {
+              const pct = i.discountPercent ?? 0;
+              const disc = this.lineDiscount(i.quantity, i.unitPrice, pct);
+              return {
+                productId: i.productId,
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+                discountPercent: pct,
+                discountAmount: disc,
+                totalAmount: i.quantity * i.unitPrice - disc,
+              };
+            }),
           },
         },
         select: QUOTATION_SELECT,
@@ -305,6 +316,7 @@ export class SalesService {
               productId: i.product.id,
               quantity: i.quantity,
               unitPrice: i.unitPrice,
+              discountPercent: (i as any).discountPercent ?? 0,
               discountAmount: i.discountAmount,
               totalAmount: i.totalAmount,
               deliveredQuantity: 0,
@@ -390,14 +402,19 @@ export class SalesService {
         subtotal, taxAmount, totalAmount,
         orderedAt: new Date(),
         items: {
-          create: items.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            discountAmount: i.discountAmount ?? 0,
-            totalAmount: i.quantity * i.unitPrice - (i.discountAmount ?? 0),
-            deliveredQuantity: 0,
-          })),
+          create: items.map((i) => {
+            const pct = i.discountPercent ?? 0;
+            const disc = this.lineDiscount(i.quantity, i.unitPrice, pct);
+            return {
+              productId: i.productId,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discountPercent: pct,
+              discountAmount: disc,
+              totalAmount: i.quantity * i.unitPrice - disc,
+              deliveredQuantity: 0,
+            };
+          }),
         },
       },
       select: ORDER_SELECT,
@@ -572,8 +589,15 @@ export class SalesService {
     if (!c || c.deletedAt) throw new NotFoundException(`Customer #${id} not found`);
   }
 
-  private calcTotals(items: { quantity: number; unitPrice: number; discountAmount?: number }[]) {
-    const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice - (i.discountAmount ?? 0), 0);
+  private lineDiscount(qty: number, price: number, pct: number): number {
+    return Math.round(qty * price * pct / 100);
+  }
+
+  private calcTotals(items: { quantity: number; unitPrice: number; discountPercent?: number }[]) {
+    const subtotal = items.reduce((s, i) => {
+      const disc = this.lineDiscount(i.quantity, i.unitPrice, i.discountPercent ?? 0);
+      return s + i.quantity * i.unitPrice - disc;
+    }, 0);
     const taxAmount = Math.round(subtotal * 0.1 * 100) / 100;
     const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
     return { subtotal, taxAmount, totalAmount };

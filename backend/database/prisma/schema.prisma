@@ -556,13 +556,14 @@ model Quotation {
 }
 
 model QuotationItem {
-  id             Int     @id @default(autoincrement())
-  quotationId    Int     @map("quotation_id")
-  productId      Int     @map("product_id")
-  quantity       Decimal @db.Decimal(18, 2)
-  unitPrice      Decimal @map("unit_price") @db.Decimal(18, 2)
-  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(18, 2)
-  totalAmount    Decimal @map("total_amount") @db.Decimal(18, 2)
+  id              Int     @id @default(autoincrement())
+  quotationId     Int     @map("quotation_id")
+  productId       Int     @map("product_id")
+  quantity        Decimal @db.Decimal(18, 2)
+  unitPrice       Decimal @map("unit_price") @db.Decimal(18, 2)
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  discountAmount  Decimal @default(0) @map("discount_amount") @db.Decimal(18, 2)
+  totalAmount     Decimal @map("total_amount") @db.Decimal(18, 2)
 
   quotation Quotation @relation(fields: [quotationId], references: [id])
   product   Product   @relation(fields: [productId], references: [id])
@@ -606,6 +607,7 @@ model SalesOrderItem {
   quantity          Decimal @db.Decimal(18, 2)
   deliveredQuantity Decimal @default(0) @map("delivered_quantity") @db.Decimal(18, 2)
   unitPrice         Decimal @map("unit_price") @db.Decimal(18, 2)
+  discountPercent   Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
   discountAmount    Decimal @default(0) @map("discount_amount") @db.Decimal(18, 2)
   totalAmount       Decimal @map("total_amount") @db.Decimal(18, 2)
 

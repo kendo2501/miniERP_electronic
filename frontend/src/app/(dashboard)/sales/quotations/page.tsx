@@ -53,7 +53,7 @@ const itemSchema = z.object({
   productId: z.string().min(1, "Chọn sản phẩm"),
   quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Số lượng phải là số nguyên dương"),
   unitPrice: z.string().refine((v) => Number(v) > 0, "Đơn giá phải lớn hơn 0"),
-  discountAmount: z.string().optional(),
+  discountPercent: z.string().optional().refine((v) => !v || (Number(v) >= 0 && Number(v) <= 100), "CK 0–100"),
 });
 
 const schema = z.object({
@@ -88,7 +88,7 @@ export default function QuotationsPage() {
 
   // Resubmit dialog (Sale after revision)
   const [resubmitTarget, setResubmitTarget] = useState<Quotation | null>(null);
-  const [resubmitItems, setResubmitItems] = useState<Array<{ productId: number; productName: string; sku: string; quantity: number; unitPrice: number; discountAmount: number }>>([]);
+  const [resubmitItems, setResubmitItems] = useState<Array<{ productId: number; productName: string; sku: string; quantity: number; unitPrice: number; discountPercent: number }>>([]);
 
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
@@ -142,7 +142,7 @@ export default function QuotationsPage() {
           productId: parseInt(i.productId),
           quantity: parseFloat(i.quantity),
           unitPrice: parseFloat(i.unitPrice),
-          discountAmount: i.discountAmount ? parseFloat(i.discountAmount) : undefined,
+          discountPercent: i.discountPercent ? parseFloat(i.discountPercent) : undefined,
         })),
       }).then((r) => r.data),
     onSuccess: () => {
@@ -202,7 +202,7 @@ export default function QuotationsPage() {
 
   const resubmitMut = useMutation({
     mutationFn: ({ id, items }: { id: number; items: typeof resubmitItems }) =>
-      resubmitQuotation(id, items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, discountAmount: i.discountAmount }))),
+      resubmitQuotation(id, items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, discountPercent: i.discountPercent }))),
     onSuccess: () => {
       toast.success("Đã gửi lại báo giá chờ duyệt");
       invalidate();
@@ -249,7 +249,7 @@ export default function QuotationsPage() {
       sku: i.product.sku,
       quantity: Number(i.quantity),
       unitPrice: Number(i.unitPrice),
-      discountAmount: Number(i.discountAmount),
+      discountPercent: Number(i.discountPercent),
     })));
     setResubmitTarget(q);
   }
@@ -544,7 +544,7 @@ export default function QuotationsPage() {
               <span>Sản phẩm</span>
               <span>SL</span>
               <span>Đơn giá (₫)</span>
-              <span>CK (₫)</span>
+              <span>CK (%)</span>
             </div>
             {resubmitItems.map((item, idx) => (
               <div key={idx} className="grid grid-cols-[2fr_80px_120px_100px] gap-2 items-center">
@@ -563,9 +563,9 @@ export default function QuotationsPage() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
                 />
                 <Input
-                  type="number" min="0" step="1000"
-                  value={item.discountAmount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, discountAmount: Number(e.target.value) } : it))}
+                  type="number" min="0" max="100" step="1"
+                  value={item.discountPercent}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, discountPercent: Number(e.target.value) } : it))}
                 />
               </div>
             ))}
@@ -669,7 +669,7 @@ export default function QuotationsPage() {
                   <span className="text-xs text-muted-foreground font-medium">Sản phẩm (SKU)</span>
                   <span className="text-xs text-muted-foreground font-medium">SL</span>
                   <span className="text-xs text-muted-foreground font-medium">Đơn giá (₫)</span>
-                  <span className="text-xs text-muted-foreground font-medium">CK (₫)</span>
+                  <span className="text-xs text-muted-foreground font-medium">CK (%)</span>
                   <span />
                 </div>
                 {(items ?? []).map((item, idx) => (
@@ -679,8 +679,8 @@ export default function QuotationsPage() {
                       onChange={(e) => setValue(`items.${idx}.quantity`, e.target.value)} defaultValue="1" />
                     <Input type="number" min="0" step="1000" placeholder="0"
                       onChange={(e) => setValue(`items.${idx}.unitPrice`, e.target.value)} value={item.unitPrice} />
-                    <Input type="number" min="0" step="1000" placeholder="0"
-                      onChange={(e) => setValue(`items.${idx}.discountAmount`, e.target.value)} />
+                    <Input type="number" min="0" max="100" step="1" placeholder="0"
+                      onChange={(e) => setValue(`items.${idx}.discountPercent`, e.target.value)} />
                     <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive"
                       onClick={() => { const cur = items ?? []; if (cur.length > 1) setValue("items", cur.filter((_, i) => i !== idx)); }}
                       disabled={(items ?? []).length <= 1}>

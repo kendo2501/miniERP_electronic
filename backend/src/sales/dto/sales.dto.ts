@@ -1,4 +1,4 @@
-import { IsInt, IsString, IsOptional, IsArray, IsNumber, ValidateNested, IsDateString, Min } from 'class-validator';
+import { IsInt, IsString, IsOptional, IsArray, IsNumber, ValidateNested, IsDateString, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -8,7 +8,8 @@ export class QuotationItemDto {
   @ApiProperty() @IsInt() @Type(() => Number) productId!: number;
   @ApiProperty() @IsNumber() @Min(0.01) @Type(() => Number) quantity!: number;
   @ApiProperty() @IsNumber() @Min(0) @Type(() => Number) unitPrice!: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) discountAmount?: number;
+  @ApiPropertyOptional({ description: 'Chiết khấu % (0–100)' })
+  @IsOptional() @IsNumber() @Min(0) @Max(100) @Type(() => Number) discountPercent?: number;
 }
 
 export class CreateQuotationDto {
@@ -34,7 +35,8 @@ export class SalesOrderItemDto {
   @ApiProperty() @IsInt() @Type(() => Number) productId!: number;
   @ApiProperty() @IsNumber() @Min(0.01) @Type(() => Number) quantity!: number;
   @ApiProperty() @IsNumber() @Min(0) @Type(() => Number) unitPrice!: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) discountAmount?: number;
+  @ApiPropertyOptional({ description: 'Chiết khấu % (0–100)' })
+  @IsOptional() @IsNumber() @Min(0) @Max(100) @Type(() => Number) discountPercent?: number;
 }
 
 export class CreateSalesOrderDto {
@@ -87,6 +89,7 @@ export class UpdateQuotationItemsDto {
   @ApiProperty({ type: [QuotationItemDto] })
   @IsArray() @ValidateNested({ each: true }) @Type(() => QuotationItemDto) items!: QuotationItemDto[];
 }
+
 
 // ─── Counter Offer ────────────────────────────────────────────────────────
 

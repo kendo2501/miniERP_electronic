@@ -48,7 +48,7 @@ const itemSchema = z.object({
   productId: z.string().min(1, "Chọn sản phẩm"),
   quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Số lượng phải là số nguyên dương"),
   unitPrice: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Đơn giá phải là số nguyên dương"),
-  discountAmount: z.string().optional(),
+  discountPercent: z.string().optional().refine((v) => !v || (Number(v) >= 0 && Number(v) <= 100), "CK 0–100"),
 });
 
 const schema = z.object({
@@ -95,7 +95,7 @@ export default function SalesOrdersPage() {
           productId: parseInt(i.productId),
           quantity: parseInt(i.quantity, 10),
           unitPrice: parseInt(i.unitPrice, 10),
-          discountAmount: i.discountAmount ? parseFloat(i.discountAmount) : undefined,
+          discountPercent: i.discountPercent ? parseFloat(i.discountPercent) : undefined,
         })),
       }).then((r) => r.data),
     onSuccess: () => {
@@ -334,7 +334,7 @@ export default function SalesOrdersPage() {
                   <span className="text-xs text-muted-foreground font-medium">Sản phẩm (SKU)</span>
                   <span className="text-xs text-muted-foreground font-medium">SL</span>
                   <span className="text-xs text-muted-foreground font-medium">Đơn giá (₫)</span>
-                  <span className="text-xs text-muted-foreground font-medium">CK (₫)</span>
+                  <span className="text-xs text-muted-foreground font-medium">CK (%)</span>
                   <span />
                 </div>
                 {(items ?? []).map((item, idx) => (
@@ -351,8 +351,8 @@ export default function SalesOrdersPage() {
                       onChange={(e) => setValue(`items.${idx}.unitPrice`, e.target.value)}
                       value={item.unitPrice}
                     />
-                    <Input type="number" min="0" step="1000" placeholder="0"
-                      onChange={(e) => setValue(`items.${idx}.discountAmount`, e.target.value)}
+                    <Input type="number" min="0" max="100" step="1" placeholder="0"
+                      onChange={(e) => setValue(`items.${idx}.discountPercent`, e.target.value)}
                     />
                     <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive"
                       onClick={() => { const cur = items ?? []; if (cur.length > 1) setValue("items", cur.filter((_, i) => i !== idx)); }}

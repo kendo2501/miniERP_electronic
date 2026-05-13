@@ -78,6 +78,7 @@ export interface QuotationItem {
   id: number;
   quantity: number;
   unitPrice: number;
+  discountPercent: number;
   discountAmount: number;
   totalAmount: number;
   product: { id: number; sku: string; productName: string; unit: string };
@@ -117,7 +118,7 @@ export interface QuotationItemPayload {
   productId: number;
   quantity: number;
   unitPrice: number;
-  discountAmount?: number;
+  discountPercent?: number;
 }
 
 export interface CreateQuotationPayload {
@@ -142,6 +143,7 @@ export interface SalesOrderItem {
   quantity: number;
   deliveredQuantity: number;
   unitPrice: number;
+  discountPercent: number;
   discountAmount: number;
   totalAmount: number;
   product: { id: number; sku: string; productName: string; unit: string };
@@ -181,7 +183,7 @@ export interface SalesOrderItemPayload {
   productId: number;
   quantity: number;
   unitPrice: number;
-  discountAmount?: number;
+  discountPercent?: number;
 }
 
 export interface CreateSalesOrderPayload {
