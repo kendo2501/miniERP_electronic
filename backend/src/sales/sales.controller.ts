@@ -6,6 +6,7 @@ import {
   CreateSalesOrderDto, SalesOrderQueryDto,
   CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
   SubmitCounterOfferDto,
+  CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
 } from './dto/sales.dto';
 import { RequirePermissions, AnyPermission } from '../common/decorators/permissions.decorator';
 
@@ -44,6 +45,18 @@ export class SalesController {
   @Post('quotations/:id/reject-offer') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Admin rejects counter offer' })
   rejectCounterOffer(@Param('id', ParseIntPipe) id: number) { return this.service.rejectCounterOffer(id); }
 
+  @Post('quotations/:id/approve') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Manager approves quotation' })
+  approveQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.approveQuotation(id); }
+
+  @Post('quotations/:id/request-revision') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Manager requests revision with reason' })
+  requestRevision(@Param('id', ParseIntPipe) id: number, @Body() dto: RequestRevisionDto) { return this.service.requestRevision(id, dto); }
+
+  @Post('quotations/:id/cancel-with-reason') @HttpCode(HttpStatus.OK) @AnyPermission('sales.quotation.approve', 'sales.quotation.update_own') @ApiOperation({ summary: 'Cancel quotation with reason' })
+  cancelWithReason(@Param('id', ParseIntPipe) id: number, @Body() dto: CancelWithReasonDto) { return this.service.cancelWithReason(id, dto); }
+
+  @Post('quotations/:id/resubmit') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Sale resubmits quotation after revision request' })
+  resubmitQuotation(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateQuotationItemsDto) { return this.service.resubmitQuotation(id, dto); }
+
   // ─── Sales Orders ─────────────────────────────────────────────────────────
 
   @Get('orders') @AnyPermission('sales.order.view_all', 'sales.order.view_team', 'sales.order.view_assigned', 'sales.order.view_own') @ApiOperation({ summary: 'List sales orders' })
@@ -60,6 +73,9 @@ export class SalesController {
 
   @Post('orders/:id/cancel') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.cancel') @ApiOperation({ summary: 'Cancel order' })
   cancelOrder(@Param('id', ParseIntPipe) id: number) { return this.service.cancelOrder(id); }
+
+  @Post('orders/:id/confirm-payment') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.approve') @ApiOperation({ summary: 'Confirm order payment' })
+  confirmPayment(@Param('id', ParseIntPipe) id: number) { return this.service.confirmPayment(id); }
 
   // ─── Deliveries ───────────────────────────────────────────────────────────
 

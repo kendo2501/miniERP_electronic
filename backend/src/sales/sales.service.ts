@@ -6,11 +6,13 @@ import {
   CreateSalesOrderDto, SalesOrderQueryDto,
   CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
   SubmitCounterOfferDto,
+  CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
 } from './dto/sales.dto';
 
 const QUOTATION_SELECT = {
   id: true, quotationNumber: true, status: true, subtotal: true,
   taxAmount: true, totalAmount: true, validUntil: true, notes: true,
+  approvalNotes: true, cancelReason: true,
   negotiationStatus: true, counterOfferAmount: true, counterOfferNote: true, counterOfferAt: true,
   createdAt: true, updatedAt: true,
   customer: { select: { id: true, companyName: true, customerCode: true } },
@@ -23,7 +25,7 @@ const QUOTATION_SELECT = {
 };
 
 const ORDER_SELECT = {
-  id: true, orderNumber: true, status: true, subtotal: true,
+  id: true, orderNumber: true, status: true, paymentStatus: true, paidAt: true, subtotal: true,
   taxAmount: true, totalAmount: true, orderedAt: true, confirmedAt: true, notes: true,
   createdAt: true, updatedAt: true,
   customer: { select: { id: true, companyName: true, customerCode: true } },
@@ -81,7 +83,7 @@ export class SalesService {
       data: {
         ...data,
         quotationNumber: number,
-        status: 'DRAFT',
+        status: 'PENDING_APPROVAL',
         subtotal, taxAmount, totalAmount,
         validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
         items: {
@@ -100,13 +102,13 @@ export class SalesService {
 
   async sendQuotation(id: number) {
     const q = await this.getQuotation(id);
-    if (q.status !== 'DRAFT') throw new BadRequestException('Only DRAFT quotations can be sent');
+    if (!['APPROVED'].includes(q.status ?? '')) throw new BadRequestException('Only APPROVED quotations can be sent to customer');
     return this.prisma.quotation.update({ where: { id }, data: { status: 'SENT' }, select: QUOTATION_SELECT });
   }
 
   async confirmQuotation(id: number) {
     const q = await this.getQuotation(id);
-    if (!['DRAFT', 'SENT'].includes(q.status ?? '')) throw new BadRequestException('Quotation cannot be confirmed');
+    if (!['SENT', 'APPROVED'].includes(q.status ?? '')) throw new BadRequestException('Quotation cannot be confirmed');
 
     const orderNumber = await this.generateOrderNumber();
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(q.items.map((i) => ({
@@ -144,6 +146,71 @@ export class SalesService {
     const q = await this.getQuotation(id);
     if (q.status === 'CANCELLED') throw new BadRequestException('Quotation already cancelled');
     return this.prisma.quotation.update({ where: { id }, data: { status: 'CANCELLED' }, select: QUOTATION_SELECT });
+  }
+
+  async approveQuotation(id: number) {
+    const q = await this.getQuotation(id);
+    if (q.status !== 'PENDING_APPROVAL') throw new BadRequestException('Only PENDING_APPROVAL quotations can be approved');
+    return this.prisma.quotation.update({ where: { id }, data: { status: 'APPROVED', approvalNotes: null }, select: QUOTATION_SELECT });
+  }
+
+  async requestRevision(id: number, dto: RequestRevisionDto) {
+    const q = await this.getQuotation(id);
+    if (q.status !== 'PENDING_APPROVAL') throw new BadRequestException('Only PENDING_APPROVAL quotations can request revision');
+    return this.prisma.quotation.update({
+      where: { id },
+      data: { status: 'REVISION_REQUESTED', approvalNotes: dto.reason },
+      select: QUOTATION_SELECT,
+    });
+  }
+
+  async cancelWithReason(id: number, dto: CancelWithReasonDto) {
+    const q = await this.getQuotation(id);
+    if (q.status === 'CANCELLED') throw new BadRequestException('Quotation already cancelled');
+    if (q.status === 'CONFIRMED') throw new BadRequestException('Confirmed quotations cannot be cancelled');
+    return this.prisma.quotation.update({
+      where: { id },
+      data: { status: 'CANCELLED', cancelReason: dto.reason },
+      select: QUOTATION_SELECT,
+    });
+  }
+
+  async resubmitQuotation(id: number, dto: UpdateQuotationItemsDto) {
+    const q = await this.getQuotation(id);
+    if (q.status !== 'REVISION_REQUESTED') throw new BadRequestException('Only REVISION_REQUESTED quotations can be resubmitted');
+    const { subtotal, taxAmount, totalAmount } = this.calcTotals(dto.items);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.quotationItem.deleteMany({ where: { quotationId: id } });
+      return tx.quotation.update({
+        where: { id },
+        data: {
+          status: 'PENDING_APPROVAL',
+          approvalNotes: null,
+          subtotal, taxAmount, totalAmount,
+          items: {
+            create: dto.items.map((i) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discountAmount: i.discountAmount ?? 0,
+              totalAmount: i.quantity * i.unitPrice - (i.discountAmount ?? 0),
+            })),
+          },
+        },
+        select: QUOTATION_SELECT,
+      });
+    });
+  }
+
+  async confirmPayment(id: number) {
+    const o = await this.getOrder(id);
+    if ((o as any).paymentStatus === 'PAID') throw new BadRequestException('Order already marked as paid');
+    return this.prisma.salesOrder.update({
+      where: { id },
+      data: { paymentStatus: 'PAID', paidAt: new Date() },
+      select: ORDER_SELECT,
+    });
   }
 
   async submitCounterOffer(id: number, dto: SubmitCounterOfferDto) {
@@ -236,7 +303,7 @@ export class SalesService {
       this.prisma.salesOrder.findMany({
         where, skip, take: limit, orderBy: { createdAt: 'desc' },
         select: {
-          id: true, orderNumber: true, status: true, totalAmount: true, orderedAt: true, confirmedAt: true, createdAt: true,
+          id: true, orderNumber: true, status: true, paymentStatus: true, totalAmount: true, subtotal: true, taxAmount: true, orderedAt: true, confirmedAt: true, createdAt: true,
           customer: { select: { id: true, companyName: true, customerCode: true } },
           quotation: { select: { id: true, quotationNumber: true } },
           _count: { select: { items: true, deliveries: true } },

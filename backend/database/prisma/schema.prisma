@@ -538,6 +538,8 @@ model Quotation {
   status               String?   @db.VarChar(50)
   validUntil           DateTime? @map("valid_until") @db.Date
   notes                String?   @db.Text
+  approvalNotes        String?   @map("approval_notes") @db.Text
+  cancelReason         String?   @map("cancel_reason") @db.Text
   negotiationStatus    String?   @default("NONE") @map("negotiation_status") @db.VarChar(20)
   counterOfferAmount   Decimal?  @map("counter_offer_amount") @db.Decimal(18, 2)
   counterOfferNote     String?   @map("counter_offer_note") @db.Text
@@ -577,12 +579,14 @@ model SalesOrder {
   subtotal    Decimal?  @db.Decimal(18, 2)
   taxAmount   Decimal?  @map("tax_amount") @db.Decimal(18, 2)
   totalAmount Decimal?  @map("total_amount") @db.Decimal(18, 2)
-  status      String?   @db.VarChar(50)
-  orderedAt   DateTime? @map("ordered_at")
-  confirmedAt DateTime? @map("confirmed_at")
-  notes       String?   @db.Text
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  status        String?   @db.VarChar(50)
+  paymentStatus String    @default("UNPAID") @map("payment_status") @db.VarChar(20)
+  paidAt        DateTime? @map("paid_at")
+  orderedAt     DateTime? @map("ordered_at")
+  confirmedAt   DateTime? @map("confirmed_at")
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   customer      Customer         @relation(fields: [customerId], references: [id])
   quotation     Quotation?       @relation(fields: [quotationId], references: [id])

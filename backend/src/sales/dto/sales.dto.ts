@@ -73,6 +73,21 @@ export class MarkDeliveryFailedDto {
   @ApiPropertyOptional() @IsOptional() @IsString() failureReason?: string;
 }
 
+// ─── Quotation Approval Flow ─────────────────────────────────────────────
+
+export class CancelWithReasonDto {
+  @ApiProperty() @IsString() reason!: string;
+}
+
+export class RequestRevisionDto {
+  @ApiProperty() @IsString() reason!: string;
+}
+
+export class UpdateQuotationItemsDto {
+  @ApiProperty({ type: [QuotationItemDto] })
+  @IsArray() @ValidateNested({ each: true }) @Type(() => QuotationItemDto) items!: QuotationItemDto[];
+}
+
 // ─── Counter Offer ────────────────────────────────────────────────────────
 
 export class SubmitCounterOfferDto {

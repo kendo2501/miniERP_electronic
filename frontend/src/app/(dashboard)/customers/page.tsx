@@ -222,6 +222,9 @@ export default function CustomersPage() {
             <DialogTitle>{t.customers.createTitle}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4 pt-2">
+            <div className="rounded-md bg-muted/50 border px-3 py-2 text-xs text-muted-foreground">
+              Mã KH (customerCode) sẽ được tạo tự động sau khi lưu.
+            </div>
             <div className="space-y-1.5">
               <Label>{t.customers.companyName} *</Label>
               <Input placeholder={t.customers.companyPlaceholder} {...register("companyName")} />

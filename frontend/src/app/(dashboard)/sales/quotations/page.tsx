@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Trash2, Send, CheckCircle, XCircle, FileText, MessageSquare } from "lucide-react";
+import { Search, Plus, Loader2, Trash2, Send, CheckCircle, XCircle, FileText, MessageSquare, Edit2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,37 +12,47 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   listQuotations, createQuotation, sendQuotation, confirmQuotation, cancelQuotation, listCustomers,
   submitCounterOffer, acceptCounterOffer, rejectCounterOffer,
+  approveQuotation, requestRevision, cancelQuotationWithReason, resubmitQuotation,
 } from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
-import type { QuotationStatus } from "@/types/sales";
+import type { Quotation, QuotationStatus } from "@/types/sales";
 import { vnd } from "@/lib/format";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 import Link from "next/link";
 
-const STATUS_VARIANTS: Record<QuotationStatus, "secondary" | "default" | "outline" | "destructive"> = {
-  DRAFT: "secondary",
-  SENT: "default",
-  CONFIRMED: "outline",
-  CANCELLED: "destructive",
+// ─── Status display ──────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<QuotationStatus, string> = {
+  PENDING_APPROVAL: "Chờ duyệt",
+  APPROVED: "Đã duyệt",
+  REVISION_REQUESTED: "Yêu cầu chỉnh sửa",
+  SENT: "Đã gửi KH",
+  CONFIRMED: "Đã xác nhận",
+  CANCELLED: "Đã hủy",
 };
 
-const STATUS_COLORS: Record<QuotationStatus, string> = {
-  DRAFT: "",
-  SENT: "text-blue-600",
-  CONFIRMED: "text-green-600 border-green-300",
-  CANCELLED: "",
+const STATUS_CLASSES: Record<QuotationStatus, string> = {
+  PENDING_APPROVAL: "bg-yellow-100 text-yellow-800 border border-yellow-300",
+  APPROVED: "bg-green-100 text-green-800 border border-green-300",
+  REVISION_REQUESTED: "bg-orange-100 text-orange-800 border border-orange-300",
+  SENT: "bg-blue-100 text-blue-800 border border-blue-300",
+  CONFIRMED: "bg-emerald-100 text-emerald-800 border border-emerald-300",
+  CANCELLED: "bg-red-100 text-red-800 border border-red-300",
 };
+
+// ─── Form schema ─────────────────────────────────────────────────────────────
 
 const itemSchema = z.object({
   productId: z.string().min(1, "Chọn sản phẩm"),
-  quantity: z.string().min(1, "Bắt buộc"),
-  unitPrice: z.string().min(1, "Bắt buộc"),
+  quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Số lượng phải là số nguyên dương"),
+  unitPrice: z.string().refine((v) => Number(v) > 0, "Đơn giá phải lớn hơn 0"),
   discountAmount: z.string().optional(),
 });
 
@@ -55,17 +65,40 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function QuotationsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+
+  // Counter offer dialog
   const [counterOfferTarget, setCounterOfferTarget] = useState<{ id: number; original: number } | null>(null);
   const [counterAmount, setCounterAmount] = useState("");
   const [counterNote, setCounterNote] = useState("");
+
+  // Revision request dialog (Manager)
+  const [revisionTarget, setRevisionTarget] = useState<number | null>(null);
+  const [revisionReason, setRevisionReason] = useState("");
+
+  // Cancel with reason dialog
+  const [cancelTarget, setCancelTarget] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+
+  // Resubmit dialog (Sale after revision)
+  const [resubmitTarget, setResubmitTarget] = useState<Quotation | null>(null);
+  const [resubmitItems, setResubmitItems] = useState<Array<{ productId: number; productName: string; sku: string; quantity: number; unitPrice: number; discountAmount: number }>>([]);
+
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
+
+  const canCreate = hasPermission("sales.quotation.create");
+  const canApprove = hasPermission("sales.quotation.approve");
+  const canUpdateOwn = hasPermission("sales.quotation.update_own");
+
+  // ─── Queries ──────────────────────────────────────────────────────────────
 
   const { data, isLoading } = useQuery({
     queryKey: ["quotations", page, search, statusFilter],
@@ -79,10 +112,25 @@ export default function QuotationsPage() {
     queryFn: () => listCustomers({ limit: 200 }).then((r) => r.data),
   });
 
+  // ─── Form ─────────────────────────────────────────────────────────────────
+
   const { handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { items: [{ productId: "", quantity: "1", unitPrice: "0" }] },
   });
+
+  const items = watch("items");
+
+  function handleProductChange(idx: number, productId: string, product?: Product) {
+    setValue(`items.${idx}.productId`, productId);
+    if (product?.standardPrice) {
+      setValue(`items.${idx}.unitPrice`, String(product.standardPrice));
+    }
+  }
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["quotations"] });
 
   const createMut = useMutation({
     mutationFn: (v: FormValues) =>
@@ -98,83 +146,115 @@ export default function QuotationsPage() {
         })),
       }).then((r) => r.data),
     onSuccess: () => {
-      toast.success(t.quotations.quotationCreated);
-      qc.invalidateQueries({ queryKey: ["quotations"] });
+      toast.success("Báo giá đã gửi chờ duyệt");
+      invalidate();
       setShowCreate(false);
       reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
     },
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Tạo báo giá thất bại"),
   });
 
-  const sendMut = useMutation({
-    mutationFn: (id: number) => sendQuotation(id),
-    onSuccess: () => { toast.success(t.quotations.sent); qc.invalidateQueries({ queryKey: ["quotations"] }); },
-    onError: () => toast.error("Gửi báo giá thất bại"),
+  // Manager actions
+  const approveMut = useMutation({
+    mutationFn: (id: number) => approveQuotation(id),
+    onSuccess: () => { toast.success("Đã duyệt báo giá"); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Duyệt thất bại"),
+  });
+
+  const requestRevisionMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => requestRevision(id, reason),
+    onSuccess: () => {
+      toast.success("Đã yêu cầu chỉnh sửa");
+      invalidate();
+      setRevisionTarget(null);
+      setRevisionReason("");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Yêu cầu chỉnh sửa thất bại"),
+  });
+
+  const cancelWithReasonMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => cancelQuotationWithReason(id, reason),
+    onSuccess: () => {
+      toast.success("Đã hủy báo giá");
+      invalidate();
+      setCancelTarget(null);
+      setCancelReason("");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Hủy thất bại"),
   });
 
   const confirmMut = useMutation({
     mutationFn: (id: number) => confirmQuotation(id),
     onSuccess: () => {
-      toast.success(t.quotations.approved + " → Đã tạo đơn hàng");
-      qc.invalidateQueries({ queryKey: ["quotations"] });
+      toast.success("Đã xác nhận → Tạo đơn hàng thành công");
+      invalidate();
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
-    onError: () => toast.error("Duyệt báo giá thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận thất bại"),
   });
 
-  const cancelMut = useMutation({
-    mutationFn: (id: number) => cancelQuotation(id),
-    onSuccess: () => { toast.success(t.quotations.rejected); qc.invalidateQueries({ queryKey: ["quotations"] }); },
-    onError: () => toast.error("Hủy báo giá thất bại"),
+  // Sale actions
+  const sendMut = useMutation({
+    mutationFn: (id: number) => sendQuotation(id),
+    onSuccess: () => { toast.success("Đã gửi báo giá cho khách hàng"); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi thất bại"),
   });
 
+  const resubmitMut = useMutation({
+    mutationFn: ({ id, items }: { id: number; items: typeof resubmitItems }) =>
+      resubmitQuotation(id, items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, discountAmount: i.discountAmount }))),
+    onSuccess: () => {
+      toast.success("Đã gửi lại báo giá chờ duyệt");
+      invalidate();
+      setResubmitTarget(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi lại thất bại"),
+  });
+
+  // Counter offer (customer via sales rep)
   const counterOfferMut = useMutation({
     mutationFn: ({ id, proposedAmount, note }: { id: number; proposedAmount: number; note?: string }) =>
       submitCounterOffer(id, { proposedAmount, note }),
     onSuccess: () => {
       toast.success("Đã ghi nhận đề xuất giá — chờ Admin xác nhận");
-      qc.invalidateQueries({ queryKey: ["quotations"] });
+      invalidate();
       setCounterOfferTarget(null);
       setCounterAmount("");
       setCounterNote("");
     },
-    onError: () => toast.error("Gửi đề xuất giá thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi đề xuất giá thất bại"),
   });
 
   const acceptOfferMut = useMutation({
     mutationFn: (id: number) => acceptCounterOffer(id),
     onSuccess: () => {
       toast.success("Đã chấp nhận giá đề xuất → Tạo đơn hàng thành công");
-      qc.invalidateQueries({ queryKey: ["quotations"] });
+      invalidate();
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
-    onError: () => toast.error("Chấp nhận giá thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Chấp nhận giá thất bại"),
   });
 
   const rejectOfferMut = useMutation({
     mutationFn: (id: number) => rejectCounterOffer(id),
-    onSuccess: () => { toast.success("Đã từ chối giá đề xuất"); qc.invalidateQueries({ queryKey: ["quotations"] }); },
-    onError: () => toast.error("Từ chối giá thất bại"),
+    onSuccess: () => { toast.success("Đã từ chối giá đề xuất"); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Từ chối giá thất bại"),
   });
 
-  const canCreate = hasPermission("sales.quotation.create");
-  const canApprove = hasPermission("sales.quotation.approve");
-  const canUpdateOwn = hasPermission("sales.quotation.update_own");
-  const items = watch("items");
-
-  function handleProductChange(idx: number, productId: string, product?: Product) {
-    setValue(`items.${idx}.productId`, productId);
-    if (product?.standardPrice) {
-      setValue(`items.${idx}.unitPrice`, String(product.standardPrice));
-    }
+  function openResubmit(q: Quotation) {
+    if (!q.items) return;
+    setResubmitItems(q.items.map((i) => ({
+      productId: i.product.id,
+      productName: i.product.productName,
+      sku: i.product.sku,
+      quantity: Number(i.quantity),
+      unitPrice: Number(i.unitPrice),
+      discountAmount: Number(i.discountAmount),
+    })));
+    setResubmitTarget(q);
   }
 
-  const STATUS_LABELS: Record<QuotationStatus, string> = {
-    DRAFT: t.common.draft,
-    SENT: "Đã gửi",
-    CONFIRMED: "Đã duyệt",
-    CANCELLED: t.common.cancelled,
-  };
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -207,13 +287,15 @@ export default function QuotationsPage() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             </div>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.quotations.allStatuses}</SelectItem>
-                <SelectItem value="DRAFT">{t.common.draft}</SelectItem>
-                <SelectItem value="SENT">Đã gửi</SelectItem>
-                <SelectItem value="CONFIRMED">Đã duyệt</SelectItem>
-                <SelectItem value="CANCELLED">{t.common.cancelled}</SelectItem>
+                <SelectItem value="PENDING_APPROVAL">Chờ duyệt</SelectItem>
+                <SelectItem value="APPROVED">Đã duyệt</SelectItem>
+                <SelectItem value="REVISION_REQUESTED">Yêu cầu chỉnh sửa</SelectItem>
+                <SelectItem value="SENT">Đã gửi KH</SelectItem>
+                <SelectItem value="CONFIRMED">Đã xác nhận</SelectItem>
+                <SelectItem value="CANCELLED">Đã hủy</SelectItem>
               </SelectContent>
             </Select>
             {data && <span className="text-sm text-muted-foreground ml-auto">{data.total} {t.quotations.totalQuotations}</span>}
@@ -252,22 +334,21 @@ export default function QuotationsPage() {
                         </td>
                         <td className="px-6 py-3">
                           <div className="flex flex-col gap-1">
-                            <Badge variant={STATUS_VARIANTS[q.status]} className={STATUS_COLORS[q.status]}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-fit ${STATUS_CLASSES[q.status]}`}>
                               {STATUS_LABELS[q.status]}
-                            </Badge>
+                            </span>
+                            {q.approvalNotes && q.status === "REVISION_REQUESTED" && (
+                              <span className="text-xs text-orange-700 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {q.approvalNotes}
+                              </span>
+                            )}
+                            {q.cancelReason && q.status === "CANCELLED" && (
+                              <span className="text-xs text-red-600">Lý do: {q.cancelReason}</span>
+                            )}
                             {q.negotiationStatus === "PROPOSED" && (
                               <Badge variant="secondary" className="text-xs text-purple-700 bg-purple-50 border border-purple-200 w-fit">
                                 💬 Đề xuất: {vnd(Number(q.counterOfferAmount))}
-                              </Badge>
-                            )}
-                            {q.negotiationStatus === "ACCEPTED" && (
-                              <Badge variant="secondary" className="text-xs text-green-700 bg-green-50 border border-green-200 w-fit">
-                                ✓ Giá đã duyệt
-                              </Badge>
-                            )}
-                            {q.negotiationStatus === "REJECTED" && (
-                              <Badge variant="secondary" className="text-xs text-orange-700 bg-orange-50 border border-orange-200 w-fit">
-                                ✗ Giá bị từ chối
                               </Badge>
                             )}
                           </div>
@@ -289,20 +370,33 @@ export default function QuotationsPage() {
                         </td>
                         <td className="px-6 py-3">
                           <div className="flex items-center gap-1 flex-wrap">
-                            {q.status === "DRAFT" && (
-                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1"
-                                onClick={() => sendMut.mutate(q.id)} disabled={sendMut.isPending}>
-                                <Send className="h-3 w-3" /> Gửi KH
+                            {/* Manager: Duyệt / Yêu cầu chỉnh sửa / Hủy khi PENDING_APPROVAL */}
+                            {canApprove && q.status === "PENDING_APPROVAL" && (
+                              <>
+                                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-700 hover:text-green-800"
+                                  onClick={() => approveMut.mutate(q.id)} disabled={approveMut.isPending}>
+                                  <CheckCircle className="h-3 w-3" /> Duyệt
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                                  onClick={() => { setRevisionTarget(q.id); setRevisionReason(""); }}>
+                                  <Edit2 className="h-3 w-3" /> Yêu cầu chỉnh sửa
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
+                                  onClick={() => { setCancelTarget(q.id); setCancelReason(""); }}>
+                                  <XCircle className="h-3 w-3" /> Hủy
+                                </Button>
+                              </>
+                            )}
+
+                            {/* Manager: Tạo đơn khi APPROVED hoặc SENT */}
+                            {canApprove && (q.status === "APPROVED" || q.status === "SENT") && q.negotiationStatus !== "PROPOSED" && (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-700 hover:text-green-800"
+                                onClick={() => confirmMut.mutate(q.id)} disabled={confirmMut.isPending}>
+                                <CheckCircle className="h-3 w-3" /> Tạo đơn
                               </Button>
                             )}
-                            {/* Sales: submit counter offer when SENT and no pending offer */}
-                            {canUpdateOwn && q.status === "SENT" && (!q.negotiationStatus || q.negotiationStatus === "NONE" || q.negotiationStatus === "REJECTED") && (
-                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-purple-600 hover:text-purple-700"
-                                onClick={() => { setCounterOfferTarget({ id: q.id, original: Number(q.totalAmount) }); setCounterAmount(String(q.totalAmount)); setCounterNote(""); }}>
-                                <MessageSquare className="h-3 w-3" /> Đề xuất giá
-                              </Button>
-                            )}
-                            {/* Admin: accept or reject pending counter offer */}
+
+                            {/* Manager: xử lý đề xuất giá */}
                             {canApprove && q.negotiationStatus === "PROPOSED" && (
                               <>
                                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
@@ -315,16 +409,35 @@ export default function QuotationsPage() {
                                 </Button>
                               </>
                             )}
-                            {/* Admin: confirm at original price (only when no pending offer) */}
-                            {canApprove && (q.status === "DRAFT" || q.status === "SENT") && q.negotiationStatus !== "PROPOSED" && (
-                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
-                                onClick={() => confirmMut.mutate(q.id)} disabled={confirmMut.isPending}>
-                                <CheckCircle className="h-3 w-3" /> Tạo đơn
+
+                            {/* Sale: Gửi khách hàng khi APPROVED */}
+                            {canUpdateOwn && !canApprove && q.status === "APPROVED" && (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700"
+                                onClick={() => sendMut.mutate(q.id)} disabled={sendMut.isPending}>
+                                <Send className="h-3 w-3" /> Gửi KH
                               </Button>
                             )}
-                            {q.status !== "CANCELLED" && q.status !== "CONFIRMED" && (
+
+                            {/* Sale: Chỉnh sửa lại giá khi REVISION_REQUESTED */}
+                            {canUpdateOwn && !canApprove && q.status === "REVISION_REQUESTED" && (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                                onClick={() => openResubmit(q)}>
+                                <Edit2 className="h-3 w-3" /> Điều chỉnh lại giá
+                              </Button>
+                            )}
+
+                            {/* Sale: Đề xuất giá khi SENT */}
+                            {canUpdateOwn && q.status === "SENT" && (!q.negotiationStatus || q.negotiationStatus === "NONE" || q.negotiationStatus === "REJECTED") && (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-purple-600 hover:text-purple-700"
+                                onClick={() => { setCounterOfferTarget({ id: q.id, original: Number(q.totalAmount) }); setCounterAmount(String(q.totalAmount)); setCounterNote(""); }}>
+                                <MessageSquare className="h-3 w-3" /> Đề xuất giá
+                              </Button>
+                            )}
+
+                            {/* Hủy có lý do — sale có thể hủy nếu chưa xác nhận */}
+                            {!canApprove && canUpdateOwn && (q.status === "REVISION_REQUESTED") && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
-                                onClick={() => cancelMut.mutate(q.id)} disabled={cancelMut.isPending}>
+                                onClick={() => { setCancelTarget(q.id); setCancelReason(""); }}>
                                 <XCircle className="h-3 w-3" /> Hủy
                               </Button>
                             )}
@@ -353,7 +466,126 @@ export default function QuotationsPage() {
         </CardContent>
       </Card>
 
-      {/* Counter Offer Dialog */}
+      {/* ─── Revision Request Dialog (Manager) ─────────────────────────────── */}
+      <Dialog open={revisionTarget !== null} onOpenChange={(v) => { if (!v) { setRevisionTarget(null); setRevisionReason(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Yêu cầu chỉnh sửa báo giá</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Label>Lý do yêu cầu chỉnh sửa *</Label>
+            <Textarea
+              value={revisionReason}
+              onChange={(e) => setRevisionReason(e.target.value)}
+              placeholder="Nhập lý do yêu cầu chỉnh sửa..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRevisionTarget(null); setRevisionReason(""); }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              disabled={!revisionReason.trim() || requestRevisionMut.isPending}
+              onClick={() => {
+                if (revisionTarget === null) return;
+                requestRevisionMut.mutate({ id: revisionTarget, reason: revisionReason.trim() });
+              }}>
+              {requestRevisionMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Gửi yêu cầu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Cancel With Reason Dialog ──────────────────────────────────────── */}
+      <Dialog open={cancelTarget !== null} onOpenChange={(v) => { if (!v) { setCancelTarget(null); setCancelReason(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Hủy báo giá</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Label>Lý do hủy *</Label>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Nhập lý do hủy báo giá..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCancelTarget(null); setCancelReason(""); }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!cancelReason.trim() || cancelWithReasonMut.isPending}
+              onClick={() => {
+                if (cancelTarget === null) return;
+                cancelWithReasonMut.mutate({ id: cancelTarget, reason: cancelReason.trim() });
+              }}>
+              {cancelWithReasonMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Xác nhận hủy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Resubmit Dialog (Sale edit prices) ─────────────────────────────── */}
+      <Dialog open={resubmitTarget !== null} onOpenChange={(v) => { if (!v) setResubmitTarget(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Điều chỉnh lại giá báo giá</DialogTitle>
+            {resubmitTarget?.approvalNotes && (
+              <p className="text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded p-2 mt-1">
+                <AlertCircle className="h-4 w-4 inline mr-1" />
+                Lý do yêu cầu chỉnh sửa: <strong>{resubmitTarget.approvalNotes}</strong>
+              </p>
+            )}
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="grid grid-cols-[2fr_80px_120px_100px] gap-2 text-xs font-medium text-muted-foreground">
+              <span>Sản phẩm</span>
+              <span>SL</span>
+              <span>Đơn giá (₫)</span>
+              <span>CK (₫)</span>
+            </div>
+            {resubmitItems.map((item, idx) => (
+              <div key={idx} className="grid grid-cols-[2fr_80px_120px_100px] gap-2 items-center">
+                <div>
+                  <div className="font-medium text-sm">{item.productName}</div>
+                  <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
+                </div>
+                <Input
+                  type="number" min="1" step="1"
+                  value={item.quantity}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
+                />
+                <Input
+                  type="number" min="0" step="1000"
+                  value={item.unitPrice}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
+                />
+                <Input
+                  type="number" min="0" step="1000"
+                  value={item.discountAmount}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, discountAmount: Number(e.target.value) } : it))}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResubmitTarget(null)}>{t.common.cancel}</Button>
+            <Button
+              disabled={resubmitMut.isPending}
+              onClick={() => {
+                if (!resubmitTarget) return;
+                resubmitMut.mutate({ id: resubmitTarget.id, items: resubmitItems });
+              }}>
+              {resubmitMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Gửi lại chờ duyệt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Counter Offer Dialog ────────────────────────────────────────────── */}
       <Dialog open={!!counterOfferTarget} onOpenChange={(v) => { if (!v) { setCounterOfferTarget(null); setCounterAmount(""); setCounterNote(""); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Nhập giá đề xuất của khách hàng</DialogTitle></DialogHeader>
@@ -365,20 +597,14 @@ export default function QuotationsPage() {
             )}
             <div className="space-y-1.5">
               <Label>Giá đề xuất (₫) *</Label>
-              <Input
-                type="number" min="0" step="1000"
-                value={counterAmount}
+              <Input type="number" min="0" step="1000" value={counterAmount}
                 onChange={(e) => setCounterAmount(e.target.value)}
-                placeholder="Nhập số tiền khách đề xuất..."
-              />
+                placeholder="Nhập số tiền khách đề xuất..." />
             </div>
             <div className="space-y-1.5">
               <Label>Ghi chú</Label>
-              <Input
-                value={counterNote}
-                onChange={(e) => setCounterNote(e.target.value)}
-                placeholder="Lý do / điều kiện khách hàng..."
-              />
+              <Input value={counterNote} onChange={(e) => setCounterNote(e.target.value)}
+                placeholder="Lý do / điều kiện khách hàng..." />
             </div>
           </div>
           <DialogFooter>
@@ -398,7 +624,7 @@ export default function QuotationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Dialog */}
+      {/* ─── Create Dialog ───────────────────────────────────────────────────── */}
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] }); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t.quotations.createTitle}</DialogTitle></DialogHeader>
@@ -430,7 +656,6 @@ export default function QuotationsPage() {
               <Input placeholder="Ghi chú thêm..." onChange={(e) => setValue("notes", e.target.value)} />
             </div>
 
-            {/* Line items */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>Sản phẩm *</Label>
@@ -449,21 +674,13 @@ export default function QuotationsPage() {
                 </div>
                 {(items ?? []).map((item, idx) => (
                   <div key={idx} className="grid grid-cols-[2fr_64px_100px_80px_32px] gap-2 items-center">
-                    <ProductSelect
-                      value={item.productId}
-                      onChange={(pid, prod) => handleProductChange(idx, pid, prod)}
-                    />
-                    <Input type="number" min="0.01" step="1" placeholder="1"
-                      onChange={(e) => setValue(`items.${idx}.quantity`, e.target.value)}
-                      defaultValue="1"
-                    />
+                    <ProductSelect value={item.productId} onChange={(pid, prod) => handleProductChange(idx, pid, prod)} />
+                    <Input type="number" min="1" step="1" placeholder="1"
+                      onChange={(e) => setValue(`items.${idx}.quantity`, e.target.value)} defaultValue="1" />
                     <Input type="number" min="0" step="1000" placeholder="0"
-                      onChange={(e) => setValue(`items.${idx}.unitPrice`, e.target.value)}
-                      value={item.unitPrice}
-                    />
+                      onChange={(e) => setValue(`items.${idx}.unitPrice`, e.target.value)} value={item.unitPrice} />
                     <Input type="number" min="0" step="1000" placeholder="0"
-                      onChange={(e) => setValue(`items.${idx}.discountAmount`, e.target.value)}
-                    />
+                      onChange={(e) => setValue(`items.${idx}.discountAmount`, e.target.value)} />
                     <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive"
                       onClick={() => { const cur = items ?? []; if (cur.length > 1) setValue("items", cur.filter((_, i) => i !== idx)); }}
                       disabled={(items ?? []).length <= 1}>
@@ -471,6 +688,7 @@ export default function QuotationsPage() {
                     </Button>
                   </div>
                 ))}
+                {errors.items && <p className="text-xs text-destructive">Kiểm tra lại thông tin sản phẩm</p>}
               </div>
             </div>
 
@@ -480,7 +698,7 @@ export default function QuotationsPage() {
               </Button>
               <Button type="submit" disabled={createMut.isPending}>
                 {createMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Tạo báo giá
+                Tạo & gửi duyệt
               </Button>
             </DialogFooter>
           </form>

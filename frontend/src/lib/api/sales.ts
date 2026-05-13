@@ -52,6 +52,18 @@ export const acceptCounterOffer = (id: number) =>
 export const rejectCounterOffer = (id: number) =>
   apiClient.post<Quotation>(`/sales/quotations/${id}/reject-offer`);
 
+export const approveQuotation = (id: number) =>
+  apiClient.post<Quotation>(`/sales/quotations/${id}/approve`);
+
+export const requestRevision = (id: number, reason: string) =>
+  apiClient.post<Quotation>(`/sales/quotations/${id}/request-revision`, { reason });
+
+export const cancelQuotationWithReason = (id: number, reason: string) =>
+  apiClient.post<Quotation>(`/sales/quotations/${id}/cancel-with-reason`, { reason });
+
+export const resubmitQuotation = (id: number, items: { productId: number; quantity: number; unitPrice: number; discountAmount?: number }[]) =>
+  apiClient.post<Quotation>(`/sales/quotations/${id}/resubmit`, { items });
+
 // ─── Sales Orders ─────────────────────────────────────────────────────────────
 
 export const listOrders = (params?: Record<string, unknown>) =>
@@ -68,6 +80,9 @@ export const confirmOrder = (id: number) =>
 
 export const cancelOrder = (id: number) =>
   apiClient.post<SalesOrder>(`/sales/orders/${id}/cancel`);
+
+export const confirmPayment = (id: number) =>
+  apiClient.post<SalesOrder>(`/sales/orders/${id}/confirm-payment`);
 
 // ─── Deliveries ───────────────────────────────────────────────────────────────
 

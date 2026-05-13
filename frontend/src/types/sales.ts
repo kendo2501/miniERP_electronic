@@ -59,7 +59,7 @@ export interface UpdateCustomerPayload extends Partial<CreateCustomerPayload> {}
 
 // ─── Quotation ────────────────────────────────────────────────────────────────
 
-export type QuotationStatus = 'DRAFT' | 'SENT' | 'CONFIRMED' | 'CANCELLED';
+export type QuotationStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REVISION_REQUESTED' | 'SENT' | 'CONFIRMED' | 'CANCELLED';
 export type NegotiationStatus = 'NONE' | 'PROPOSED' | 'ACCEPTED' | 'REJECTED';
 
 export interface QuotationItem {
@@ -80,6 +80,8 @@ export interface Quotation {
   totalAmount: number;
   validUntil?: string;
   notes?: string;
+  approvalNotes?: string;
+  cancelReason?: string;
   negotiationStatus?: NegotiationStatus;
   counterOfferAmount?: number;
   counterOfferNote?: string;
@@ -133,10 +135,14 @@ export interface SalesOrderItem {
   product: { id: number; sku: string; productName: string; unit: string };
 }
 
+export type PaymentStatus = 'UNPAID' | 'PAID';
+
 export interface SalesOrder {
   id: number;
   orderNumber: string;
   status: SalesOrderStatus;
+  paymentStatus: PaymentStatus;
+  paidAt?: string;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;

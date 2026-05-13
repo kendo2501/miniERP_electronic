@@ -13,10 +13,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { listOrders, confirmOrder, cancelOrder, createOrder, listCustomers } from "@/lib/api/sales";
+import { listOrders, confirmOrder, cancelOrder, createOrder, listCustomers, confirmPayment } from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
-import type { SalesOrderStatus } from "@/types/sales";
+import type { SalesOrderStatus, PaymentStatus } from "@/types/sales";
 import { vnd } from "@/lib/format";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
@@ -38,16 +38,16 @@ const STATUS_COLORS: Record<SalesOrderStatus, string> = {
   CANCELLED: "",
 };
 
-function PaymentBadge({ status }: { status?: string }) {
-  if (!status || status === "UNPAID") return <Badge variant="secondary" className="text-xs text-orange-600">Chưa trả</Badge>;
-  if (status === "PARTIAL") return <Badge variant="secondary" className="text-xs text-yellow-600">Trả 1 phần</Badge>;
-  return <Badge variant="outline" className="text-xs text-green-600">Đã trả</Badge>;
+function PaymentBadge({ status }: { status?: PaymentStatus }) {
+  if (!status || status === "UNPAID")
+    return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">Chưa thanh toán</span>;
+  return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">Đã thanh toán</span>;
 }
 
 const itemSchema = z.object({
   productId: z.string().min(1, "Chọn sản phẩm"),
-  quantity: z.string().min(1, "Bắt buộc"),
-  unitPrice: z.string().min(1, "Bắt buộc"),
+  quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Số lượng phải là số nguyên dương"),
+  unitPrice: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Đơn giá phải là số nguyên dương"),
   discountAmount: z.string().optional(),
 });
 
@@ -119,7 +119,14 @@ export default function SalesOrdersPage() {
     onError: () => toast.error("Hủy đơn thất bại"),
   });
 
+  const paymentMut = useMutation({
+    mutationFn: (id: number) => confirmPayment(id),
+    onSuccess: () => { toast.success("Đã xác nhận thanh toán"); qc.invalidateQueries({ queryKey: ["orders"] }); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận thanh toán thất bại"),
+  });
+
   const canCreate = hasPermission("sales.order.create");
+  const canApprove = hasPermission("sales.order.approve");
   const items = watch("items");
 
   const STATUS_LABELS: Record<SalesOrderStatus, string> = {
@@ -221,8 +228,11 @@ export default function SalesOrdersPage() {
                       <td className="px-6 py-3">
                         <PaymentBadge status={(o as any).paymentStatus} />
                       </td>
-                      <td className="px-6 py-3 text-right font-semibold tabular-nums">
-                        {vnd(Number(o.totalAmount))}
+                      <td className="px-6 py-3 text-right">
+                        <div className="font-semibold tabular-nums">{vnd(Number(o.totalAmount))}</div>
+                        {Number(o.subtotal) !== Number(o.totalAmount) && (
+                          <div className="text-xs text-muted-foreground">Trước thuế: {vnd(Number(o.subtotal))}</div>
+                        )}
                       </td>
                       <td className="px-6 py-3 text-center">
                         <span className={`text-sm font-medium ${(o._count?.deliveries ?? 0) > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
@@ -233,7 +243,7 @@ export default function SalesOrdersPage() {
                         {new Date(o.orderedAt).toLocaleDateString("vi-VN")}
                       </td>
                       <td className="px-6 py-3">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 flex-wrap">
                           {o.status === "DRAFT" && (
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
                               onClick={() => confirmMut.mutate(o.id)} disabled={confirmMut.isPending}>
@@ -246,6 +256,12 @@ export default function SalesOrdersPage() {
                                 <Truck className="h-3 w-3" /> Giao hàng
                               </Button>
                             </Link>
+                          )}
+                          {canApprove && o.paymentStatus === "UNPAID" && !["CANCELLED", "DRAFT"].includes(o.status) && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-blue-700 hover:text-blue-800"
+                              onClick={() => paymentMut.mutate(o.id)} disabled={paymentMut.isPending}>
+                              <CheckCircle className="h-3 w-3" /> Đã thanh toán
+                            </Button>
                           )}
                           {!["CANCELLED", "DELIVERED"].includes(o.status) && (
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
@@ -327,11 +343,11 @@ export default function SalesOrdersPage() {
                       value={item.productId}
                       onChange={(pid, prod) => handleProductChange(idx, pid, prod)}
                     />
-                    <Input type="number" min="0.01" step="1" placeholder="1"
+                    <Input type="number" min="1" step="1" placeholder="1"
                       onChange={(e) => setValue(`items.${idx}.quantity`, e.target.value)}
                       defaultValue="1"
                     />
-                    <Input type="number" min="0" step="1000" placeholder="0"
+                    <Input type="number" min="1" step="1000" placeholder="0"
                       onChange={(e) => setValue(`items.${idx}.unitPrice`, e.target.value)}
                       value={item.unitPrice}
                     />
