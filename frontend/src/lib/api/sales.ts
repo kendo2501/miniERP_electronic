@@ -67,7 +67,7 @@ export const requestRevision = (id: number, reason: string) =>
 export const cancelQuotationWithReason = (id: number, reason: string) =>
   apiClient.post<Quotation>(`/sales/quotations/${id}/cancel-with-reason`, { reason });
 
-export const resubmitQuotation = (id: number, items: { productId: number; quantity: number; unitPrice: number; discountAmount?: number }[]) =>
+export const resubmitQuotation = (id: number, items: { productId: number; quantity: number; unitPrice: number; discountPercent?: number }[]) =>
   apiClient.post<Quotation>(`/sales/quotations/${id}/resubmit`, { items });
 
 // ─── Sales Orders ─────────────────────────────────────────────────────────────
@@ -89,6 +89,12 @@ export const cancelOrder = (id: number) =>
 
 export const confirmPayment = (id: number) =>
   apiClient.post<SalesOrder>(`/sales/orders/${id}/confirm-payment`);
+
+export const requestPriceAdjustment = (id: number, reason?: string) =>
+  apiClient.post<SalesOrder>(`/sales/orders/${id}/request-price-adjustment`, { reason });
+
+export const adjustOrderPrices = (id: number, items: { productId: number; quantity: number; unitPrice: number; discountPercent?: number }[]) =>
+  apiClient.post<SalesOrder>(`/sales/orders/${id}/adjust-prices`, { items });
 
 // ─── Deliveries ───────────────────────────────────────────────────────────────
 

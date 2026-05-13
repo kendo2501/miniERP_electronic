@@ -8,6 +8,7 @@ import {
   CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
   SubmitCounterOfferDto,
   CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
+  RequestPriceAdjustmentDto, AdjustOrderPricesDto,
 } from './dto/sales.dto';
 
 const QUOTATION_SELECT = {
@@ -28,6 +29,7 @@ const QUOTATION_SELECT = {
 const ORDER_SELECT = {
   id: true, orderNumber: true, status: true, paymentStatus: true, paidAt: true, subtotal: true,
   taxAmount: true, totalAmount: true, orderedAt: true, confirmedAt: true, notes: true,
+  salesUserId: true,
   createdAt: true, updatedAt: true,
   customer: { select: { id: true, companyName: true, customerCode: true } },
   quotation: { select: { id: true, quotationNumber: true } },
@@ -61,6 +63,7 @@ export class SalesService {
         where, skip, take: limit, orderBy: { createdAt: 'desc' },
         select: {
           id: true, quotationNumber: true, status: true, totalAmount: true, validUntil: true, createdAt: true,
+          approvalNotes: true, cancelReason: true,
           negotiationStatus: true, counterOfferAmount: true, counterOfferNote: true,
           customer: { select: { id: true, companyName: true, customerCode: true } },
           _count: { select: { items: true } },
@@ -262,14 +265,122 @@ export class SalesService {
     return result;
   }
 
-  async confirmPayment(id: number) {
+  async requestPriceAdjustment(id: number, dto: RequestPriceAdjustmentDto, actorId?: number) {
+    const o = await this.getOrder(id);
+    if (o.status !== 'CONFIRMED') throw new BadRequestException('Only CONFIRMED orders can request price adjustment');
+
+    const result = await this.prisma.salesOrder.update({
+      where: { id },
+      data: { status: 'PRICE_ADJUSTMENT_REQUESTED' },
+      select: ORDER_SELECT,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        eventType: 'ORDER_PRICE_ADJUSTMENT_REQUESTED',
+        category: 'sales',
+        actorId: actorId ?? null,
+        entityType: 'SalesOrder',
+        entityId: id,
+        action: 'REQUEST_PRICE_ADJUSTMENT',
+        status: 'SUCCESS',
+        metadata: { orderNumber: (o as any).orderNumber, reason: dto.reason ?? null },
+        beforeSnapshot: { status: o.status, totalAmount: (o as any).totalAmount },
+      },
+    }).catch(() => {});
+
+    const salesUserId = (o as any).salesUserId;
+    if (salesUserId) {
+      this.notifyUser(
+        salesUserId,
+        `Đơn hàng ${(o as any).orderNumber} cần điều chỉnh giá`,
+        `Quản lý yêu cầu điều chỉnh giá.${dto.reason ? ` Lý do: ${dto.reason}` : ''}`,
+      ).catch(() => {});
+    }
+
+    return result;
+  }
+
+  async adjustOrderPrices(id: number, dto: AdjustOrderPricesDto, actorId?: number) {
+    const o = await this.getOrder(id);
+    if (o.status !== 'PRICE_ADJUSTMENT_REQUESTED')
+      throw new BadRequestException('Only PRICE_ADJUSTMENT_REQUESTED orders can have prices adjusted');
+
+    const { subtotal, taxAmount, totalAmount } = this.calcTotals(dto.items);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
+      return tx.salesOrder.update({
+        where: { id },
+        data: {
+          status: 'DRAFT',
+          subtotal, taxAmount, totalAmount,
+          items: {
+            create: dto.items.map((i) => {
+              const pct = i.discountPercent ?? 0;
+              const disc = this.lineDiscount(i.quantity, i.unitPrice, pct);
+              return {
+                productId: i.productId,
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+                discountPercent: pct,
+                discountAmount: disc,
+                totalAmount: i.quantity * i.unitPrice - disc,
+                deliveredQuantity: 0,
+              };
+            }),
+          },
+        },
+        select: ORDER_SELECT,
+      });
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        eventType: 'ORDER_PRICES_ADJUSTED',
+        category: 'sales',
+        actorId: actorId ?? null,
+        entityType: 'SalesOrder',
+        entityId: id,
+        action: 'ADJUST_PRICES',
+        status: 'SUCCESS',
+        metadata: { orderNumber: (o as any).orderNumber, newTotal: totalAmount, itemCount: dto.items.length },
+        beforeSnapshot: { status: o.status, totalAmount: (o as any).totalAmount },
+      },
+    }).catch(() => {});
+
+    this.notifyManagers(
+      `Đơn hàng ${(o as any).orderNumber} đã điều chỉnh giá`,
+      `Đơn hàng ${(o as any).orderNumber} đã được điều chỉnh giá và đang chờ xác nhận lại.`,
+    ).catch(() => {});
+
+    return result;
+  }
+
+  async confirmPayment(id: number, actorId?: number) {
     const o = await this.getOrder(id);
     if ((o as any).paymentStatus === 'PAID') throw new BadRequestException('Order already marked as paid');
-    return this.prisma.salesOrder.update({
+
+    const result = await this.prisma.salesOrder.update({
       where: { id },
       data: { paymentStatus: 'PAID', paidAt: new Date() },
       select: ORDER_SELECT,
     });
+
+    await this.prisma.auditLog.create({
+      data: {
+        eventType: 'ORDER_PAYMENT_CONFIRMED',
+        category: 'sales',
+        actorId: actorId ?? null,
+        entityType: 'SalesOrder',
+        entityId: id,
+        action: 'CONFIRM_PAYMENT',
+        status: 'SUCCESS',
+        metadata: { orderNumber: (o as any).orderNumber, totalAmount: (o as any).totalAmount },
+      },
+    }).catch(() => {});
+
+    return result;
   }
 
   async submitCounterOffer(id: number, dto: SubmitCounterOfferDto) {

@@ -104,3 +104,14 @@ export class DeliveryQueryDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) salesOrderId?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
 }
+
+// ─── Order Price Adjustment ───────────────────────────────────────────────
+
+export class RequestPriceAdjustmentDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+}
+
+export class AdjustOrderPricesDto {
+  @ApiProperty({ type: [SalesOrderItemDto] })
+  @IsArray() @ValidateNested({ each: true }) @Type(() => SalesOrderItemDto) items!: SalesOrderItemDto[];
+}

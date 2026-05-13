@@ -10,11 +10,12 @@ import { vnd } from "@/lib/format";
 import type { SalesOrderStatus, DeliveryStatus } from "@/types/sales";
 
 const ORDER_STATUS_CONFIG: Record<SalesOrderStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  DRAFT:               { label: "Chờ xác nhận",  icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
-  CONFIRMED:           { label: "Đã xác nhận",   icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-blue-700 bg-blue-50 border-blue-200" },
-  PARTIALLY_DELIVERED: { label: "Đang giao",     icon: <Truck className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
-  DELIVERED:           { label: "Đã giao hàng",  icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-green-700 bg-green-50 border-green-200" },
-  CANCELLED:           { label: "Đã hủy",        icon: <XCircle className="h-3.5 w-3.5" />,      className: "text-red-700 bg-red-50 border-red-200" },
+  DRAFT:                       { label: "Chờ xác nhận",    icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
+  CONFIRMED:                   { label: "Đã xác nhận",     icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-blue-700 bg-blue-50 border-blue-200" },
+  PARTIALLY_DELIVERED:         { label: "Đang giao",       icon: <Truck className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
+  DELIVERED:                   { label: "Đã giao hàng",    icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-green-700 bg-green-50 border-green-200" },
+  CANCELLED:                   { label: "Đã hủy",          icon: <XCircle className="h-3.5 w-3.5" />,      className: "text-red-700 bg-red-50 border-red-200" },
+  PRICE_ADJUSTMENT_REQUESTED:  { label: "Đang xử lý",      icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
 };
 
 const DELIVERY_STATUS_CONFIG: Record<DeliveryStatus, { label: string; className: string }> = {

@@ -136,7 +136,8 @@ export type SalesOrderStatus =
   | 'CONFIRMED'
   | 'PARTIALLY_DELIVERED'
   | 'DELIVERED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'PRICE_ADJUSTMENT_REQUESTED';
 
 export interface SalesOrderItem {
   id: number;

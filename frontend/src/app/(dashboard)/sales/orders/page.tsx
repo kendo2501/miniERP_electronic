@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Trash2, CheckCircle, XCircle, Truck, ShoppingCart } from "lucide-react";
+import { Search, Plus, Loader2, Trash2, CheckCircle, XCircle, Truck, ShoppingCart, Edit2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { listOrders, confirmOrder, cancelOrder, createOrder, listCustomers, confirmPayment } from "@/lib/api/sales";
+import {
+  listOrders, confirmOrder, cancelOrder, createOrder, listCustomers, confirmPayment,
+  requestPriceAdjustment, adjustOrderPrices, getOrder,
+} from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
 import type { SalesOrderStatus, PaymentStatus } from "@/types/sales";
@@ -22,12 +26,13 @@ import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 import Link from "next/link";
 
-const STATUS_VARIANTS: Record<SalesOrderStatus, "secondary" | "default" | "outline" | "destructive" | "warning"> = {
+const STATUS_VARIANTS: Record<SalesOrderStatus, string> = {
   DRAFT: "secondary",
   CONFIRMED: "default",
   PARTIALLY_DELIVERED: "warning",
   DELIVERED: "outline",
   CANCELLED: "destructive",
+  PRICE_ADJUSTMENT_REQUESTED: "warning",
 } as any;
 
 const STATUS_COLORS: Record<SalesOrderStatus, string> = {
@@ -36,6 +41,7 @@ const STATUS_COLORS: Record<SalesOrderStatus, string> = {
   PARTIALLY_DELIVERED: "text-orange-600",
   DELIVERED: "text-green-600 border-green-300",
   CANCELLED: "",
+  PRICE_ADJUSTMENT_REQUESTED: "text-orange-700 border-orange-300",
 };
 
 function PaymentBadge({ status }: { status?: PaymentStatus }) {
@@ -59,14 +65,37 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+type AdjustItem = {
+  productId: number;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+};
+
 export default function SalesOrdersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+
+  // Request price adjustment dialog (Manager)
+  const [requestAdjustTarget, setRequestAdjustTarget] = useState<number | null>(null);
+  const [requestAdjustReason, setRequestAdjustReason] = useState("");
+
+  // Adjust prices dialog (Saler)
+  const [adjustPriceOrderId, setAdjustPriceOrderId] = useState<number | null>(null);
+  const [adjustPriceItems, setAdjustPriceItems] = useState<AdjustItem[]>([]);
+
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
+
+  const canCreate = hasPermission("sales.order.create");
+  const canApprove = hasPermission("sales.order.approve");
+
+  // ─── Queries ──────────────────────────────────────────────────────────────
 
   const { data, isLoading } = useQuery({
     queryKey: ["orders", page, search, statusFilter],
@@ -81,10 +110,40 @@ export default function SalesOrdersPage() {
     enabled: showCreate,
   });
 
+  // Fetch full order detail when adjust-prices dialog is triggered
+  const { data: adjustOrderDetail, isFetching: loadingAdjustDetail } = useQuery({
+    queryKey: ["order-detail-adjust", adjustPriceOrderId],
+    queryFn: () => getOrder(adjustPriceOrderId!).then((r) => r.data),
+    enabled: adjustPriceOrderId !== null,
+  });
+
+  useEffect(() => {
+    if (adjustOrderDetail?.items) {
+      setAdjustPriceItems(
+        adjustOrderDetail.items.map((i) => ({
+          productId: i.product.id,
+          productName: i.product.productName,
+          sku: i.product.sku,
+          quantity: Number(i.quantity),
+          unitPrice: Number(i.unitPrice),
+          discountPercent: Number((i as any).discountPercent ?? 0),
+        })),
+      );
+    }
+  }, [adjustOrderDetail]);
+
+  // ─── Form ─────────────────────────────────────────────────────────────────
+
   const { handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { items: [{ productId: "", quantity: "1", unitPrice: "0" }] },
   });
+
+  const items = watch("items");
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["orders"] });
 
   const createMut = useMutation({
     mutationFn: (v: FormValues) =>
@@ -100,7 +159,7 @@ export default function SalesOrdersPage() {
       }).then((r) => r.data),
     onSuccess: () => {
       toast.success(t.orders.orderCreated);
-      qc.invalidateQueries({ queryKey: ["orders"] });
+      invalidate();
       setShowCreate(false);
       reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
     },
@@ -109,25 +168,50 @@ export default function SalesOrdersPage() {
 
   const confirmMut = useMutation({
     mutationFn: (id: number) => confirmOrder(id),
-    onSuccess: () => { toast.success(t.orders.confirmed); qc.invalidateQueries({ queryKey: ["orders"] }); },
+    onSuccess: () => { toast.success(t.orders.confirmed); invalidate(); },
     onError: () => toast.error("Xác nhận đơn thất bại"),
   });
 
   const cancelMut = useMutation({
     mutationFn: (id: number) => cancelOrder(id),
-    onSuccess: () => { toast.success(t.orders.cancelledMsg); qc.invalidateQueries({ queryKey: ["orders"] }); },
+    onSuccess: () => { toast.success(t.orders.cancelledMsg); invalidate(); },
     onError: () => toast.error("Hủy đơn thất bại"),
   });
 
   const paymentMut = useMutation({
     mutationFn: (id: number) => confirmPayment(id),
-    onSuccess: () => { toast.success("Đã xác nhận thanh toán"); qc.invalidateQueries({ queryKey: ["orders"] }); },
+    onSuccess: () => { toast.success("Đã xác nhận thanh toán"); invalidate(); },
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận thanh toán thất bại"),
   });
 
-  const canCreate = hasPermission("sales.order.create");
-  const canApprove = hasPermission("sales.order.approve");
-  const items = watch("items");
+  const requestAdjustMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      requestPriceAdjustment(id, reason || undefined),
+    onSuccess: () => {
+      toast.success("Đã gửi yêu cầu điều chỉnh giá cho nhân viên");
+      invalidate();
+      setRequestAdjustTarget(null);
+      setRequestAdjustReason("");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Yêu cầu thất bại"),
+  });
+
+  const adjustPricesMut = useMutation({
+    mutationFn: ({ id, items }: { id: number; items: AdjustItem[] }) =>
+      adjustOrderPrices(id, items.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        discountPercent: i.discountPercent,
+      }))),
+    onSuccess: () => {
+      toast.success("Đã điều chỉnh giá — đơn hàng đang chờ quản lý xác nhận lại");
+      invalidate();
+      setAdjustPriceOrderId(null);
+      setAdjustPriceItems([]);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Điều chỉnh giá thất bại"),
+  });
 
   const STATUS_LABELS: Record<SalesOrderStatus, string> = {
     DRAFT: t.common.draft,
@@ -135,6 +219,7 @@ export default function SalesOrdersPage() {
     PARTIALLY_DELIVERED: "Giao 1 phần",
     DELIVERED: "Đã giao",
     CANCELLED: t.common.cancelled,
+    PRICE_ADJUSTMENT_REQUESTED: "Chờ điều chỉnh",
   };
 
   function handleProductChange(idx: number, productId: string, product?: Product) {
@@ -173,11 +258,12 @@ export default function SalesOrdersPage() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             </div>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.orders.allStatuses}</SelectItem>
                 <SelectItem value="DRAFT">{t.common.draft}</SelectItem>
                 <SelectItem value="CONFIRMED">Đã xác nhận</SelectItem>
+                <SelectItem value="PRICE_ADJUSTMENT_REQUESTED">Chờ điều chỉnh</SelectItem>
                 <SelectItem value="PARTIALLY_DELIVERED">Giao 1 phần</SelectItem>
                 <SelectItem value="DELIVERED">Đã giao</SelectItem>
                 <SelectItem value="CANCELLED">{t.common.cancelled}</SelectItem>
@@ -199,7 +285,7 @@ export default function SalesOrdersPage() {
                   <tr className="border-b bg-muted/50">
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Số đơn</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Khách hàng</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
+                    {canApprove && <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>}
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thanh toán</th>
                     <th className="h-10 px-6 text-right font-medium text-muted-foreground">Tổng tiền</th>
                     <th className="h-10 px-6 text-center font-medium text-muted-foreground">Giao hàng</th>
@@ -215,16 +301,24 @@ export default function SalesOrdersPage() {
                         {o.quotation && (
                           <div className="text-xs text-muted-foreground">từ {o.quotation.quotationNumber}</div>
                         )}
+                        {/* Show "Chờ điều chỉnh" indicator for Saler (no status column) */}
+                        {!canApprove && o.status === "PRICE_ADJUSTMENT_REQUESTED" && (
+                          <div className="flex items-center gap-1 text-xs text-orange-700 mt-0.5">
+                            <AlertCircle className="h-3 w-3" /> Chờ điều chỉnh
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3">
                         <div className="font-medium">{o.customer.companyName}</div>
                         <div className="text-xs text-muted-foreground">{o.customer.customerCode}</div>
                       </td>
-                      <td className="px-6 py-3">
-                        <Badge variant={STATUS_VARIANTS[o.status] as any} className={STATUS_COLORS[o.status]}>
-                          {STATUS_LABELS[o.status]}
-                        </Badge>
-                      </td>
+                      {canApprove && (
+                        <td className="px-6 py-3">
+                          <Badge variant={STATUS_VARIANTS[o.status as SalesOrderStatus] as any} className={STATUS_COLORS[o.status as SalesOrderStatus]}>
+                            {STATUS_LABELS[o.status as SalesOrderStatus]}
+                          </Badge>
+                        </td>
+                      )}
                       <td className="px-6 py-3">
                         <PaymentBadge status={(o as any).paymentStatus} />
                       </td>
@@ -244,26 +338,49 @@ export default function SalesOrdersPage() {
                       </td>
                       <td className="px-6 py-3">
                         <div className="flex items-center gap-1 flex-wrap">
-                          {o.status === "DRAFT" && (
+
+                          {/* ── Manager actions ── */}
+                          {canApprove && o.status === "DRAFT" && (
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
                               onClick={() => confirmMut.mutate(o.id)} disabled={confirmMut.isPending}>
                               <CheckCircle className="h-3 w-3" /> Xác nhận
                             </Button>
                           )}
-                          {(o.status === "CONFIRMED" || o.status === "PARTIALLY_DELIVERED") && (
+
+                          {canApprove && o.status === "CONFIRMED" && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                              onClick={() => { setRequestAdjustTarget(o.id); setRequestAdjustReason(""); }}>
+                              <Edit2 className="h-3 w-3" /> Yêu cầu điều chỉnh giá
+                            </Button>
+                          )}
+
+                          {/* ── Saler actions ── */}
+                          {canCreate && !canApprove && o.status === "PRICE_ADJUSTMENT_REQUESTED" && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                              onClick={() => { setAdjustPriceItems([]); setAdjustPriceOrderId(o.id); }}>
+                              <Edit2 className="h-3 w-3" /> Điều chỉnh lại
+                            </Button>
+                          )}
+
+                          {/* ── Shared: Giao hàng ── */}
+                          {["CONFIRMED", "PARTIALLY_DELIVERED"].includes(o.status) && (
                             <Link href="/sales/deliveries">
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700">
                                 <Truck className="h-3 w-3" /> Giao hàng
                               </Button>
                             </Link>
                           )}
-                          {canApprove && o.paymentStatus === "UNPAID" && !["CANCELLED", "DRAFT"].includes(o.status) && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-blue-700 hover:text-blue-800"
+
+                          {/* ── Shared: Xác nhận thanh toán (Manager + Saler) ── */}
+                          {(canApprove || canCreate) && (o as any).paymentStatus === "UNPAID" && !["CANCELLED", "DRAFT", "PRICE_ADJUSTMENT_REQUESTED"].includes(o.status) && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-emerald-700 hover:text-emerald-800"
                               onClick={() => paymentMut.mutate(o.id)} disabled={paymentMut.isPending}>
-                              <CheckCircle className="h-3 w-3" /> Đã thanh toán
+                              <CheckCircle className="h-3 w-3" /> Xác nhận thanh toán
                             </Button>
                           )}
-                          {!["CANCELLED", "DELIVERED"].includes(o.status) && (
+
+                          {/* ── Shared: Hủy ── */}
+                          {!["CANCELLED", "DELIVERED", "PRICE_ADJUSTMENT_REQUESTED"].includes(o.status) && (
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
                               onClick={() => cancelMut.mutate(o.id)} disabled={cancelMut.isPending}>
                               <XCircle className="h-3 w-3" /> Hủy
@@ -274,7 +391,7 @@ export default function SalesOrdersPage() {
                     </tr>
                   ))}
                   {data?.items.length === 0 && (
-                    <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">{t.orders.noOrders}</td></tr>
+                    <tr><td colSpan={canApprove ? 8 : 7} className="py-12 text-center text-muted-foreground">{t.orders.noOrders}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -293,7 +410,102 @@ export default function SalesOrdersPage() {
         </CardContent>
       </Card>
 
-      {/* Create Order Dialog */}
+      {/* ─── Request Price Adjustment Dialog (Manager) ─────────────────────────── */}
+      <Dialog open={requestAdjustTarget !== null} onOpenChange={(v) => { if (!v) { setRequestAdjustTarget(null); setRequestAdjustReason(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Yêu cầu điều chỉnh giá đơn hàng</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-muted-foreground">Nhân viên kinh doanh sẽ được thông báo để điều chỉnh lại giá và gửi lên duyệt.</p>
+            <Label>Lý do (tuỳ chọn)</Label>
+            <Textarea
+              value={requestAdjustReason}
+              onChange={(e) => setRequestAdjustReason(e.target.value)}
+              placeholder="Nhập lý do yêu cầu điều chỉnh..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRequestAdjustTarget(null); setRequestAdjustReason(""); }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              disabled={requestAdjustMut.isPending}
+              onClick={() => {
+                if (requestAdjustTarget === null) return;
+                requestAdjustMut.mutate({ id: requestAdjustTarget, reason: requestAdjustReason });
+              }}>
+              {requestAdjustMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Gửi yêu cầu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Adjust Prices Dialog (Saler) ──────────────────────────────────────── */}
+      <Dialog open={adjustPriceOrderId !== null} onOpenChange={(v) => { if (!v) { setAdjustPriceOrderId(null); setAdjustPriceItems([]); } }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Điều chỉnh lại giá đơn hàng</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Sau khi điều chỉnh, đơn hàng sẽ tự động gửi lên quản lý để xét duyệt lại.
+            </p>
+          </DialogHeader>
+
+          {loadingAdjustDetail || adjustPriceItems.length === 0 ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Đang tải dữ liệu...</span>
+            </div>
+          ) : (
+            <div className="space-y-3 pt-2">
+              <div className="grid grid-cols-[2fr_80px_130px_100px] gap-2 text-xs font-medium text-muted-foreground">
+                <span>Sản phẩm</span>
+                <span>SL</span>
+                <span>Đơn giá (₫)</span>
+                <span>CK (%)</span>
+              </div>
+              {adjustPriceItems.map((item, idx) => (
+                <div key={idx} className="grid grid-cols-[2fr_80px_130px_100px] gap-2 items-center">
+                  <div>
+                    <div className="font-medium text-sm">{item.productName}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
+                  </div>
+                  <Input
+                    type="number" min="1" step="1"
+                    value={item.quantity}
+                    onChange={(e) => setAdjustPriceItems((prev) => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
+                  />
+                  <Input
+                    type="number" min="0" step="1000"
+                    value={item.unitPrice}
+                    onChange={(e) => setAdjustPriceItems((prev) => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
+                  />
+                  <Input
+                    type="number" min="0" max="100" step="1"
+                    value={item.discountPercent}
+                    onChange={(e) => setAdjustPriceItems((prev) => prev.map((it, i) => i === idx ? { ...it, discountPercent: Number(e.target.value) } : it))}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAdjustPriceOrderId(null); setAdjustPriceItems([]); }}>{t.common.cancel}</Button>
+            <Button
+              disabled={adjustPricesMut.isPending || adjustPriceItems.length === 0 || loadingAdjustDetail}
+              onClick={() => {
+                if (!adjustPriceOrderId) return;
+                adjustPricesMut.mutate({ id: adjustPriceOrderId, items: adjustPriceItems });
+              }}>
+              {adjustPricesMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Gửi lại chờ duyệt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Create Order Dialog ────────────────────────────────────────────────── */}
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] }); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t.orders.createTitle}</DialogTitle></DialogHeader>
@@ -320,7 +532,6 @@ export default function SalesOrdersPage() {
               </div>
             </div>
 
-            {/* Line items */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>Sản phẩm *</Label>

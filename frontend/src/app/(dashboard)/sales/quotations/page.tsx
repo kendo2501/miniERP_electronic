@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
-  listQuotations, createQuotation, sendQuotation, confirmQuotation, cancelQuotation, listCustomers,
+  listQuotations, getQuotation, createQuotation, sendQuotation, confirmQuotation, cancelQuotation, listCustomers,
   submitCounterOffer, acceptCounterOffer, rejectCounterOffer,
   approveQuotation, requestRevision, cancelQuotationWithReason, resubmitQuotation,
 } from "@/lib/api/sales";
@@ -86,7 +86,8 @@ export default function QuotationsPage() {
   const [cancelTarget, setCancelTarget] = useState<number | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
-  // Resubmit dialog (Sale after revision)
+  // Resubmit dialog (Sale after revision) — fetches full quotation on open
+  const [resubmitTargetId, setResubmitTargetId] = useState<number | null>(null);
   const [resubmitTarget, setResubmitTarget] = useState<Quotation | null>(null);
   const [resubmitItems, setResubmitItems] = useState<Array<{ productId: number; productName: string; sku: string; quantity: number; unitPrice: number; discountPercent: number }>>([]);
 
@@ -111,6 +112,29 @@ export default function QuotationsPage() {
     queryKey: ["customers-list"],
     queryFn: () => listCustomers({ limit: 200 }).then((r) => r.data),
   });
+
+  // Fetch full quotation detail for resubmit (items not in list query)
+  const { data: resubmitDetail, isFetching: loadingResubmit } = useQuery({
+    queryKey: ["quotation-detail-resubmit", resubmitTargetId],
+    queryFn: () => getQuotation(resubmitTargetId!).then((r) => r.data),
+    enabled: resubmitTargetId !== null,
+  });
+
+  useEffect(() => {
+    if (resubmitDetail?.items) {
+      setResubmitItems(
+        resubmitDetail.items.map((i) => ({
+          productId: i.product.id,
+          productName: i.product.productName,
+          sku: i.product.sku,
+          quantity: Number(i.quantity),
+          unitPrice: Number(i.unitPrice),
+          discountPercent: Number((i as any).discountPercent ?? 0),
+        })),
+      );
+      setResubmitTarget(resubmitDetail as any);
+    }
+  }, [resubmitDetail]);
 
   // ─── Form ─────────────────────────────────────────────────────────────────
 
@@ -206,7 +230,9 @@ export default function QuotationsPage() {
     onSuccess: () => {
       toast.success("Đã gửi lại báo giá chờ duyệt");
       invalidate();
+      setResubmitTargetId(null);
       setResubmitTarget(null);
+      setResubmitItems([]);
     },
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi lại thất bại"),
   });
@@ -240,19 +266,6 @@ export default function QuotationsPage() {
     onSuccess: () => { toast.success("Đã từ chối giá đề xuất"); invalidate(); },
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Từ chối giá thất bại"),
   });
-
-  function openResubmit(q: Quotation) {
-    if (!q.items) return;
-    setResubmitItems(q.items.map((i) => ({
-      productId: i.product.id,
-      productName: i.product.productName,
-      sku: i.product.sku,
-      quantity: Number(i.quantity),
-      unitPrice: Number(i.unitPrice),
-      discountPercent: Number(i.discountPercent),
-    })));
-    setResubmitTarget(q);
-  }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -421,7 +434,7 @@ export default function QuotationsPage() {
                             {/* Sale: Chỉnh sửa lại giá khi REVISION_REQUESTED */}
                             {canUpdateOwn && !canApprove && q.status === "REVISION_REQUESTED" && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
-                                onClick={() => openResubmit(q)}>
+                                onClick={() => { setResubmitItems([]); setResubmitTarget(null); setResubmitTargetId(q.id); }}>
                                 <Edit2 className="h-3 w-3" /> Điều chỉnh lại giá
                               </Button>
                             )}
@@ -528,7 +541,7 @@ export default function QuotationsPage() {
       </Dialog>
 
       {/* ─── Resubmit Dialog (Sale edit prices) ─────────────────────────────── */}
-      <Dialog open={resubmitTarget !== null} onOpenChange={(v) => { if (!v) setResubmitTarget(null); }}>
+      <Dialog open={resubmitTargetId !== null} onOpenChange={(v) => { if (!v) { setResubmitTargetId(null); setResubmitTarget(null); setResubmitItems([]); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Điều chỉnh lại giá báo giá</DialogTitle>
@@ -539,41 +552,50 @@ export default function QuotationsPage() {
               </p>
             )}
           </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div className="grid grid-cols-[2fr_80px_120px_100px] gap-2 text-xs font-medium text-muted-foreground">
-              <span>Sản phẩm</span>
-              <span>SL</span>
-              <span>Đơn giá (₫)</span>
-              <span>CK (%)</span>
+
+          {loadingResubmit || resubmitItems.length === 0 ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Đang tải dữ liệu...</span>
             </div>
-            {resubmitItems.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-[2fr_80px_120px_100px] gap-2 items-center">
-                <div>
-                  <div className="font-medium text-sm">{item.productName}</div>
-                  <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
-                </div>
-                <Input
-                  type="number" min="1" step="1"
-                  value={item.quantity}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
-                />
-                <Input
-                  type="number" min="0" step="1000"
-                  value={item.unitPrice}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
-                />
-                <Input
-                  type="number" min="0" max="100" step="1"
-                  value={item.discountPercent}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, discountPercent: Number(e.target.value) } : it))}
-                />
+          ) : (
+            <div className="space-y-3 pt-2">
+              <div className="grid grid-cols-[2fr_80px_120px_100px] gap-2 text-xs font-medium text-muted-foreground">
+                <span>Sản phẩm</span>
+                <span>SL</span>
+                <span>Đơn giá (₫)</span>
+                <span>CK (%)</span>
               </div>
-            ))}
-          </div>
+              {resubmitItems.map((item, idx) => (
+                <div key={idx} className="grid grid-cols-[2fr_80px_120px_100px] gap-2 items-center">
+                  <div>
+                    <div className="font-medium text-sm">{item.productName}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
+                  </div>
+                  <Input
+                    type="number" min="1" step="1"
+                    value={item.quantity}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
+                  />
+                  <Input
+                    type="number" min="0" step="1000"
+                    value={item.unitPrice}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
+                  />
+                  <Input
+                    type="number" min="0" max="100" step="1"
+                    value={item.discountPercent}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResubmitItems((prev) => prev.map((it, i) => i === idx ? { ...it, discountPercent: Number(e.target.value) } : it))}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResubmitTarget(null)}>{t.common.cancel}</Button>
+            <Button variant="outline" onClick={() => { setResubmitTargetId(null); setResubmitTarget(null); setResubmitItems([]); }}>{t.common.cancel}</Button>
             <Button
-              disabled={resubmitMut.isPending}
+              disabled={resubmitMut.isPending || resubmitItems.length === 0 || loadingResubmit}
               onClick={() => {
                 if (!resubmitTarget) return;
                 resubmitMut.mutate({ id: resubmitTarget.id, items: resubmitItems });

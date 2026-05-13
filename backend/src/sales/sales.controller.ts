@@ -7,6 +7,7 @@ import {
   CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
   SubmitCounterOfferDto,
   CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
+  RequestPriceAdjustmentDto, AdjustOrderPricesDto,
 } from './dto/sales.dto';
 import { RequirePermissions, AnyPermission } from '../common/decorators/permissions.decorator';
 
@@ -74,8 +75,14 @@ export class SalesController {
   @Post('orders/:id/cancel') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.cancel') @ApiOperation({ summary: 'Cancel order' })
   cancelOrder(@Param('id', ParseIntPipe) id: number) { return this.service.cancelOrder(id); }
 
-  @Post('orders/:id/confirm-payment') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.approve') @ApiOperation({ summary: 'Confirm order payment' })
-  confirmPayment(@Param('id', ParseIntPipe) id: number) { return this.service.confirmPayment(id); }
+  @Post('orders/:id/confirm-payment') @HttpCode(HttpStatus.OK) @AnyPermission('sales.order.approve', 'sales.order.create') @ApiOperation({ summary: 'Confirm order payment (Manager or Saler)' })
+  confirmPayment(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.confirmPayment(id, req.user?.id); }
+
+  @Post('orders/:id/request-price-adjustment') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.approve') @ApiOperation({ summary: 'Manager requests price adjustment — sets PRICE_ADJUSTMENT_REQUESTED' })
+  requestPriceAdjustment(@Param('id', ParseIntPipe) id: number, @Body() dto: RequestPriceAdjustmentDto, @Req() req: any) { return this.service.requestPriceAdjustment(id, dto, req.user?.id); }
+
+  @Post('orders/:id/adjust-prices') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.create') @ApiOperation({ summary: 'Saler adjusts prices on PRICE_ADJUSTMENT_REQUESTED order → back to DRAFT' })
+  adjustOrderPrices(@Param('id', ParseIntPipe) id: number, @Body() dto: AdjustOrderPricesDto, @Req() req: any) { return this.service.adjustOrderPrices(id, dto, req.user?.id); }
 
   // ─── Deliveries ───────────────────────────────────────────────────────────
 
