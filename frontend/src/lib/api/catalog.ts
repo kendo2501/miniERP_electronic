@@ -63,3 +63,30 @@ export const updateUomConversions = (
   conversions: { fromUnit: string; toUnit: string; conversionRate: number }[],
 ) =>
   apiClient.put<UomConversion[]>(`/catalog/products/${id}/uom-conversions`, { conversions });
+
+// ─── Excel Import / Export ────────────────────────────────────────────────────
+
+export const exportCategoryTemplate = () =>
+  apiClient.get('/catalog/categories/export-template', { responseType: 'blob' });
+
+export const importCategories = (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiClient.post<{ created: number; updated: number; errors: { row: number; message: string }[] }>(
+    '/catalog/categories/import', formData,
+  );
+};
+
+export const exportProducts = (params?: Record<string, unknown>) =>
+  apiClient.get('/catalog/products/export', { params, responseType: 'blob' });
+
+// ─── Product Images ───────────────────────────────────────────────────────────
+
+export const uploadProductImages = (productId: number, files: File[]) => {
+  const formData = new FormData();
+  files.forEach((f) => formData.append('files', f));
+  return apiClient.post(`/catalog/products/${productId}/images`, formData);
+};
+
+export const deleteProductImage = (productId: number, imageId: number) =>
+  apiClient.delete(`/catalog/products/${productId}/images/${imageId}`);

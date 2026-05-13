@@ -267,7 +267,8 @@ export class SalesService {
 
   async requestPriceAdjustment(id: number, dto: RequestPriceAdjustmentDto, actorId?: number) {
     const o = await this.getOrder(id);
-    if (o.status !== 'CONFIRMED') throw new BadRequestException('Only CONFIRMED orders can request price adjustment');
+    if (!['CONFIRMED', 'PENDING_REAPPROVAL'].includes(o.status as string))
+      throw new BadRequestException('Only CONFIRMED or PENDING_REAPPROVAL orders can request price adjustment');
 
     const result = await this.prisma.salesOrder.update({
       where: { id },
@@ -313,7 +314,7 @@ export class SalesService {
       return tx.salesOrder.update({
         where: { id },
         data: {
-          status: 'DRAFT',
+          status: 'PENDING_REAPPROVAL',
           subtotal, taxAmount, totalAmount,
           items: {
             create: dto.items.map((i) => {
@@ -353,6 +354,43 @@ export class SalesService {
       `Đơn hàng ${(o as any).orderNumber} đã điều chỉnh giá`,
       `Đơn hàng ${(o as any).orderNumber} đã được điều chỉnh giá và đang chờ xác nhận lại.`,
     ).catch(() => {});
+
+    return result;
+  }
+
+  async confirmReapproval(id: number, actorId?: number) {
+    const o = await this.getOrder(id);
+    if (o.status !== 'PENDING_REAPPROVAL')
+      throw new BadRequestException('Only PENDING_REAPPROVAL orders can be re-approved');
+
+    const result = await this.prisma.salesOrder.update({
+      where: { id },
+      data: { status: 'CONFIRMED' },
+      select: ORDER_SELECT,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        eventType: 'ORDER_REAPPROVAL_CONFIRMED',
+        category: 'sales',
+        actorId: actorId ?? null,
+        entityType: 'SalesOrder',
+        entityId: id,
+        action: 'CONFIRM_REAPPROVAL',
+        status: 'SUCCESS',
+        metadata: { orderNumber: (o as any).orderNumber, totalAmount: (o as any).totalAmount },
+        beforeSnapshot: { status: o.status },
+      },
+    }).catch(() => {});
+
+    const salesUserId = (o as any).salesUserId;
+    if (salesUserId) {
+      this.notifyUser(
+        salesUserId,
+        `Đơn hàng ${(o as any).orderNumber} đã được duyệt lại`,
+        `Quản lý đã xác nhận giá mới. Đơn hàng tiếp tục xử lý.`,
+      ).catch(() => {});
+    }
 
     return result;
   }

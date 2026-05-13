@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto, CreateAddressDto, UpdateAddressDto } from './dto/customer.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 
 @ApiTags('Customers')
@@ -24,6 +24,31 @@ export class CustomersController {
 
   @Delete(':id') @HttpCode(HttpStatus.OK) @RequirePermissions('customer.update_assigned') @ApiOperation({ summary: 'Soft-delete customer' })
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove(id); }
+
+  @Post(':id/addresses')
+  @RequirePermissions('customer.update_assigned')
+  @ApiOperation({ summary: 'Add address to customer' })
+  addAddress(@Param('id', ParseIntPipe) id: number, @Body() dto: CreateAddressDto) {
+    return this.service.addAddress(id, dto);
+  }
+
+  @Patch(':id/addresses/:addressId')
+  @RequirePermissions('customer.update_assigned')
+  @ApiOperation({ summary: 'Update customer address' })
+  updateAddress(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('addressId', ParseIntPipe) addressId: number,
+    @Body() dto: UpdateAddressDto,
+  ) { return this.service.updateAddress(id, addressId, dto); }
+
+  @Delete(':id/addresses/:addressId')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('customer.update_assigned')
+  @ApiOperation({ summary: 'Delete customer address' })
+  removeAddress(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('addressId', ParseIntPipe) addressId: number,
+  ) { return this.service.removeAddress(id, addressId); }
 
   @Post(':id/portal-account') @RequirePermissions('customer.create') @ApiOperation({ summary: 'Create portal account for customer' })
   createPortalAccount(@Param('id', ParseIntPipe) id: number, @Body() dto: CreatePortalAccountDto) {

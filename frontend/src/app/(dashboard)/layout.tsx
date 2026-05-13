@@ -10,7 +10,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Topbar */}
-          <header className="flex h-14 shrink-0 items-center justify-end border-b bg-background px-6 gap-2">
+          <header className="flex h-14 shrink-0 items-center justify-end bg-white border-b border-border px-6 gap-2 shadow-sm">
+            <div className="absolute top-0 left-60 right-0 h-0.5 bg-gradient-to-r from-[#593E67] via-[#B85B56] to-[#FEA837]" />
             <NotificationBell />
           </header>
           <main className="flex-1 overflow-y-auto bg-background p-8">

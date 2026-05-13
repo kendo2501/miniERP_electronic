@@ -3,7 +3,10 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
+import { MinioService } from '../minio/minio.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -11,9 +14,14 @@ import { ProductQueryDto } from './dto/product-query.dto';
 import { ProductAttributeDto } from './dto/product-attribute.dto';
 import { UomConversionDto } from './dto/uom-conversion.dto';
 
+type ImportResult = { created: number; updated: number; errors: { row: number; message: string }[] };
+
 @Injectable()
 export class CatalogService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private minioService: MinioService,
+  ) {}
 
   // ─── CATEGORIES ────────────────────────────────────────────────────────────
 
@@ -256,6 +264,179 @@ export class CatalogService {
       data: { deletedAt: new Date() },
       select: { id: true },
     });
+  }
+
+  async uploadImages(productId: number, files: Express.Multer.File[]) {
+    await this.getProduct(productId);
+
+    // Upload to MinIO first (outside transaction)
+    const uploads = await Promise.all(
+      files.map(async (file) => {
+        const ext = file.mimetype === 'image/jpeg' ? 'jpg' : 'png';
+        const key = `products/${productId}/${randomUUID()}.${ext}`;
+        const url = await this.minioService.uploadFile(key, file.buffer, file.mimetype);
+        return url;
+      }),
+    );
+
+    // Serialize count + creates in a transaction to avoid sortOrder race condition
+    return this.prisma.$transaction(async (tx) => {
+      const currentCount = await tx.productImage.count({ where: { productId } });
+      return Promise.all(
+        uploads.map((imageUrl, i) =>
+          tx.productImage.create({
+            data: { productId, imageUrl, sortOrder: currentCount + i },
+          }),
+        ),
+      );
+    });
+  }
+
+  async deleteImage(productId: number, imageId: number) {
+    const image = await this.prisma.productImage.findUnique({ where: { id: imageId } });
+    if (!image || image.productId !== productId) {
+      throw new NotFoundException(`Image #${imageId} not found for product #${productId}`);
+    }
+    const key = this.minioService.extractKey(image.imageUrl);
+    try {
+      await this.minioService.deleteFile(key);
+    } catch (err: any) {
+      // Only ignore "object not found" — rethrow real errors (network, permission, etc.)
+      if (err.code !== 'NoSuchKey') throw err;
+    }
+    await this.prisma.productImage.delete({ where: { id: imageId } });
+  }
+
+  // ─── EXCEL IMPORT / EXPORT ────────────────────────────────────────────────
+
+  async exportCategoryTemplate(): Promise<Buffer> {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Categories');
+    ws.columns = [
+      { header: 'Code', key: 'code', width: 20 },
+      { header: 'Name', key: 'name', width: 30 },
+      { header: 'ParentCode', key: 'parentCode', width: 20 },
+      { header: 'Description', key: 'description', width: 40 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    return wb.xlsx.writeBuffer() as unknown as Promise<Buffer>;
+  }
+
+  async importCategories(buffer: Buffer): Promise<ImportResult> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+    const ws = wb.worksheets[0];
+
+    const existing = await this.prisma.category.findMany({
+      where: { isActive: true },
+      select: { id: true, code: true },
+    });
+    const codeMap = new Map(
+      existing.filter((c) => c.code).map((c) => [c.code!, c.id]),
+    );
+
+    const errors: { row: number; message: string }[] = [];
+    let created = 0;
+    let updated = 0;
+
+    for (let i = 2; i <= ws.rowCount; i++) {
+      const row = ws.getRow(i);
+      const code = (row.getCell(1).text ?? '').trim();
+      const name = (row.getCell(2).text ?? '').trim();
+      const parentCode = (row.getCell(3).text ?? '').trim();
+      const description = (row.getCell(4).text ?? '').trim();
+
+      if (!name) continue;
+
+      let parentId: number | undefined;
+      if (parentCode) {
+        const found = codeMap.get(parentCode);
+        if (!found) {
+          errors.push({ row: i, message: `ParentCode "${parentCode}" không tồn tại` });
+          continue;
+        }
+        parentId = found;
+      }
+
+      if (code && codeMap.has(code)) {
+        await this.prisma.category.update({
+          where: { code },
+          data: { name, description: description || undefined, parentId: parentId ?? null },
+        });
+        updated++;
+      } else {
+        const newCat = await this.prisma.category.create({
+          data: {
+            code: code || undefined,
+            name,
+            description: description || undefined,
+            parentId,
+          },
+        });
+        if (code) codeMap.set(code, newCat.id);
+        created++;
+      }
+    }
+
+    return { created, updated, errors };
+  }
+
+  async exportProducts(query: ProductQueryDto): Promise<Buffer> {
+    const { search, categoryId, brandId, isActive, attrKey, attrValue } = query;
+
+    const where: any = { deletedAt: null };
+    if (typeof isActive === 'boolean') where.isActive = isActive;
+    if (categoryId) where.categoryId = categoryId;
+    if (brandId) where.brandId = brandId;
+    if (search) {
+      where.OR = [
+        { sku: { contains: search, mode: 'insensitive' } },
+        { productName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (attrKey && attrValue) {
+      where.attributes = { some: { attrKey, attrValue } };
+    }
+
+    const products = await this.prisma.product.findMany({
+      where,
+      include: {
+        category: { select: { name: true } },
+        brand: { select: { name: true } },
+        attributes: { orderBy: { attrKey: 'asc' } },
+        uomConversions: { orderBy: { fromUnit: 'asc' } },
+      },
+      orderBy: { sku: 'asc' },
+    });
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Products');
+    ws.columns = [
+      { header: 'SKU', key: 'sku', width: 20 },
+      { header: 'Name', key: 'name', width: 30 },
+      { header: 'Category', key: 'category', width: 20 },
+      { header: 'Brand', key: 'brand', width: 20 },
+      { header: 'Unit', key: 'unit', width: 15 },
+      { header: 'MinPrice', key: 'minPrice', width: 15 },
+      { header: 'Attributes', key: 'attributes', width: 50 },
+      { header: 'UoM Conversions', key: 'uom', width: 40 },
+    ];
+    ws.getRow(1).font = { bold: true };
+
+    for (const p of products) {
+      ws.addRow({
+        sku: p.sku,
+        name: p.productName,
+        category: p.category?.name ?? '',
+        brand: p.brand?.name ?? '',
+        unit: p.unit ?? '',
+        minPrice: p.minPrice ? Number(p.minPrice) : '',
+        attributes: p.attributes.map((a) => `${a.attrKey}: ${a.attrValue}`).join('; '),
+        uom: p.uomConversions.map((u) => `${u.fromUnit}→${u.toUnit}×${Number(u.conversionRate)}`).join('; '),
+      });
+    }
+
+    return wb.xlsx.writeBuffer() as unknown as Promise<Buffer>;
   }
 
   private async ensureCategoryExists(id: number) {

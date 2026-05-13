@@ -1,5 +1,13 @@
 export type CustomerType = 'RETAIL' | 'WHOLESALE';
 
+export interface CustomerAddress {
+  id: number;
+  customerId: number;
+  label?: string;
+  address: string;
+  isDefault: boolean;
+}
+
 export interface Customer {
   id: number;
   customerCode: string;
@@ -16,6 +24,7 @@ export interface Customer {
   createdAt: string;
   updatedAt: string;
   linkedUser?: { id: number; fullName: string; email: string; status: string } | null;
+  addresses?: CustomerAddress[];
 }
 
 export interface CustomerBalanceInvoice {
@@ -137,7 +146,8 @@ export type SalesOrderStatus =
   | 'PARTIALLY_DELIVERED'
   | 'DELIVERED'
   | 'CANCELLED'
-  | 'PRICE_ADJUSTMENT_REQUESTED';
+  | 'PRICE_ADJUSTMENT_REQUESTED'
+  | 'PENDING_REAPPROVAL';
 
 export interface SalesOrderItem {
   id: number;

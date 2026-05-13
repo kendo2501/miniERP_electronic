@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsInt, MaxLength, Min, IsIn, MinLength, IsEmail, Matches } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, MaxLength, Min, IsIn, MinLength, IsEmail, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -52,6 +52,18 @@ export class CreatePortalAccountDto {
   @ApiProperty() @IsEmail() email!: string;
   @ApiProperty() @IsString() @MinLength(8) password!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(255) fullName?: string;
+}
+
+export class CreateAddressDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) label?: string;
+  @ApiProperty() @IsString() address!: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isDefault?: boolean;
+}
+
+export class UpdateAddressDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) label?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isDefault?: boolean;
 }
 
 export class CustomerQueryDto {

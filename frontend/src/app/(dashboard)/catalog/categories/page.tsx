@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Loader2, ChevronRight, FolderOpen, Trash2 } from "lucide-react";
+import { Plus, Loader2, ChevronRight, FolderOpen, Trash2, FileDown, Upload, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { listCategories, createCategory, deactivateCategory } from "@/lib/api/catalog";
+import { listCategories, createCategory, deactivateCategory, exportCategoryTemplate, importCategories } from "@/lib/api/catalog";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 import type { Category } from "@/types/catalog";
@@ -64,8 +64,13 @@ function CategoryRow({ cat, onDeactivate, canManage, depth = 0, t }: {
   );
 }
 
+type ImportResult = { created: number; updated: number; errors: { row: number; message: string }[] };
+
 export default function CategoriesPage() {
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
@@ -97,6 +102,28 @@ export default function CategoriesPage() {
     onError: () => toast.error("Failed to remove category"),
   });
 
+  const importMut = useMutation({
+    mutationFn: (file: File) => importCategories(file).then((r) => r.data),
+    onSuccess: (data) => {
+      setImportResult(data);
+      if (data.errors.length === 0) toast.success(t.catalog.importSuccess);
+      qc.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Import thất bại"),
+  });
+
+  const handleExportTemplate = async () => {
+    try {
+      const res = await exportCategoryTemplate();
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = "categories-template.xlsx"; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Xuất file thất bại");
+    }
+  };
+
   const canManage = hasPermission("catalog.category.manage");
 
   const buildTree = (cats: Category[]): Category[] => {
@@ -124,6 +151,16 @@ export default function CategoriesPage() {
         <div className="flex gap-2">
           <Link href="/catalog/products"><Button variant="outline" size="sm">{t.catalog.products}</Button></Link>
           <Link href="/catalog/brands"><Button variant="outline" size="sm">{t.catalog.brands}</Button></Link>
+          <Button variant="outline" size="sm" onClick={handleExportTemplate}>
+            <FileDown className="h-4 w-4" />
+            {t.catalog.exportTemplate}
+          </Button>
+          {canManage && (
+            <Button variant="outline" size="sm" onClick={() => { setShowImport(true); setImportFile(null); setImportResult(null); }}>
+              <Upload className="h-4 w-4" />
+              {t.catalog.importExcel}
+            </Button>
+          )}
           {canManage && (
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
@@ -171,6 +208,58 @@ export default function CategoriesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ─── Import Dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={showImport} onOpenChange={(v) => { setShowImport(v); if (!v) { setImportFile(null); setImportResult(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{t.catalog.importCategories}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Upload file Excel (.xlsx) theo mẫu. Nếu code đã tồn tại → cập nhật; nếu chưa → tạo mới.
+            </p>
+            <div className="space-y-1.5">
+              <Label>{t.catalog.selectFile}</Label>
+              <Input
+                type="file"
+                accept=".xlsx"
+                onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); setImportResult(null); }}
+              />
+            </div>
+            {importResult && (
+              <div className="rounded-md border p-3 space-y-1 text-sm">
+                <p className="font-medium">{t.catalog.importSuccess}</p>
+                <p className="text-muted-foreground">
+                  {t.catalog.importCreated}: <span className="font-semibold text-green-600">{importResult.created}</span>
+                  {" · "}
+                  {t.catalog.importUpdated}: <span className="font-semibold text-blue-600">{importResult.updated}</span>
+                </p>
+                {importResult.errors.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-destructive font-medium flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5" /> {t.catalog.importErrors} ({importResult.errors.length})
+                    </p>
+                    {importResult.errors.map((err) => (
+                      <p key={err.row} className="text-xs text-destructive pl-5">
+                        Row {err.row}: {err.message}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImport(false)}>{t.common.cancel}</Button>
+            <Button
+              disabled={!importFile || importMut.isPending}
+              onClick={() => importFile && importMut.mutate(importFile)}
+            >
+              {importMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t.catalog.importExcel}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) reset(); }}>
         <DialogContent className="max-w-md">

@@ -4,6 +4,13 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+  /* ── Brand Design System ── */
+  --color-brand-primary:    #593E67;
+  --color-brand-secondary:  #84495F;
+  --color-brand-accent:     #B85B56;
+  --color-brand-cta:        #DE741C;
+  --color-brand-highlight:  #FEA837;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -50,32 +57,36 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #F8F8F8;
+  --foreground: #1A1219;
+  --card: #FFFFFF;
+  --card-foreground: #1A1219;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1219;
+
+  /* ── Brand primary wired into shadcn slots ── */
+  --primary: #593E67;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F2EDF5;
+  --secondary-foreground: #593E67;
+  --muted: #F2EDF5;
+  --muted-foreground: #7A6685;
+  --accent: #F5EFF8;
+  --accent-foreground: #593E67;
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --sidebar-background: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --destructive-foreground: #FFFFFF;
+  --border: #E5DDE9;
+  --input: #E8E0EC;
+  --ring: #593E67;
+
+  /* ── Sidebar — deep brand purple ── */
+  --sidebar-background: #432D51;
+  --sidebar-foreground: #EDE6F2;
+  --sidebar-primary: #FEA837;
+  --sidebar-primary-foreground: #432D51;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
 }
 
 .dark {

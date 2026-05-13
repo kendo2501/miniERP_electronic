@@ -29,6 +29,15 @@ export const createPortalAccount = (customerId: number, data: { email: string; p
 export const unlinkPortalAccount = (customerId: number) =>
   apiClient.delete(`/customers/${customerId}/portal-account`);
 
+export const addCustomerAddress = (customerId: number, data: { label?: string; address: string; isDefault?: boolean }) =>
+  apiClient.post(`/customers/${customerId}/addresses`, data);
+
+export const updateCustomerAddress = (customerId: number, addressId: number, data: { label?: string; address?: string; isDefault?: boolean }) =>
+  apiClient.patch(`/customers/${customerId}/addresses/${addressId}`, data);
+
+export const deleteCustomerAddress = (customerId: number, addressId: number) =>
+  apiClient.delete(`/customers/${customerId}/addresses/${addressId}`);
+
 // ─── Quotations ───────────────────────────────────────────────────────────────
 
 export const listQuotations = (params?: Record<string, unknown>) =>
@@ -95,6 +104,9 @@ export const requestPriceAdjustment = (id: number, reason?: string) =>
 
 export const adjustOrderPrices = (id: number, items: { productId: number; quantity: number; unitPrice: number; discountPercent?: number }[]) =>
   apiClient.post<SalesOrder>(`/sales/orders/${id}/adjust-prices`, { items });
+
+export const confirmReapproval = (id: number) =>
+  apiClient.post<SalesOrder>(`/sales/orders/${id}/confirm-reapproval`);
 
 // ─── Deliveries ───────────────────────────────────────────────────────────────
 

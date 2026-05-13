@@ -69,7 +69,7 @@ export function NotificationBell() {
       >
         <Bell className="h-4 w-4" />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#FEA837] text-[10px] font-bold text-[#432D51]">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -138,7 +138,7 @@ export function NotificationBell() {
                       </p>
                     </div>
                     {!n.readAt && (
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#FEA837]" />
                     )}
                   </div>
                 ))

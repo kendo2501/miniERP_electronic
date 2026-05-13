@@ -16,6 +16,7 @@ const ORDER_STATUS_CONFIG: Record<SalesOrderStatus, { label: string; icon: React
   DELIVERED:                   { label: "Đã giao hàng",    icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-green-700 bg-green-50 border-green-200" },
   CANCELLED:                   { label: "Đã hủy",          icon: <XCircle className="h-3.5 w-3.5" />,      className: "text-red-700 bg-red-50 border-red-200" },
   PRICE_ADJUSTMENT_REQUESTED:  { label: "Đang xử lý",      icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
+  PENDING_REAPPROVAL:          { label: "Đang xử lý",      icon: <Clock className="h-3.5 w-3.5" />,        className: "text-purple-700 bg-purple-50 border-purple-200" },
 };
 
 const DELIVERY_STATUS_CONFIG: Record<DeliveryStatus, { label: string; className: string }> = {

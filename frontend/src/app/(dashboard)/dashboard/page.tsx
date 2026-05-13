@@ -55,23 +55,26 @@ interface SalesKpis {
 // ─── Shared components ────────────────────────────────────────────────────────
 
 function KpiCard({
-  title, value, sub, icon: Icon, growth, accent,
+  title, value, sub, icon: Icon, growth, accent, topColor,
 }: {
   title: string; value: string; sub?: string;
-  icon: any; growth?: number | null; accent?: string;
+  icon: any; growth?: number | null; accent?: string; topColor?: string;
 }) {
   return (
-    <Card>
+    <Card className="overflow-hidden">
+      {topColor && <div className={`h-1 w-full ${topColor}`} />}
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className={`h-4 w-4 ${accent ?? "text-muted-foreground"}`} />
+        <div className={`h-8 w-8 rounded-lg flex items-center justify-center bg-muted/60`}>
+          <Icon className={`h-4 w-4 ${accent ?? "text-muted-foreground"}`} />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="text-2xl font-bold tracking-tight">{value}</div>
         <div className="flex items-center gap-2 mt-1">
           {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
           {growth != null && (
-            <span className={`flex items-center text-xs font-medium ${growth >= 0 ? "text-green-500" : "text-red-500"}`}>
+            <span className={`flex items-center text-xs font-semibold px-1.5 py-0.5 rounded-full ${growth >= 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"}`}>
               {growth >= 0
                 ? <TrendingUp className="h-3 w-3 mr-0.5" />
                 : <TrendingDown className="h-3 w-3 mr-0.5" />}
@@ -89,17 +92,19 @@ function MiniBarChart({ data }: { data: SalesPoint[] }) {
   const maxRev = Math.max(...data.map((d) => d.revenue), 1);
   const last14 = data.slice(-14);
   return (
-    <div className="flex items-end gap-0.5 h-16 w-full">
-      {last14.map((d) => {
-        const h = Math.max(4, (d.revenue / maxRev) * 64);
+    <div className="flex items-end gap-1 h-20 w-full">
+      {last14.map((d, i) => {
+        const h = Math.max(4, (d.revenue / maxRev) * 80);
+        const isRecent = i >= last14.length - 3;
         return (
           <div key={d.date} className="group relative flex-1 flex flex-col items-center justify-end">
             <div
-              className="w-full rounded-sm bg-primary/60 hover:bg-primary transition-colors cursor-pointer"
+              className={`w-full rounded-t-sm transition-all duration-150 cursor-pointer ${isRecent ? "bg-[#DE741C]" : "bg-[#593E67]/40"} hover:bg-[#DE741C]`}
               style={{ height: `${h}px` }}
             />
-            <div className="absolute bottom-full mb-1 hidden group-hover:block z-10 whitespace-nowrap rounded bg-popover border px-2 py-1 text-xs shadow">
-              {d.date}: ${d.revenue.toLocaleString()}
+            <div className="absolute bottom-full mb-1.5 hidden group-hover:block z-10 whitespace-nowrap rounded-md bg-[#432D51] text-white px-2.5 py-1.5 text-xs shadow-lg">
+              <span className="font-semibold">{d.date}</span>
+              <br />${d.revenue.toLocaleString()}
             </div>
           </div>
         );
@@ -173,62 +178,74 @@ function AdminDashboard({ user }: { user: any }) {
               title={t.dashboard.revenueThisMonth}
               value={`$${kpis.revenue.thisMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
               sub={`vs $${kpis.revenue.lastMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${t.dashboard.growth}`}
-              icon={DollarSign} growth={kpis.revenue.growthPct} accent="text-green-500"
+              icon={DollarSign} growth={kpis.revenue.growthPct}
+              accent="text-[#DE741C]" topColor="bg-[#DE741C]"
             />
             <KpiCard
               title={`${t.dashboard.orders} (${t.common.thisMonth})`}
               value={String(kpis.orders.thisMonth)}
               sub={`${kpis.orders.total} ${t.dashboard.totalOrders.toLowerCase()}`}
               icon={ShoppingCart} growth={kpis.orders.growthPct}
+              accent="text-[#B85B56]" topColor="bg-[#B85B56]"
             />
             <KpiCard
               title={t.dashboard.totalCustomers}
               value={String(kpis.customers.total)}
               sub={`+${kpis.customers.newThisMonth} ${t.dashboard.newThisMonth}`}
-              icon={Users} accent="text-primary"
+              icon={Users} accent="text-[#593E67]" topColor="bg-[#593E67]"
             />
             <KpiCard
               title={t.dashboard.activeListings}
               value={String(kpis.products.active)}
               sub={kpis.products.lowStock > 0 ? `${kpis.products.lowStock} ${t.dashboard.lowStock}` : "Stock OK"}
               icon={Package}
-              accent={kpis.products.lowStock > 0 ? "text-yellow-500" : "text-muted-foreground"}
+              accent={kpis.products.lowStock > 0 ? "text-[#FEA837]" : "text-muted-foreground"}
+              topColor={kpis.products.lowStock > 0 ? "bg-[#FEA837]" : "bg-muted"}
             />
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card className={kpis.finance.outstandingAmount > 0 ? "border-orange-500/30" : ""}>
+            <Card className={`overflow-hidden ${kpis.finance.outstandingAmount > 0 ? "border-[#DE741C]/30" : ""}`}>
+              <div className="h-1 bg-[#DE741C]" />
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground">{t.dashboard.outstandingAR}</CardTitle>
-                <FileText className="h-4 w-4 text-orange-500" />
+                <div className="h-8 w-8 rounded-lg bg-[#DE741C]/10 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-[#DE741C]" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
+                <div className="text-2xl font-bold tracking-tight">
                   ${kpis.finance.outstandingAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{kpis.finance.outstandingCount} {t.dashboard.invoicesDue}</p>
               </CardContent>
             </Card>
 
-            <Card className={kpis.operations.pendingDeliveries > 0 ? "border-blue-500/30" : ""}>
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-[#84495F]" />
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground">{t.dashboard.pendingDeliveries}</CardTitle>
-                <Truck className="h-4 w-4 text-blue-500" />
+                <div className="h-8 w-8 rounded-lg bg-[#84495F]/10 flex items-center justify-center">
+                  <Truck className="h-4 w-4 text-[#84495F]" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{kpis.operations.pendingDeliveries}</div>
+                <div className="text-2xl font-bold tracking-tight">{kpis.operations.pendingDeliveries}</div>
                 <p className="text-xs text-muted-foreground mt-1">awaiting dispatch</p>
               </CardContent>
             </Card>
 
             {kpis.products.lowStock > 0 && (
-              <Card className="border-yellow-500/30 bg-yellow-500/5">
+              <Card className="overflow-hidden border-[#FEA837]/40 bg-[#FEA837]/5">
+                <div className="h-1 bg-[#FEA837]" />
                 <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-yellow-600 dark:text-yellow-400">{t.dashboard.lowStockAlerts}</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <CardTitle className="text-sm font-medium text-[#B85B56]">{t.dashboard.lowStockAlerts}</CardTitle>
+                  <div className="h-8 w-8 rounded-lg bg-[#FEA837]/20 flex items-center justify-center">
+                    <AlertTriangle className="h-4 w-4 text-[#FEA837]" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{kpis.products.lowStock}</div>
+                  <div className="text-2xl font-bold tracking-tight text-[#B85B56]">{kpis.products.lowStock}</div>
                   <p className="text-xs text-muted-foreground mt-1">products ≤10 units</p>
                 </CardContent>
               </Card>
@@ -384,30 +401,22 @@ function ManagerDashboard({ user }: { user: any }) {
           </div>
 
           <div className="flex gap-3 flex-wrap">
-            <Link href="/sales/quotations">
-              <Card className="cursor-pointer hover:border-primary/50 transition-colors w-44">
-                <CardContent className="p-4 flex flex-col items-center gap-2">
-                  <ClipboardList className="h-6 w-6 text-purple-500" />
-                  <span className="text-sm font-medium">{t.quotations.title}</span>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/finance/invoices">
-              <Card className="cursor-pointer hover:border-primary/50 transition-colors w-44">
-                <CardContent className="p-4 flex flex-col items-center gap-2">
-                  <FileText className="h-6 w-6 text-orange-500" />
-                  <span className="text-sm font-medium">{t.dashboard.viewInvoices}</span>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/sales/deliveries">
-              <Card className="cursor-pointer hover:border-primary/50 transition-colors w-44">
-                <CardContent className="p-4 flex flex-col items-center gap-2">
-                  <Truck className="h-6 w-6 text-blue-500" />
-                  <span className="text-sm font-medium">{t.deliveries.title}</span>
-                </CardContent>
-              </Card>
-            </Link>
+            {[
+              { href: "/sales/quotations", icon: ClipboardList, label: t.quotations.title, color: "text-[#593E67]", bg: "bg-[#593E67]/8" },
+              { href: "/finance/invoices", icon: FileText, label: t.dashboard.viewInvoices, color: "text-[#DE741C]", bg: "bg-[#DE741C]/8" },
+              { href: "/sales/deliveries", icon: Truck, label: t.deliveries.title, color: "text-[#84495F]", bg: "bg-[#84495F]/8" },
+            ].map(({ href, icon: Icon, label, color, bg }) => (
+              <Link key={href} href={href}>
+                <Card className="cursor-pointer hover:border-[#593E67]/40 hover:shadow-md transition-all w-44">
+                  <CardContent className="p-4 flex flex-col items-center gap-3">
+                    <div className={`h-10 w-10 rounded-xl ${bg} flex items-center justify-center`}>
+                      <Icon className={`h-5 w-5 ${color}`} />
+                    </div>
+                    <span className="text-sm font-medium text-center">{label}</span>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
         </>
       )}
@@ -476,15 +485,17 @@ function SalesDashboard({ user }: { user: any }) {
               <p className="text-sm font-medium text-muted-foreground">{t.dashboard.quickActions}</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { href: "/customers", icon: UserRound, label: t.dashboard.myCustomers, color: "text-primary" },
-                  { href: "/sales/quotations", icon: ClipboardList, label: t.quotations.title, color: "text-purple-500" },
-                  { href: "/sales/orders", icon: ShoppingCart, label: t.orders.title, color: "text-blue-500" },
-                  { href: "/sales/deliveries", icon: Truck, label: t.deliveries.title, color: "text-teal-500" },
-                ].map(({ href, icon: Icon, label, color }) => (
+                  { href: "/customers",         icon: UserRound,    label: t.dashboard.myCustomers, color: "text-[#593E67]", bg: "bg-[#593E67]/10" },
+                  { href: "/sales/quotations",  icon: ClipboardList,label: t.quotations.title,      color: "text-[#84495F]", bg: "bg-[#84495F]/10" },
+                  { href: "/sales/orders",      icon: ShoppingCart, label: t.orders.title,          color: "text-[#B85B56]", bg: "bg-[#B85B56]/10" },
+                  { href: "/sales/deliveries",  icon: Truck,        label: t.deliveries.title,      color: "text-[#DE741C]", bg: "bg-[#DE741C]/10" },
+                ].map(({ href, icon: Icon, label, color, bg }) => (
                   <Link key={href} href={href}>
-                    <Card className="cursor-pointer hover:border-primary/50 transition-colors h-full">
-                      <CardContent className="p-4 flex flex-col items-center gap-2">
-                        <Icon className={`h-6 w-6 ${color}`} />
+                    <Card className="cursor-pointer hover:border-[#593E67]/40 hover:shadow-md transition-all h-full">
+                      <CardContent className="p-4 flex flex-col items-center gap-3">
+                        <div className={`h-10 w-10 rounded-xl ${bg} flex items-center justify-center`}>
+                          <Icon className={`h-5 w-5 ${color}`} />
+                        </div>
                         <span className="text-sm font-medium text-center">{label}</span>
                       </CardContent>
                     </Card>
@@ -510,24 +521,27 @@ function CustomerDashboard({ user }: { user: any }) {
       icon: Package,
       label: t.catalog.title,
       description: t.catalog.subtitle,
-      color: "text-purple-500",
-      border: "hover:border-purple-500/50",
+      color: "text-[#593E67]",
+      bg: "bg-[#593E67]/10",
+      border: "hover:border-[#593E67]/40",
     },
     {
       href: "/notifications",
       icon: Bell,
       label: t.notifications.title,
       description: t.notifications.subtitle,
-      color: "text-yellow-500",
-      border: "hover:border-yellow-500/50",
+      color: "text-[#FEA837]",
+      bg: "bg-[#FEA837]/15",
+      border: "hover:border-[#FEA837]/50",
     },
     {
       href: "/settings",
       icon: Settings,
       label: t.dashboard.viewSettings,
       description: t.settings.subtitle,
-      color: "text-blue-500",
-      border: "hover:border-blue-500/50",
+      color: "text-[#84495F]",
+      bg: "bg-[#84495F]/10",
+      border: "hover:border-[#84495F]/40",
     },
   ];
 
@@ -540,9 +554,12 @@ function CustomerDashboard({ user }: { user: any }) {
         </p>
       </div>
 
-      <Card className="border-primary/20 bg-primary/5">
+      <Card className="border-[#593E67]/20 bg-gradient-to-r from-[#593E67]/5 to-[#FEA837]/5 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-[#593E67] via-[#B85B56] to-[#FEA837]" />
         <CardContent className="p-6 flex items-center gap-4">
-          <CheckCircle2 className="h-8 w-8 text-primary shrink-0" />
+          <div className="h-12 w-12 rounded-xl bg-[#593E67]/10 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-6 w-6 text-[#593E67]" />
+          </div>
           <div>
             <p className="font-semibold">{t.common.active}</p>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -553,11 +570,11 @@ function CustomerDashboard({ user }: { user: any }) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {portalCards.map(({ href, icon: Icon, label, description, color, border }) => (
+        {portalCards.map(({ href, icon: Icon, label, description, color, bg, border }) => (
           <Link key={href} href={href}>
-            <Card className={`cursor-pointer transition-colors h-full ${border}`}>
+            <Card className={`cursor-pointer transition-all hover:shadow-md h-full ${border}`}>
               <CardContent className="p-6 flex flex-col gap-3">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center`}>
                   <Icon className={`h-5 w-5 ${color}`} />
                 </div>
                 <div>
@@ -887,15 +904,17 @@ function WarehouseDashboard({ user }: { user: any }) {
               <p className="text-sm font-medium text-muted-foreground">{t.dashboard.quickActions}</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { href: "/inventory", icon: Package, label: t.inventory.title, color: "text-primary" },
-                  { href: "/sales/deliveries", icon: Truck, label: t.deliveries.title, color: "text-blue-500" },
-                  { href: "/catalog", icon: LayoutGrid, label: t.catalog.products, color: "text-purple-500" },
-                  { href: "/notifications", icon: Bell, label: t.notifications.title, color: "text-yellow-500" },
-                ].map(({ href, icon: Icon, label, color }) => (
+                  { href: "/inventory",        icon: Package,    label: t.inventory.title,       color: "text-[#593E67]", bg: "bg-[#593E67]/10" },
+                  { href: "/sales/deliveries", icon: Truck,      label: t.deliveries.title,      color: "text-[#84495F]", bg: "bg-[#84495F]/10" },
+                  { href: "/catalog",          icon: LayoutGrid, label: t.catalog.products,      color: "text-[#B85B56]", bg: "bg-[#B85B56]/10" },
+                  { href: "/notifications",    icon: Bell,       label: t.notifications.title,   color: "text-[#FEA837]", bg: "bg-[#FEA837]/15" },
+                ].map(({ href, icon: Icon, label, color, bg }) => (
                   <Link key={href} href={href}>
-                    <Card className="cursor-pointer hover:border-primary/50 transition-colors h-full">
-                      <CardContent className="p-4 flex flex-col items-center gap-2">
-                        <Icon className={`h-6 w-6 ${color}`} />
+                    <Card className="cursor-pointer hover:border-[#593E67]/40 hover:shadow-md transition-all h-full">
+                      <CardContent className="p-4 flex flex-col items-center gap-3">
+                        <div className={`h-10 w-10 rounded-xl ${bg} flex items-center justify-center`}>
+                          <Icon className={`h-5 w-5 ${color}`} />
+                        </div>
                         <span className="text-sm font-medium text-center">{label}</span>
                       </CardContent>
                     </Card>

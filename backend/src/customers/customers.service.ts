@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto, CreateAddressDto, UpdateAddressDto } from './dto/customer.dto';
 
 const SELECT_CUSTOMER = {
   id: true, customerCode: true, companyName: true, contactName: true,
@@ -44,11 +44,57 @@ export class CustomersService {
       where: { id },
       include: {
         assignedSales: { select: { id: true, fullName: true, email: true } },
+        addresses: { orderBy: [{ isDefault: 'desc' }, { id: 'asc' }] },
         _count: { select: { quotations: true, salesOrders: true, invoices: true } },
       },
     });
     if (!c || c.deletedAt) throw new NotFoundException(`Customer #${id} not found`);
     return c;
+  }
+
+  async addAddress(customerId: number, dto: CreateAddressDto) {
+    await this.findOne(customerId);
+
+    if (dto.isDefault) {
+      return this.prisma.$transaction(async (tx) => {
+        await tx.customerAddress.updateMany({
+          where: { customerId, isDefault: true },
+          data: { isDefault: false },
+        });
+        return tx.customerAddress.create({
+          data: { customerId, label: dto.label, address: dto.address, isDefault: true },
+        });
+      });
+    }
+
+    return this.prisma.customerAddress.create({
+      data: { customerId, label: dto.label, address: dto.address, isDefault: dto.isDefault ?? false },
+    });
+  }
+
+  async updateAddress(customerId: number, addressId: number, dto: UpdateAddressDto) {
+    await this.findOne(customerId);
+    const existing = await this.prisma.customerAddress.findFirst({ where: { id: addressId, customerId } });
+    if (!existing) throw new NotFoundException(`Address #${addressId} not found for customer #${customerId}`);
+
+    if (dto.isDefault) {
+      return this.prisma.$transaction(async (tx) => {
+        await tx.customerAddress.updateMany({
+          where: { customerId, isDefault: true, id: { not: addressId } },
+          data: { isDefault: false },
+        });
+        return tx.customerAddress.update({ where: { id: addressId }, data: dto });
+      });
+    }
+
+    return this.prisma.customerAddress.update({ where: { id: addressId }, data: dto });
+  }
+
+  async removeAddress(customerId: number, addressId: number) {
+    await this.findOne(customerId);
+    const existing = await this.prisma.customerAddress.findFirst({ where: { id: addressId, customerId } });
+    if (!existing) throw new NotFoundException(`Address #${addressId} not found for customer #${customerId}`);
+    return this.prisma.customerAddress.delete({ where: { id: addressId } });
   }
 
   async create(dto: CreateCustomerDto) {

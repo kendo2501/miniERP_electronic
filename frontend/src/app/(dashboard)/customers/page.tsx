@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown, UserCheck, UserPlus, UserX } from "lucide-react";
+import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown, UserCheck, UserPlus, UserX, MapPin, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { listCustomers, createCustomer, getCustomerBalance, createPortalAccount, unlinkPortalAccount } from "@/lib/api/sales";
-import type { CustomerType, CustomerBalanceInvoice } from "@/types/sales";
+import { listCustomers, createCustomer, getCustomer, getCustomerBalance, createPortalAccount, unlinkPortalAccount, addCustomerAddress, updateCustomerAddress, deleteCustomerAddress } from "@/lib/api/sales";
+import type { CustomerType, CustomerBalanceInvoice, CustomerAddress } from "@/types/sales";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 
@@ -70,6 +70,12 @@ export default function CustomersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [balanceCustomer, setBalanceCustomer] = useState<{ id: number; name: string } | null>(null);
   const [portalTarget, setPortalTarget] = useState<{ id: number; name: string } | null>(null);
+  const [addressCustomer, setAddressCustomer] = useState<{ id: number; name: string } | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null);
+  const [addrLabel, setAddrLabel] = useState("");
+  const [addrText, setAddrText] = useState("");
+  const [addrIsDefault, setAddrIsDefault] = useState(false);
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
@@ -138,6 +144,68 @@ export default function CustomersPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Hủy liên kết thất bại"),
   });
 
+  const { data: customerDetail, isLoading: detailLoading } = useQuery({
+    queryKey: ["customer-detail", addressCustomer?.id],
+    queryFn: () => getCustomer(addressCustomer!.id).then((r) => r.data),
+    enabled: !!addressCustomer,
+  });
+
+  const addAddressMut = useMutation({
+    mutationFn: (data: { label?: string; address: string; isDefault?: boolean }) =>
+      addCustomerAddress(addressCustomer!.id, data),
+    onSuccess: () => {
+      toast.success(t.customers.addressAdded);
+      qc.invalidateQueries({ queryKey: ["customer-detail", addressCustomer?.id] });
+      resetAddressForm();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Thêm địa chỉ thất bại"),
+  });
+
+  const updateAddressMut = useMutation({
+    mutationFn: ({ addressId, data }: { addressId: number; data: { label?: string; address?: string; isDefault?: boolean } }) =>
+      updateCustomerAddress(addressCustomer!.id, addressId, data),
+    onSuccess: () => {
+      toast.success(t.customers.addressUpdated);
+      qc.invalidateQueries({ queryKey: ["customer-detail", addressCustomer?.id] });
+      resetAddressForm();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Cập nhật địa chỉ thất bại"),
+  });
+
+  const deleteAddressMut = useMutation({
+    mutationFn: (addressId: number) => deleteCustomerAddress(addressCustomer!.id, addressId),
+    onSuccess: () => {
+      toast.success(t.customers.addressDeleted);
+      qc.invalidateQueries({ queryKey: ["customer-detail", addressCustomer?.id] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Xóa địa chỉ thất bại"),
+  });
+
+  function openEditAddress(addr: CustomerAddress) {
+    setEditingAddress(addr);
+    setAddrLabel(addr.label ?? "");
+    setAddrText(addr.address);
+    setAddrIsDefault(addr.isDefault);
+    setShowAddressForm(true);
+  }
+
+  function resetAddressForm() {
+    setShowAddressForm(false);
+    setEditingAddress(null);
+    setAddrLabel("");
+    setAddrText("");
+    setAddrIsDefault(false);
+  }
+
+  function submitAddressForm() {
+    if (!addrText.trim()) return;
+    if (editingAddress) {
+      updateAddressMut.mutate({ addressId: editingAddress.id, data: { label: addrLabel || undefined, address: addrText, isDefault: addrIsDefault } });
+    } else {
+      addAddressMut.mutate({ label: addrLabel || undefined, address: addrText, isDefault: addrIsDefault });
+    }
+  }
+
   const canCreate = hasPermission("customer.create");
 
   return (
@@ -189,6 +257,7 @@ export default function CustomersPage() {
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.email}</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Tài khoản portal</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.date}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground"></th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground"></th>
                   </tr>
                 </thead>
@@ -262,11 +331,21 @@ export default function CustomersPage() {
                           {t.customers.viewBalance}
                         </Button>
                       </td>
+                      <td className="px-6 py-3">
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700"
+                          onClick={() => { setAddressCustomer({ id: c.id, name: c.companyName }); resetAddressForm(); }}
+                        >
+                          <MapPin className="h-3 w-3" />
+                          {t.customers.addresses}
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                   {data?.items.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-muted-foreground">{t.customers.noCustomers}</td>
+                      <td colSpan={10} className="py-12 text-center text-muted-foreground">{t.customers.noCustomers}</td>
                     </tr>
                   )}
                 </tbody>
@@ -404,6 +483,86 @@ export default function CustomersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Address Management Dialog */}
+      <Dialog open={!!addressCustomer} onOpenChange={(v) => { if (!v) { setAddressCustomer(null); resetAddressForm(); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-blue-600" />
+              {t.customers.addresses} — {addressCustomer?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <div className="space-y-3">
+              {/* Address list */}
+              {!customerDetail?.addresses || customerDetail.addresses.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">{t.customers.noAddresses}</p>
+              ) : (
+                <div className="space-y-2">
+                  {customerDetail.addresses.map((addr, idx) => (
+                    <div key={addr.id} className="flex items-start justify-between p-3 border rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm">{addr.label || `${t.customers.addresses} ${idx + 1}`}</span>
+                          {addr.isDefault && (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">{t.customers.defaultBadge}</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-0.5">{addr.address}</p>
+                      </div>
+                      <div className="flex gap-1 ml-2 shrink-0">
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEditAddress(addr)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => deleteAddressMut.mutate(addr.id)}
+                          disabled={deleteAddressMut.isPending}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add/Edit form */}
+              {showAddressForm ? (
+                <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                  <p className="text-sm font-medium">{editingAddress ? t.customers.editAddress : t.customers.addAddress}</p>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t.customers.addressLabel}</Label>
+                    <Input placeholder="VD: Kho HCM, Văn phòng..." value={addrLabel} onChange={(e) => setAddrLabel(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t.customers.addressText} *</Label>
+                    <Input placeholder="Số nhà, đường, quận/huyện..." value={addrText} onChange={(e) => setAddrText(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="isDefault" checked={addrIsDefault} onChange={(e) => setAddrIsDefault(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+                    <Label htmlFor="isDefault" className="text-xs cursor-pointer">{t.customers.setDefault}</Label>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button size="sm" variant="outline" onClick={resetAddressForm}>{t.common.cancel}</Button>
+                    <Button size="sm" onClick={submitAddressForm} disabled={!addrText.trim() || addAddressMut.isPending || updateAddressMut.isPending}>
+                      {(addAddressMut.isPending || updateAddressMut.isPending) && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+                      {t.common.save}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setShowAddressForm(true)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  {t.customers.addAddress}
+                </Button>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

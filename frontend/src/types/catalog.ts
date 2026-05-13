@@ -15,6 +15,15 @@ export interface Brand {
   description?: string;
 }
 
+export interface ProductImage {
+  id: number;
+  productId: number;
+  imageUrl: string;
+  isPrimary: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface ProductAttribute {
   id: number;
   attrKey: string;
@@ -43,6 +52,7 @@ export interface Product {
   updatedAt: string;
   category?: { id: number; name: string };
   brand?: { id: number; name: string };
+  images?: ProductImage[];
   attributes?: ProductAttribute[];
   uomConversions?: UomConversion[];
   stockSummary?: { warehouseName: string; availableQuantity: number }[];

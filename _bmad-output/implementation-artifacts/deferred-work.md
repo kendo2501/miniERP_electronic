@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 1-4-product-image-upload (2026-05-13)
+
+- Credentials MinIO (`MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`) dùng `config.get` với default hardcode — cân nhắc dùng `config.getOrThrow` khi setup production
+- `uploadImages` không atomic — nếu DB create thất bại sau khi MinIO upload thành công, object bị orphan. Fix: upload all → transaction DB → compensate MinIO nếu fail
+- Không có tenant/org isolation trong catalog image endpoints — pre-existing pattern trên tất cả catalog endpoints, cần xem xét khi implement multi-tenancy
+
 ## Deferred from: code review of 1-2-product-unit-of-measure-conversion (2026-05-13)
 
 - Product existence check ngoài transaction trong `upsertUomConversions` (race condition tiềm năng) — pre-existing pattern từ `upsertProductAttributes`

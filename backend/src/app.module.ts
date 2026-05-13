@@ -19,6 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { StockInquiryModule } from './stock-inquiry/stock-inquiry.module';
+import { MinioModule } from './minio/minio.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -40,6 +41,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     HealthModule,
     AuthModule,
     UsersModule,
+    MinioModule,
     CatalogModule,
     InventoryModule,
     CustomersModule,

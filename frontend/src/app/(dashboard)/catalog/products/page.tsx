@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Package, Power, Pencil, X } from "lucide-react";
+import { Search, Plus, Loader2, Package, Power, Pencil, X, Trash2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import {
   listProducts, createProduct, deactivateProduct,
   listCategories, listBrands, getProduct, updateProduct, updateProductAttributes,
-  updateUomConversions,
+  updateUomConversions, uploadProductImages, deleteProductImage, exportProducts,
 } from "@/lib/api/catalog";
 import type { ProductAttribute } from "@/types/catalog";
 import { useAuthStore } from "@/store/auth.store";
@@ -43,12 +43,30 @@ export default function ProductsPage() {
   const [brandFilter, setBrandFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [editTab, setEditTab] = useState<"general" | "attributes" | "uom">("general");
+  const [editTab, setEditTab] = useState<"general" | "attributes" | "uom" | "images">("general");
   const [attrRows, setAttrRows] = useState<{ attrKey: string; attrValue: string }[]>([]);
   const [uomRows, setUomRows] = useState<{ fromUnit: string; toUnit: string; conversionRate: string }[]>([]);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
+
+  const handleExportProducts = async () => {
+    try {
+      const res = await exportProducts({
+        search: search || undefined,
+        categoryId: categoryFilter !== "all" ? parseInt(categoryFilter) : undefined,
+        brandId: brandFilter !== "all" ? parseInt(brandFilter) : undefined,
+      });
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = "products-export.xlsx"; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Xuất file thất bại");
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["products", page, search, categoryFilter, brandFilter],
@@ -141,6 +159,27 @@ export default function ProductsPage() {
     onError: () => toast.error("Failed to deactivate product"),
   });
 
+  const uploadImagesMut = useMutation({
+    mutationFn: () => uploadProductImages(editId!, uploadFiles),
+    onSuccess: () => {
+      toast.success(t.catalog.imageUploaded);
+      qc.invalidateQueries({ queryKey: ["product", editId] });
+      setUploadFiles([]);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Lỗi upload ảnh"),
+  });
+
+  const deleteImageMut = useMutation({
+    mutationFn: (imageId: number) => deleteProductImage(editId!, imageId),
+    onMutate: (id) => setDeletingImageId(id),
+    onSuccess: () => {
+      toast.success(t.catalog.imageDeleted);
+      qc.invalidateQueries({ queryKey: ["product", editId] });
+    },
+    onSettled: () => setDeletingImageId(null),
+    onError: () => toast.error("Lỗi xoá ảnh"),
+  });
+
   const canCreate = hasPermission("catalog.product.create");
   const canManage = hasPermission("catalog.product.deactivate");
   const canUpdate = hasPermission("catalog.product.update");
@@ -157,6 +196,8 @@ export default function ProductsPage() {
     editForm.reset();
     setAttrRows([]);
     setUomRows([]);
+    setUploadFiles([]);
+    setDeletingImageId(null);
   }
 
   useEffect(() => {
@@ -215,6 +256,10 @@ export default function ProductsPage() {
         <div className="flex gap-2">
           <Link href="/catalog/categories"><Button variant="outline" size="sm">{t.catalog.categories}</Button></Link>
           <Link href="/catalog/brands"><Button variant="outline" size="sm">{t.catalog.brands}</Button></Link>
+          <Button variant="outline" size="sm" onClick={handleExportProducts}>
+            <FileDown className="h-4 w-4" />
+            {t.catalog.exportProducts}
+          </Button>
           {canCreate && (
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
@@ -456,6 +501,22 @@ export default function ProductsPage() {
                     </span>
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setEditTab("images")}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    editTab === "images"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.catalog.productImages}
+                  {editProduct?.images?.length ? (
+                    <span className="ml-1.5 rounded-full bg-primary/10 text-primary text-xs px-1.5 py-0.5">
+                      {editProduct.images.length}
+                    </span>
+                  ) : null}
+                </button>
               </div>
 
               {/* Tab: Thông tin chung */}
@@ -650,6 +711,74 @@ export default function ProductsPage() {
                       {saveUomMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                       {t.common.save}
                     </Button>
+                  </DialogFooter>
+                </div>
+              )}
+              {/* Tab: Ảnh sản phẩm */}
+              {editTab === "images" && (
+                <div className="space-y-4">
+                  {!editProduct?.images?.length ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">{t.catalog.noImages}</p>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-3">
+                      {editProduct.images.map((img) => (
+                        <div key={img.id} className="relative group">
+                          <img
+                            src={img.imageUrl}
+                            alt=""
+                            className="w-full h-20 object-cover rounded-md border"
+                          />
+                          {canManage && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => deleteImageMut.mutate(img.id)}
+                              disabled={deletingImageId === img.id}
+                            >
+                              {deletingImageId === img.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Trash2 className="h-3 w-3" />
+                              }
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {canManage && (
+                    <div className="border rounded-md p-3 bg-muted/20 space-y-2">
+                      <p className="text-sm font-medium">{t.catalog.uploadImages}</p>
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <input
+                          type="file"
+                          multiple
+                          accept=".jpg,.jpeg,.png"
+                          className="text-sm file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-secondary file:text-secondary-foreground"
+                          onChange={(e) => setUploadFiles(Array.from(e.target.files ?? []))}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!uploadFiles.length || uploadImagesMut.isPending}
+                          onClick={() => uploadImagesMut.mutate()}
+                        >
+                          {uploadImagesMut.isPending
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                            : <Plus className="h-3.5 w-3.5 mr-1" />
+                          }
+                          {t.catalog.uploadImages}
+                        </Button>
+                      </div>
+                      {uploadFiles.length > 0 && (
+                        <p className="text-xs text-muted-foreground">{uploadFiles.length} file được chọn</p>
+                      )}
+                    </div>
+                  )}
+
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={closeEdit}>{t.common.close}</Button>
                   </DialogFooter>
                 </div>
               )}
