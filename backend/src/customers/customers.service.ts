@@ -52,11 +52,53 @@ export class CustomersService {
   }
 
   async create(dto: CreateCustomerDto) {
-    const code = await this.generateCode();
-    return this.prisma.customer.create({
-      data: { ...dto, customerCode: code, status: 'ACTIVE', creditLimit: dto.creditLimit ?? 0 },
-      select: SELECT_CUSTOMER,
+    const { password, customerCode: inputCode, ...customerData } = dto;
+
+    // Resolve customer code
+    const code = inputCode?.trim()
+      ? inputCode.trim().toUpperCase()
+      : await this.generateCode();
+
+    // Uniqueness checks
+    const [codeExists, emailExists] = await Promise.all([
+      this.prisma.customer.findFirst({ where: { customerCode: code, deletedAt: null }, select: { id: true } }),
+      this.prisma.user.findUnique({ where: { email: dto.email }, select: { id: true } }),
+    ]);
+    if (codeExists) throw new ConflictException(`Mã khách hàng "${code}" đã tồn tại`);
+    if (emailExists) throw new ConflictException('Email đã được sử dụng bởi tài khoản khác');
+
+    const customerRole = await this.prisma.role.findUnique({ where: { code: 'CUSTOMER' }, select: { id: true } });
+    if (!customerRole) throw new BadRequestException('CUSTOMER role not found — run seed first');
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create customer + portal user in a transaction
+    const customer = await this.prisma.$transaction(async (tx) => {
+      const newCustomer = await tx.customer.create({
+        data: {
+          ...customerData,
+          customerCode: code,
+          status: 'ACTIVE',
+          creditLimit: customerData.creditLimit ?? 0,
+        },
+        select: { id: true, companyName: true },
+      });
+
+      await tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          fullName: dto.contactName ?? dto.companyName,
+          status: 'ACTIVE',
+          linkedCustomerId: newCustomer.id,
+          userRoles: { create: [{ roleId: customerRole.id }] },
+        },
+      });
+
+      return tx.customer.findUniqueOrThrow({ where: { id: newCustomer.id }, select: SELECT_CUSTOMER });
     });
+
+    return customer;
   }
 
   async update(id: number, dto: UpdateCustomerDto) {
@@ -110,7 +152,13 @@ export class CustomersService {
   }
 
   private async generateCode(): Promise<string> {
-    const count = await this.prisma.customer.count();
-    return `CUST-${String(count + 1).padStart(5, '0')}`;
+    const last = await this.prisma.customer.findFirst({
+      orderBy: { id: 'desc' },
+      select: { customerCode: true },
+    });
+    if (!last?.customerCode) return 'CUST-00001';
+    const match = last.customerCode.match(/\d+$/);
+    const next = match ? parseInt(match[0], 10) + 1 : 1;
+    return `CUST-${String(next).padStart(5, '0')}`;
   }
 }

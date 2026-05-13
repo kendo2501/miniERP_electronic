@@ -26,14 +26,20 @@ const portalSchema = z.object({
 type PortalFormValues = z.infer<typeof portalSchema>;
 
 const schema = z.object({
+  customerCode: z.string().optional(),
   companyName: z.string().min(1, "Bắt buộc"),
   contactName: z.string().optional(),
-  email: z.string().optional(),
-  phone: z.string().optional(),
+  email: z.string().email("Email không hợp lệ"),
+  phone: z
+    .string()
+    .regex(/^\d{9,11}$/, "Số điện thoại phải gồm 9–11 chữ số")
+    .optional()
+    .or(z.literal("")),
   address: z.string().optional(),
   taxCode: z.string().optional(),
   creditLimit: z.string().optional(),
   customerType: z.enum(["RETAIL", "WHOLESALE"]).optional(),
+  password: z.string().min(8, "Mật khẩu tối thiểu 8 ký tự"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -87,9 +93,11 @@ export default function CustomersPage() {
   const mutation = useMutation({
     mutationFn: (values: FormValues) =>
       createCustomer({
+        customerCode: values.customerCode?.trim() || undefined,
         companyName: values.companyName,
+        email: values.email,
+        password: values.password,
         contactName: values.contactName || undefined,
-        email: values.email || undefined,
         phone: values.phone || undefined,
         address: values.address || undefined,
         taxCode: values.taxCode || undefined,
@@ -97,7 +105,7 @@ export default function CustomersPage() {
         customerType: values.customerType,
       }).then((r) => r.data),
     onSuccess: () => {
-      toast.success(t.customers.customerCreated);
+      toast.success(t.customers.customerCreatedWithAccount);
       qc.invalidateQueries({ queryKey: ["customers"] });
       setShowCreate(false);
       reset();
@@ -285,8 +293,23 @@ export default function CustomersPage() {
             <DialogTitle>{t.customers.createTitle}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4 pt-2">
-            <div className="rounded-md bg-muted/50 border px-3 py-2 text-xs text-muted-foreground">
-              Mã KH (customerCode) sẽ được tạo tự động sau khi lưu.
+            {/* Customer code + company name */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>{t.customers.customerCode}</Label>
+                <Input placeholder={t.customers.codePlaceholder} {...register("customerCode")} />
+                <p className="text-xs text-muted-foreground">{t.customers.autoCode}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t.customers.customerType}</Label>
+                <Select onValueChange={(v) => setValue("customerType", v as "RETAIL" | "WHOLESALE")} defaultValue="RETAIL">
+                  <SelectTrigger><SelectValue placeholder={t.customers.selectType} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RETAIL">{t.customers.retail}</SelectItem>
+                    <SelectItem value="WHOLESALE">{t.customers.wholesale}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>{t.customers.companyName} *</Label>
@@ -301,23 +324,24 @@ export default function CustomersPage() {
               <div className="space-y-1.5">
                 <Label>{t.customers.phone}</Label>
                 <Input placeholder={t.customers.phonePlaceholder} {...register("phone")} />
+                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
               </div>
             </div>
+            {/* Email + Password (portal account) */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>{t.common.email}</Label>
+                <Label>{t.common.email} *</Label>
                 <Input type="email" placeholder={t.customers.emailPlaceholder} {...register("email")} />
+                {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label>{t.customers.customerType}</Label>
-                <Select onValueChange={(v) => setValue("customerType", v as "RETAIL" | "WHOLESALE")} defaultValue="RETAIL">
-                  <SelectTrigger><SelectValue placeholder={t.customers.selectType} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="RETAIL">{t.customers.retail}</SelectItem>
-                    <SelectItem value="WHOLESALE">{t.customers.wholesale}</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>{t.customers.password} *</Label>
+                <Input type="password" placeholder={t.customers.passwordPlaceholder} {...register("password")} />
+                {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
               </div>
+            </div>
+            <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
+              {t.customers.portalAccountNote}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">

@@ -1,12 +1,28 @@
-import { IsString, IsOptional, IsNumber, IsInt, MaxLength, Min, IsIn, MinLength, IsEmail } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, MaxLength, Min, IsIn, MinLength, IsEmail, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreateCustomerDto {
+  @ApiPropertyOptional({ description: 'Leave blank to auto-generate (CUST-XXXXX)' })
+  @IsOptional() @IsString() @MaxLength(50) customerCode?: string;
+
   @ApiProperty() @IsString() @MaxLength(255) companyName!: string;
+
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(255) contactName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) phone?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(255) email?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{9,11}$/, { message: 'Số điện thoại phải gồm 9–11 chữ số' })
+  phone?: string;
+
+  @ApiProperty() @IsEmail({}, { message: 'Email không hợp lệ' }) email!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8, { message: 'Mật khẩu tối thiểu 8 ký tự' })
+  password!: string;
+
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) taxCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) creditLimit?: number;
@@ -18,8 +34,12 @@ export class CreateCustomerDto {
 export class UpdateCustomerDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(255) companyName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(255) contactName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) phone?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(255) email?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{9,11}$/, { message: 'Số điện thoại phải gồm 9–11 chữ số' })
+  phone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) taxCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Type(() => Number) creditLimit?: number;

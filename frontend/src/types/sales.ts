@@ -45,7 +45,20 @@ export interface CustomerListResponse {
 }
 
 export interface CreateCustomerPayload {
+  customerCode?: string;
   companyName: string;
+  email: string;
+  password: string;
+  contactName?: string;
+  phone?: string;
+  address?: string;
+  taxCode?: string;
+  creditLimit?: number;
+  customerType?: CustomerType;
+}
+
+export interface UpdateCustomerPayload {
+  companyName?: string;
   contactName?: string;
   email?: string;
   phone?: string;
@@ -53,10 +66,8 @@ export interface CreateCustomerPayload {
   taxCode?: string;
   creditLimit?: number;
   customerType?: CustomerType;
-  notes?: string;
+  status?: string;
 }
-
-export interface UpdateCustomerPayload extends Partial<CreateCustomerPayload> {}
 
 // ─── Quotation ────────────────────────────────────────────────────────────────
 

@@ -337,6 +337,11 @@ const en = {
     noInvoices: "No invoices",
     creditLimit: "Credit Limit",
     taxCode: "Tax Code",
+    password: "Login Password",
+    passwordPlaceholder: "Min 8 characters",
+    autoCode: "Leave blank to auto-generate",
+    portalAccountNote: "A portal account will be created automatically with the email and password above.",
+    customerCreatedWithAccount: "Customer and login account created successfully",
   },
 
   orders: {
@@ -896,6 +901,11 @@ const vi: typeof en = {
     noInvoices: "Không có hóa đơn",
     creditLimit: "Hạn mức tín dụng",
     taxCode: "Mã số thuế",
+    password: "Mật khẩu đăng nhập",
+    passwordPlaceholder: "Tối thiểu 8 ký tự",
+    autoCode: "Để trống = tự động tạo",
+    portalAccountNote: "Tài khoản portal sẽ được tạo tự động với email và mật khẩu trên.",
+    customerCreatedWithAccount: "Đã tạo khách hàng và tài khoản đăng nhập",
   },
 
   orders: {
