@@ -3,7 +3,6 @@ import type {
   Customer, CustomerListResponse, CreateCustomerPayload, UpdateCustomerPayload, CustomerBalance,
   Quotation, QuotationListResponse, CreateQuotationPayload,
   SalesOrder, SalesOrderListResponse, CreateSalesOrderPayload,
-  Delivery, DeliveryListResponse, CreateDeliveryPayload,
 } from '@/types/sales';
 
 // ─── Customers ────────────────────────────────────────────────────────────────
@@ -107,20 +106,6 @@ export const adjustOrderPrices = (id: number, items: { productId: number; quanti
 
 export const confirmReapproval = (id: number) =>
   apiClient.post<SalesOrder>(`/sales/orders/${id}/confirm-reapproval`);
-
-// ─── Deliveries ───────────────────────────────────────────────────────────────
-
-export const listDeliveries = (params?: Record<string, unknown>) =>
-  apiClient.get<DeliveryListResponse>('/sales/deliveries', { params });
-
-export const createDelivery = (data: CreateDeliveryPayload) =>
-  apiClient.post<Delivery>('/sales/deliveries', data);
-
-export const markDelivered = (id: number) =>
-  apiClient.post<Delivery>(`/sales/deliveries/${id}/deliver`);
-
-export const markDeliveryFailed = (id: number, failureReason?: string) =>
-  apiClient.patch<Delivery>(`/sales/deliveries/${id}/fail`, { failureReason });
 
 // ─── Stock Inquiries ──────────────────────────────────────────────────────────
 

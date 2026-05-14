@@ -179,7 +179,7 @@ export interface SalesOrder {
   customer: { id: number; companyName: string; customerCode: string };
   quotation?: { id: number; quotationNumber: string };
   items?: SalesOrderItem[];
-  _count?: { items: number; deliveries: number };
+  _count?: { items: number };
 }
 
 export interface SalesOrderListResponse {
@@ -205,48 +205,3 @@ export interface CreateSalesOrderPayload {
   items: SalesOrderItemPayload[];
 }
 
-// ─── Delivery ─────────────────────────────────────────────────────────────────
-
-export type DeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
-
-export interface DeliveryItem {
-  id: number;
-  productId: number;
-  quantity: number;
-}
-
-export interface Delivery {
-  id: number;
-  deliveryNumber: string;
-  status: DeliveryStatus;
-  trackingCode?: string;
-  failureReason?: string;
-  failedAt?: string;
-  deliveredAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  salesOrder: { id: number; orderNumber: string };
-  warehouse: { id: number; warehouseName: string };
-  items?: DeliveryItem[];
-  _count?: { items: number };
-}
-
-export interface DeliveryListResponse {
-  items: Delivery[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-export interface DeliveryItemPayload {
-  productId: number;
-  quantity: number;
-}
-
-export interface CreateDeliveryPayload {
-  salesOrderId: number;
-  warehouseId: number;
-  trackingCode?: string;
-  items: DeliveryItemPayload[];
-}

@@ -37,7 +37,7 @@ const NAV_ITEMS = [
   { href: "/catalog",                    labelKey: "catalog"        as const, icon: LayoutGrid,      permission: "catalog.product.view" },
   { href: "/inventory",                  labelKey: "inventory"      as const, icon: Package,         permission: "inventory.stock.view" },
   { href: "/customers",                  labelKey: "customers"      as const, icon: UserRound,       permission: "customer.view_assigned" },
-  { href: "/sales",                      labelKey: "sales"          as const, icon: ShoppingCart,    permission: "sales.delivery.view" },
+  { href: "/sales",                      labelKey: "sales"          as const, icon: ShoppingCart,    permission: "sales.quotation.create" },
   { href: "/my-quotations",               labelKey: "myQuotations"   as const, icon: FileText,        permission: "sales.quotation.view_own" },
   { href: "/my-orders",                  labelKey: "myOrders"       as const, icon: ClipboardList,   permission: "sales.order.view_own" },
   { href: "/sales/stock-inquiries",      labelKey: "stockInquiries" as const, icon: ClipboardCheck,  permission: "inventory.stock.request" },

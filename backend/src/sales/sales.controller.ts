@@ -1,10 +1,9 @@
-import { Controller, Get, Post, Patch, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus, Req } from '@nestjs/common';
+import { Controller, Get, Post, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SalesService } from './sales.service';
 import {
   CreateQuotationDto, QuotationQueryDto,
   CreateSalesOrderDto, SalesOrderQueryDto,
-  CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
   SubmitCounterOfferDto,
   CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
   RequestPriceAdjustmentDto, AdjustOrderPricesDto,
@@ -34,7 +33,7 @@ export class SalesController {
   @Post('quotations/:id/send') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Send quotation to customer' })
   sendQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.sendQuotation(id); }
 
-  @Post('quotations/:id/confirm') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Confirm quotation → creates sales order' })
+  @Post('quotations/:id/confirm') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Confirm quotation → auto-creates sales order' })
   confirmQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.confirmQuotation(id); }
 
   @Post('quotations/:id/cancel') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Cancel quotation' })
@@ -89,20 +88,6 @@ export class SalesController {
 
   @Post('orders/:id/confirm-reapproval') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.approve') @ApiOperation({ summary: 'Manager re-approves adjusted order — PENDING_REAPPROVAL → CONFIRMED' })
   confirmReapproval(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.confirmReapproval(id, req.user?.id); }
-
-  // ─── Deliveries ───────────────────────────────────────────────────────────
-
-  @Get('deliveries') @AnyPermission('sales.delivery.view', 'sales.delivery.view_own') @ApiOperation({ summary: 'List deliveries' })
-  listDeliveries(@Query() query: DeliveryQueryDto, @Req() req: any) { return this.service.listDeliveries(query, req.user); }
-
-  @Post('deliveries') @RequirePermissions('sales.order.create') @ApiOperation({ summary: 'Create delivery from order' })
-  createDelivery(@Body() dto: CreateDeliveryDto) { return this.service.createDelivery(dto); }
-
-  @Post('deliveries/:id/deliver') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.create') @ApiOperation({ summary: 'Mark delivery as delivered' })
-  markDelivered(@Param('id', ParseIntPipe) id: number) { return this.service.markDelivered(id); }
-
-  @Patch('deliveries/:id/fail') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.create') @ApiOperation({ summary: 'Mark delivery as failed' })
-  markFailed(@Param('id', ParseIntPipe) id: number, @Body() dto: MarkDeliveryFailedDto) { return this.service.markFailed(id, dto); }
 
   // ─── Customer balance ─────────────────────────────────────────────────────
 

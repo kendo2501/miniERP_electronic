@@ -56,25 +56,6 @@ export class SalesOrderQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
 }
 
-// ─── Delivery ─────────────────────────────────────────────────────────────
-
-export class DeliveryItemDto {
-  @ApiProperty() @IsInt() @Type(() => Number) productId!: number;
-  @ApiProperty() @IsNumber() @Min(0.01) @Type(() => Number) quantity!: number;
-}
-
-export class CreateDeliveryDto {
-  @ApiProperty() @IsInt() @Type(() => Number) salesOrderId!: number;
-  @ApiProperty() @IsInt() @Type(() => Number) warehouseId!: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() trackingCode?: string;
-  @ApiProperty({ type: [DeliveryItemDto] })
-  @IsArray() @ValidateNested({ each: true }) @Type(() => DeliveryItemDto) items!: DeliveryItemDto[];
-}
-
-export class MarkDeliveryFailedDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() failureReason?: string;
-}
-
 // ─── Quotation Approval Flow ─────────────────────────────────────────────
 
 export class CancelWithReasonDto {
@@ -90,19 +71,11 @@ export class UpdateQuotationItemsDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => QuotationItemDto) items!: QuotationItemDto[];
 }
 
-
 // ─── Counter Offer ────────────────────────────────────────────────────────
 
 export class SubmitCounterOfferDto {
   @ApiProperty() @IsNumber() @Min(0) @Type(() => Number) proposedAmount!: number;
   @ApiPropertyOptional() @IsOptional() @IsString() note?: string;
-}
-
-export class DeliveryQueryDto {
-  @ApiPropertyOptional() @IsOptional() @Type(() => Number) page?: number = 1;
-  @ApiPropertyOptional() @IsOptional() @Type(() => Number) limit?: number = 20;
-  @ApiPropertyOptional() @IsOptional() @Type(() => Number) salesOrderId?: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
 }
 
 // ─── Order Price Adjustment ───────────────────────────────────────────────

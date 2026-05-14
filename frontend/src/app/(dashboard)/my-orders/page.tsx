@@ -1,45 +1,31 @@
 "use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Package, Truck, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
+import { Package, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { listOrders, listDeliveries } from "@/lib/api/sales";
+import { listOrders } from "@/lib/api/sales";
 import { vnd } from "@/lib/format";
-import type { SalesOrderStatus, DeliveryStatus } from "@/types/sales";
+import type { SalesOrderStatus } from "@/types/sales";
 
 const ORDER_STATUS_CONFIG: Record<SalesOrderStatus, { label: string; icon: React.ReactNode; className: string }> = {
   DRAFT:                       { label: "Chờ xác nhận",    icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
   CONFIRMED:                   { label: "Đã xác nhận",     icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-blue-700 bg-blue-50 border-blue-200" },
-  PARTIALLY_DELIVERED:         { label: "Đang giao",       icon: <Truck className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
+  PARTIALLY_DELIVERED:         { label: "Đang giao",       icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
   DELIVERED:                   { label: "Đã giao hàng",    icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-green-700 bg-green-50 border-green-200" },
   CANCELLED:                   { label: "Đã hủy",          icon: <XCircle className="h-3.5 w-3.5" />,      className: "text-red-700 bg-red-50 border-red-200" },
   PRICE_ADJUSTMENT_REQUESTED:  { label: "Đang xử lý",      icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
   PENDING_REAPPROVAL:          { label: "Đang xử lý",      icon: <Clock className="h-3.5 w-3.5" />,        className: "text-purple-700 bg-purple-50 border-purple-200" },
 };
 
-const DELIVERY_STATUS_CONFIG: Record<DeliveryStatus, { label: string; className: string }> = {
-  PENDING:   { label: "Đang vận chuyển", className: "text-blue-700 bg-blue-50 border-blue-200" },
-  DELIVERED: { label: "Đã nhận hàng",   className: "text-green-700 bg-green-50 border-green-200" },
-  FAILED:    { label: "Giao thất bại",   className: "text-red-700 bg-red-50 border-red-200" },
-  CANCELLED: { label: "Đã hủy",         className: "text-gray-700 bg-gray-50 border-gray-200" },
-};
-
 export default function MyOrdersPage() {
   const [page, setPage] = useState(1);
-  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["my-orders", page],
     queryFn: () => listOrders({ page, limit: 10 }).then((r) => r.data),
     placeholderData: (prev) => prev,
-  });
-
-  const { data: deliveriesData } = useQuery({
-    queryKey: ["my-deliveries", expandedOrderId],
-    queryFn: () => listDeliveries({ salesOrderId: expandedOrderId! } as any).then((r) => r.data),
-    enabled: !!expandedOrderId,
   });
 
   return (
@@ -68,7 +54,6 @@ export default function MyOrdersPage() {
 
           {data?.items.map((order) => {
             const cfg = ORDER_STATUS_CONFIG[order.status];
-            const isExpanded = expandedOrderId === order.id;
 
             return (
               <Card key={order.id} className="overflow-hidden">
@@ -91,71 +76,13 @@ export default function MyOrdersPage() {
                       </div>
                     </div>
 
-                    {/* Total + delivery count */}
+                    {/* Total */}
                     <div className="text-right shrink-0">
                       <div className="font-semibold tabular-nums">{vnd(Number(order.totalAmount))}</div>
-                      {(order._count?.deliveries ?? 0) > 0 && (
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {order._count?.deliveries} lần giao
-                        </div>
-                      )}
+                      <div className="text-xs text-muted-foreground mt-0.5">{order._count?.items ?? 0} sản phẩm</div>
                     </div>
                   </div>
-
-                  {/* Expand deliveries */}
-                  {(order._count?.deliveries ?? 0) > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs mt-2 text-blue-600 hover:text-blue-700 w-fit"
-                      onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                    >
-                      <Truck className="h-3.5 w-3.5 mr-1" />
-                      {isExpanded ? "Ẩn thông tin giao hàng" : "Xem thông tin giao hàng"}
-                    </Button>
-                  )}
                 </CardHeader>
-
-                {/* Delivery details (expanded) */}
-                {isExpanded && (
-                  <CardContent className="pt-0 border-t bg-muted/20">
-                    {!deliveriesData ? (
-                      <div className="py-4 flex justify-center"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                    ) : deliveriesData.items.length === 0 ? (
-                      <p className="py-4 text-sm text-muted-foreground text-center">Chưa có thông tin giao hàng</p>
-                    ) : (
-                      <div className="space-y-2 py-3">
-                        {deliveriesData.items.map((d) => {
-                          const dcfg = DELIVERY_STATUS_CONFIG[d.status as DeliveryStatus];
-                          return (
-                            <div key={d.id} className="flex items-center justify-between text-sm py-2 px-3 bg-background rounded-md border">
-                              <div className="flex items-center gap-3">
-                                <Truck className="h-4 w-4 text-muted-foreground shrink-0" />
-                                <div>
-                                  <div className="font-mono text-xs font-medium">{d.deliveryNumber}</div>
-                                  {(d as any).trackingCode && (
-                                    <div className="text-xs text-blue-600">Mã vận đơn: {(d as any).trackingCode}</div>
-                                  )}
-                                  {(d as any).deliveredAt && (
-                                    <div className="text-xs text-muted-foreground">
-                                      Ngày giao: {new Date((d as any).deliveredAt).toLocaleDateString("vi-VN")}
-                                    </div>
-                                  )}
-                                  {(d as any).failureReason && (
-                                    <div className="text-xs text-red-600">Lý do: {(d as any).failureReason}</div>
-                                  )}
-                                </div>
-                              </div>
-                              <Badge variant="outline" className={`text-xs ${dcfg?.className}`}>
-                                {dcfg?.label ?? d.status}
-                              </Badge>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                )}
               </Card>
             );
           })}

@@ -5,7 +5,6 @@ import { AuthUser } from '../common/types/auth-user.type';
 import {
   CreateQuotationDto, QuotationQueryDto,
   CreateSalesOrderDto, SalesOrderQueryDto,
-  CreateDeliveryDto, DeliveryQueryDto, MarkDeliveryFailedDto,
   SubmitCounterOfferDto,
   CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
   RequestPriceAdjustmentDto, AdjustOrderPricesDto,
@@ -141,6 +140,13 @@ export class SalesService {
 
   async confirmQuotation(id: number) {
     const q = await this.getQuotation(id);
+
+    // Idempotency: return existing order if already confirmed
+    if (q.status === 'CONFIRMED') {
+      const existing = await this.prisma.salesOrder.findFirst({ where: { quotationId: id }, select: ORDER_SELECT });
+      if (existing) return existing;
+    }
+
     if (!['SENT', 'APPROVED'].includes(q.status ?? '')) throw new BadRequestException('Quotation cannot be confirmed');
 
     const orderNumber = await this.generateOrderNumber();
@@ -157,6 +163,7 @@ export class SalesService {
           quotationId: id,
           status: 'CONFIRMED',
           subtotal, taxAmount, totalAmount,
+          salesUserId: (q as any).salesUserId ?? undefined,
           orderedAt: new Date(),
           confirmedAt: new Date(),
           items: {
@@ -480,6 +487,13 @@ export class SalesService {
 
   async acceptCounterOffer(id: number) {
     const q = await this.getQuotation(id);
+
+    // Idempotency: return existing order if already accepted
+    if ((q as any).negotiationStatus === 'ACCEPTED') {
+      const existing = await this.prisma.salesOrder.findFirst({ where: { quotationId: id }, select: ORDER_SELECT });
+      if (existing) return existing;
+    }
+
     if ((q as any).negotiationStatus !== 'PROPOSED') throw new BadRequestException('No pending counter offer to accept');
 
     const orderNumber = await this.generateOrderNumber();
@@ -557,7 +571,7 @@ export class SalesService {
           id: true, orderNumber: true, status: true, paymentStatus: true, totalAmount: true, subtotal: true, taxAmount: true, orderedAt: true, confirmedAt: true, createdAt: true,
           customer: { select: { id: true, companyName: true, customerCode: true } },
           quotation: { select: { id: true, quotationNumber: true } },
-          _count: { select: { items: true, deliveries: true } },
+          _count: { select: { items: true } },
         },
       }),
       this.prisma.salesOrder.count({ where }),
@@ -624,111 +638,6 @@ export class SalesService {
     const o = await this.getOrder(id);
     if (['CANCELLED', 'DELIVERED'].includes(o.status ?? '')) throw new BadRequestException('Order cannot be cancelled');
     return this.prisma.salesOrder.update({ where: { id }, data: { status: 'CANCELLED' }, select: ORDER_SELECT });
-  }
-
-  // ─── Deliveries ───────────────────────────────────────────────────────────
-
-  async listDeliveries(query: DeliveryQueryDto, currentUser?: AuthUser) {
-    const { page = 1, limit = 20, salesOrderId, status } = query;
-    const skip = (page - 1) * limit;
-    const where: any = {};
-    if (salesOrderId) where.salesOrderId = salesOrderId;
-    if (status) where.status = status;
-
-    const perms = currentUser?.permissions ?? [];
-    if (!perms.includes('sales.delivery.view')) {
-      const cid = currentUser?.linkedCustomerId;
-      if (!cid) return { items: [], total: 0, page, limit, totalPages: 0 };
-      // Filter deliveries for the customer's own orders
-      where.salesOrder = { customerId: cid };
-    }
-
-    const [items, total] = await Promise.all([
-      this.prisma.delivery.findMany({
-        where, skip, take: limit, orderBy: { createdAt: 'desc' },
-        include: {
-          salesOrder: { select: { id: true, orderNumber: true } },
-          warehouse: { select: { id: true, warehouseName: true } },
-          _count: { select: { items: true } },
-        },
-      }),
-      this.prisma.delivery.count({ where }),
-    ]);
-    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
-  }
-
-  async createDelivery(dto: CreateDeliveryDto) {
-    const order = await this.prisma.salesOrder.findUnique({
-      where: { id: dto.salesOrderId },
-      include: { items: true },
-    });
-    if (!order) throw new NotFoundException(`Sales Order #${dto.salesOrderId} not found`);
-    if (!['CONFIRMED', 'PARTIALLY_DELIVERED'].includes(order.status ?? '')) {
-      throw new BadRequestException('Order must be CONFIRMED or PARTIALLY_DELIVERED to create delivery');
-    }
-
-    const deliveryNumber = await this.generateDeliveryNumber();
-
-    return this.prisma.$transaction(async (tx) => {
-      const delivery = await tx.delivery.create({
-        data: {
-          deliveryNumber,
-          salesOrderId: dto.salesOrderId,
-          warehouseId: dto.warehouseId,
-          status: 'PENDING',
-          trackingCode: dto.trackingCode ?? null,
-          items: {
-            create: dto.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-          },
-        },
-        include: { items: true, warehouse: { select: { id: true, warehouseName: true } } },
-      });
-
-      // Update delivered quantities on order items
-      for (const di of dto.items) {
-        const orderItem = order.items.find((oi) => oi.productId === di.productId);
-        if (orderItem) {
-          await tx.salesOrderItem.update({
-            where: { id: orderItem.id },
-            data: { deliveredQuantity: { increment: di.quantity } },
-          });
-        }
-      }
-
-      // Recalculate order status
-      const updatedItems = await tx.salesOrderItem.findMany({ where: { salesOrderId: dto.salesOrderId } });
-      const allDelivered = updatedItems.every((i) => Number(i.deliveredQuantity) >= Number(i.quantity));
-      const anyDelivered = updatedItems.some((i) => Number(i.deliveredQuantity) > 0);
-      const newStatus = allDelivered ? 'DELIVERED' : anyDelivered ? 'PARTIALLY_DELIVERED' : 'CONFIRMED';
-
-      await tx.salesOrder.update({ where: { id: dto.salesOrderId }, data: { status: newStatus } });
-
-      return delivery;
-    });
-  }
-
-  async markDelivered(id: number) {
-    const d = await this.prisma.delivery.findUnique({ where: { id } });
-    if (!d) throw new NotFoundException(`Delivery #${id} not found`);
-    if (d.status === 'DELIVERED') throw new BadRequestException('Delivery already marked as delivered');
-    if (d.status === 'FAILED') throw new BadRequestException('Cannot mark a failed delivery as delivered');
-    return this.prisma.delivery.update({
-      where: { id },
-      data: { status: 'DELIVERED', deliveredAt: new Date() },
-      include: { salesOrder: { select: { id: true, orderNumber: true } } },
-    });
-  }
-
-  async markFailed(id: number, dto: MarkDeliveryFailedDto) {
-    const d = await this.prisma.delivery.findUnique({ where: { id } });
-    if (!d) throw new NotFoundException(`Delivery #${id} not found`);
-    if (['DELIVERED', 'CANCELLED', 'FAILED'].includes(d.status ?? ''))
-      throw new BadRequestException(`Delivery already ${d.status?.toLowerCase()}`);
-    return this.prisma.delivery.update({
-      where: { id },
-      data: { status: 'FAILED', failedAt: new Date(), failureReason: dto.failureReason ?? null },
-      include: { salesOrder: { select: { id: true, orderNumber: true } } },
-    });
   }
 
   async getCustomerBalance(customerId: number) {
@@ -816,12 +725,6 @@ export class SalesService {
     const count = await this.prisma.salesOrder.count();
     const year = new Date().getFullYear();
     return `SO-${year}-${String(count + 1).padStart(5, '0')}`;
-  }
-
-  private async generateDeliveryNumber(): Promise<string> {
-    const count = await this.prisma.delivery.count();
-    const year = new Date().getFullYear();
-    return `DEL-${year}-${String(count + 1).padStart(5, '0')}`;
   }
 
   private async notifyManagers(subject: string, content: string): Promise<void> {

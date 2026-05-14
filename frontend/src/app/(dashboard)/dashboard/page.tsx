@@ -366,7 +366,7 @@ function SalesDashboard({ user }: { user: any }) {
                   { href: "/customers",         icon: UserRound,    label: t.dashboard.myCustomers, color: "text-[#593E67]", bg: "bg-[#593E67]/10" },
                   { href: "/sales/quotations",  icon: ClipboardList,label: t.quotations.title,      color: "text-[#84495F]", bg: "bg-[#84495F]/10" },
                   { href: "/sales/orders",      icon: ShoppingCart, label: t.orders.title,          color: "text-[#B85B56]", bg: "bg-[#B85B56]/10" },
-                  { href: "/sales/deliveries",  icon: Truck,        label: t.deliveries.title,      color: "text-[#DE741C]", bg: "bg-[#DE741C]/10" },
+                  { href: "/finance",           icon: CircleDollarSign, label: t.finance.title,     color: "text-[#DE741C]", bg: "bg-[#DE741C]/10" },
                 ].map(({ href, icon: Icon, label, color, bg }) => (
                   <Link key={href} href={href}>
                     <Card className="cursor-pointer hover:border-[#593E67]/40 hover:shadow-md transition-all h-full">
@@ -631,7 +631,6 @@ function AccountantDashboard({ user }: { user: any }) {
 
 interface WarehouseKpis {
   stock: { totalSkus: number; lowStockCount: number };
-  deliveries: { pending: number; deliveredToday: number };
   warehouses: Array<{ id: number; name: string; status: string | null; skuCount: number }>;
   lowStockAlerts: Array<{ sku: string; productName: string; warehouse: string; availableQuantity: number }>;
   recentTransactions: Array<{
@@ -676,18 +675,6 @@ function WarehouseDashboard({ user }: { user: any }) {
               sub="≤10 units available"
               icon={AlertTriangle}
               accent={kpis.stock.lowStockCount > 0 ? "text-yellow-500" : "text-muted-foreground"}
-            />
-            <KpiCard
-              title={t.dashboard.pendingDeliveries}
-              value={String(kpis.deliveries.pending)}
-              sub="awaiting dispatch"
-              icon={Truck} accent="text-blue-500"
-            />
-            <KpiCard
-              title={t.dashboard.deliveredToday}
-              value={String(kpis.deliveries.deliveredToday)}
-              sub="completed today"
-              icon={CheckCircle2} accent="text-green-500"
             />
           </div>
 
@@ -782,10 +769,10 @@ function WarehouseDashboard({ user }: { user: any }) {
               <p className="text-sm font-medium text-muted-foreground">{t.dashboard.quickActions}</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { href: "/inventory",        icon: Package,    label: t.inventory.title,       color: "text-[#593E67]", bg: "bg-[#593E67]/10" },
-                  { href: "/sales/deliveries", icon: Truck,      label: t.deliveries.title,      color: "text-[#84495F]", bg: "bg-[#84495F]/10" },
-                  { href: "/catalog",          icon: LayoutGrid, label: t.catalog.products,      color: "text-[#B85B56]", bg: "bg-[#B85B56]/10" },
-                  { href: "/notifications",    icon: Bell,       label: t.notifications.title,   color: "text-[#FEA837]", bg: "bg-[#FEA837]/15" },
+                  { href: "/inventory",                icon: Package,    label: t.inventory.title,         color: "text-[#593E67]", bg: "bg-[#593E67]/10" },
+                  { href: "/inventory/stock-inquiries", icon: ClipboardList, label: t.sidebar.stockInquiries, color: "text-[#84495F]", bg: "bg-[#84495F]/10" },
+                  { href: "/catalog",                  icon: LayoutGrid, label: t.catalog.products,        color: "text-[#B85B56]", bg: "bg-[#B85B56]/10" },
+                  { href: "/notifications",            icon: Bell,       label: t.notifications.title,     color: "text-[#FEA837]", bg: "bg-[#FEA837]/15" },
                 ].map(({ href, icon: Icon, label, color, bg }) => (
                   <Link key={href} href={href}>
                     <Card className="cursor-pointer hover:border-[#593E67]/40 hover:shadow-md transition-all h-full">

@@ -284,7 +284,6 @@ export default function QuotationsPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/sales/orders"><Button variant="outline" size="sm">{t.orders.title}</Button></Link>
-          <Link href="/sales/deliveries"><Button variant="outline" size="sm">{t.deliveries.title}</Button></Link>
           {canCreate && (
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />

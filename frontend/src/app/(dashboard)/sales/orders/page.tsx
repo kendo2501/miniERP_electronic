@@ -286,7 +286,6 @@ export default function SalesOrdersPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/sales/quotations"><Button variant="outline" size="sm">{t.quotations.title}</Button></Link>
-          <Link href="/sales/deliveries"><Button variant="outline" size="sm">{t.deliveries.title}</Button></Link>
           {canCreate && (
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
@@ -348,7 +347,6 @@ export default function SalesOrdersPage() {
                     )}
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thanh toán</th>
                     <th className="h-10 px-6 text-right font-medium text-muted-foreground">Tổng tiền</th>
-                    <th className="h-10 px-6 text-center font-medium text-muted-foreground">Giao hàng</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Ngày đặt</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thao tác</th>
                   </tr>
@@ -413,13 +411,6 @@ export default function SalesOrdersPage() {
                               Trước thuế: {vnd(Number(o.subtotal))}
                             </div>
                           )}
-                        </td>
-
-                        {/* Số phiếu giao hàng */}
-                        <td className="px-6 py-3 text-center">
-                          <span className={`text-sm font-medium ${(o._count?.deliveries ?? 0) > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
-                            {o._count?.deliveries ?? 0}
-                          </span>
                         </td>
 
                         {/* Ngày đặt */}
@@ -501,7 +492,7 @@ export default function SalesOrdersPage() {
                   {data?.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={canApprove ? 8 : 7}
+                        colSpan={canApprove ? 7 : 6}
                         className="py-12 text-center text-muted-foreground"
                       >
                         {t.orders.noOrders}
