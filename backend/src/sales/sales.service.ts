@@ -267,8 +267,8 @@ export class SalesService {
 
   async requestPriceAdjustment(id: number, dto: RequestPriceAdjustmentDto, actorId?: number) {
     const o = await this.getOrder(id);
-    if (!['CONFIRMED', 'PENDING_REAPPROVAL'].includes(o.status as string))
-      throw new BadRequestException('Only CONFIRMED or PENDING_REAPPROVAL orders can request price adjustment');
+    if (!['DRAFT', 'CONFIRMED', 'PENDING_REAPPROVAL'].includes(o.status as string))
+      throw new BadRequestException('Only DRAFT, CONFIRMED or PENDING_REAPPROVAL orders can request price adjustment');
 
     const result = await this.prisma.salesOrder.update({
       where: { id },
@@ -295,7 +295,19 @@ export class SalesService {
       this.notifyUser(
         salesUserId,
         `Đơn hàng ${(o as any).orderNumber} cần điều chỉnh giá`,
-        `Quản lý yêu cầu điều chỉnh giá.${dto.reason ? ` Lý do: ${dto.reason}` : ''}`,
+        `Admin yêu cầu điều chỉnh giá.${dto.reason ? ` Lý do: ${dto.reason}` : ''}`,
+      ).catch(() => {});
+    }
+
+    const customerPortalUser = await this.prisma.user.findFirst({
+      where: { linkedCustomerId: (o as any).customer.id, deletedAt: null },
+      select: { id: true },
+    });
+    if (customerPortalUser) {
+      this.notifyUser(
+        customerPortalUser.id,
+        `Đơn hàng ${(o as any).orderNumber} đang điều chỉnh giá`,
+        `Đơn hàng của bạn đang trong quá trình điều chỉnh giá. Vui lòng chờ nhân viên kinh doanh cập nhật.`,
       ).catch(() => {});
     }
 

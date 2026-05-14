@@ -1,10 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Trash2, ShoppingCart, CheckCircle2 } from "lucide-react";
+import {
+  Search, Plus, Loader2, Trash2, ShoppingCart,
+  CheckCircle2, CheckCircle, XCircle, Edit2, AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { listOrders, confirmPayment, createOrder, listCustomers } from "@/lib/api/sales";
+import {
+  listOrders, confirmPayment, createOrder, listCustomers,
+  confirmOrder, cancelOrder, requestPriceAdjustment, adjustOrderPrices, getOrder, confirmReapproval,
+} from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
 import type { SalesOrderStatus, PaymentStatus } from "@/types/sales";
@@ -77,6 +84,15 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+type AdjustItem = {
+  productId: number;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+};
+
 // Trạng thái chặn xác nhận thanh toán
 const NO_PAYMENT_STATUSES: SalesOrderStatus[] = [
   "CANCELLED", "DRAFT", "PRICE_ADJUSTMENT_REQUESTED", "PENDING_REAPPROVAL",
@@ -89,6 +105,14 @@ export default function SalesOrdersPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+
+  // Admin: yêu cầu điều chỉnh giá
+  const [requestAdjustTarget, setRequestAdjustTarget] = useState<{ id: number; status: SalesOrderStatus } | null>(null);
+  const [requestAdjustReason, setRequestAdjustReason] = useState("");
+
+  // Sale: điều chỉnh lại giá
+  const [adjustPriceOrderId, setAdjustPriceOrderId] = useState<number | null>(null);
+  const [adjustPriceItems, setAdjustPriceItems] = useState<AdjustItem[]>([]);
 
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
@@ -115,6 +139,27 @@ export default function SalesOrdersPage() {
     queryFn: () => listCustomers({ limit: 200 }).then((r) => r.data),
     enabled: showCreate,
   });
+
+  const { data: adjustOrderDetail, isFetching: loadingAdjustDetail } = useQuery({
+    queryKey: ["order-detail-adjust", adjustPriceOrderId],
+    queryFn: () => getOrder(adjustPriceOrderId!).then((r) => r.data),
+    enabled: adjustPriceOrderId !== null,
+  });
+
+  useEffect(() => {
+    if (adjustOrderDetail?.items) {
+      setAdjustPriceItems(
+        adjustOrderDetail.items.map((i: any) => ({
+          productId: i.product.id,
+          productName: i.product.productName,
+          sku: i.product.sku,
+          quantity: Number(i.quantity),
+          unitPrice: Number(i.unitPrice),
+          discountPercent: Number(i.discountPercent ?? 0),
+        })),
+      );
+    }
+  }, [adjustOrderDetail]);
 
   // ─── Form ─────────────────────────────────────────────────────────────────
 
@@ -150,6 +195,52 @@ export default function SalesOrdersPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Tạo đơn hàng thất bại"),
   });
 
+  // Admin: xác nhận giá (DRAFT → CONFIRMED hoặc PENDING_REAPPROVAL → CONFIRMED)
+  const confirmPriceMut = useMutation({
+    mutationFn: ({ id, orderStatus }: { id: number; orderStatus: SalesOrderStatus }) =>
+      orderStatus === "PENDING_REAPPROVAL" ? confirmReapproval(id) : confirmOrder(id),
+    onSuccess: () => { toast.success("Đã xác nhận giá — đơn hàng chuyển sang Xác nhận"); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận giá thất bại"),
+  });
+
+  // Admin: hủy đơn (chỉ khi CONFIRMED)
+  const cancelMut = useMutation({
+    mutationFn: (id: number) => cancelOrder(id),
+    onSuccess: () => { toast.success(t.orders.cancelledMsg); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Hủy đơn thất bại"),
+  });
+
+  // Admin: gửi yêu cầu điều chỉnh giá
+  const requestAdjustMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      requestPriceAdjustment(id, reason || undefined),
+    onSuccess: () => {
+      toast.success("Đã gửi yêu cầu — Sale và khách hàng đã được thông báo");
+      invalidate();
+      setRequestAdjustTarget(null);
+      setRequestAdjustReason("");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Yêu cầu thất bại"),
+  });
+
+  // Sale: điều chỉnh lại giá
+  const adjustPricesMut = useMutation({
+    mutationFn: ({ id, items }: { id: number; items: AdjustItem[] }) =>
+      adjustOrderPrices(id, items.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        discountPercent: i.discountPercent,
+      }))),
+    onSuccess: () => {
+      toast.success("Đã điều chỉnh giá — đơn hàng đang chờ Admin xác nhận lại");
+      invalidate();
+      setAdjustPriceOrderId(null);
+      setAdjustPriceItems([]);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Điều chỉnh giá thất bại"),
+  });
+
   const paymentMut = useMutation({
     mutationFn: (id: number) => confirmPayment(id),
     onSuccess: () => { toast.success("Xác nhận thanh toán thành công"); invalidate(); },
@@ -171,6 +262,13 @@ export default function SalesOrdersPage() {
   function handleProductChange(idx: number, productId: string, product?: Product) {
     setValue(`items.${idx}.productId`, productId);
     if (product?.standardPrice) setValue(`items.${idx}.unitPrice`, String(product.standardPrice));
+  }
+
+  function calcAdjustTotal() {
+    return adjustPriceItems.reduce((sum, i) => {
+      const disc = i.quantity * i.unitPrice * (i.discountPercent / 100);
+      return sum + i.quantity * i.unitPrice - disc;
+    }, 0);
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -260,14 +358,22 @@ export default function SalesOrdersPage() {
                     const orderStatus = o.status as SalesOrderStatus;
                     const payStatus = (o as any).paymentStatus as PaymentStatus | undefined;
                     const isUnpaid = !payStatus || payStatus === "UNPAID";
+                    const canPay = (canApprove || canCreate)
+                      && isUnpaid
+                      && !NO_PAYMENT_STATUSES.includes(orderStatus);
 
                     return (
                       <tr key={o.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                        {/* Số đơn */}
+                        {/* Số đơn — Sale thấy inline badge khi cần action */}
                         <td className="px-6 py-3">
                           <div className="font-mono text-xs font-medium">{o.orderNumber}</div>
                           {o.quotation && (
                             <div className="text-xs text-muted-foreground">từ {o.quotation.quotationNumber}</div>
+                          )}
+                          {!canApprove && orderStatus === "PRICE_ADJUSTMENT_REQUESTED" && (
+                            <div className="inline-flex items-center gap-1 text-xs mt-1 px-1.5 py-0.5 rounded text-orange-700 bg-orange-50 border border-orange-200">
+                              <AlertCircle className="h-3 w-3" /> Cần điều chỉnh giá
+                            </div>
                           )}
                         </td>
 
@@ -321,12 +427,58 @@ export default function SalesOrdersPage() {
                           {new Date(o.orderedAt).toLocaleDateString("vi-VN")}
                         </td>
 
-                        {/* ── Thao tác: chỉ Xác nhận thanh toán ── */}
+                        {/* ── Thao tác ── */}
                         <td className="px-6 py-3">
-                          {(canApprove || canCreate)
-                            && isUnpaid
-                            && !NO_PAYMENT_STATUSES.includes(orderStatus)
-                            && (
+                          <div className="flex items-center gap-1 flex-wrap">
+
+                            {/* Admin: xác nhận giá (DRAFT hoặc PENDING_REAPPROVAL) */}
+                            {canApprove && ["DRAFT", "PENDING_REAPPROVAL"].includes(orderStatus) && (
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
+                                onClick={() => confirmPriceMut.mutate({ id: o.id, orderStatus })}
+                                disabled={confirmPriceMut.isPending}
+                              >
+                                <CheckCircle className="h-3 w-3" /> Xác nhận giá
+                              </Button>
+                            )}
+
+                            {/* Admin: yêu cầu điều chỉnh giá (DRAFT, CONFIRMED hoặc PENDING_REAPPROVAL) */}
+                            {canApprove && ["DRAFT", "CONFIRMED", "PENDING_REAPPROVAL"].includes(orderStatus) && (
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                                onClick={() => { setRequestAdjustTarget({ id: o.id, status: orderStatus }); setRequestAdjustReason(""); }}
+                              >
+                                <Edit2 className="h-3 w-3" /> Yêu cầu điều chỉnh
+                              </Button>
+                            )}
+
+                            {/* Admin: hủy đơn (chỉ khi CONFIRMED) */}
+                            {canApprove && orderStatus === "CONFIRMED" && (
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
+                                onClick={() => cancelMut.mutate(o.id)}
+                                disabled={cancelMut.isPending}
+                              >
+                                <XCircle className="h-3 w-3" /> Hủy
+                              </Button>
+                            )}
+
+                            {/* Sale: điều chỉnh lại giá (chỉ khi PRICE_ADJUSTMENT_REQUESTED) */}
+                            {canCreate && !canApprove && orderStatus === "PRICE_ADJUSTMENT_REQUESTED" && (
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 border border-orange-200 bg-orange-50"
+                                onClick={() => { setAdjustPriceItems([]); setAdjustPriceOrderId(o.id); }}
+                              >
+                                <Edit2 className="h-3 w-3" /> Điều chỉnh lại giá
+                              </Button>
+                            )}
+
+                            {/* Xác nhận thanh toán (Admin + Sale, khi đủ điều kiện) */}
+                            {canPay && (
                               <Button
                                 size="sm"
                                 className="h-7 px-2.5 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
@@ -340,6 +492,7 @@ export default function SalesOrdersPage() {
                                 Xác nhận thanh toán
                               </Button>
                             )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -378,6 +531,145 @@ export default function SalesOrdersPage() {
         </CardContent>
       </Card>
 
+      {/* ─── Dialog: Yêu cầu điều chỉnh giá (Admin) ─────────────────────────────── */}
+      <Dialog
+        open={requestAdjustTarget !== null}
+        onOpenChange={(v) => { if (!v) { setRequestAdjustTarget(null); setRequestAdjustReason(""); } }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Yêu cầu điều chỉnh giá</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Nhân viên kinh doanh và khách hàng sẽ được thông báo để điều chỉnh lại giá.
+            </p>
+            <Label>Lý do (tuỳ chọn)</Label>
+            <Textarea
+              value={requestAdjustReason}
+              onChange={(e) => setRequestAdjustReason(e.target.value)}
+              placeholder="Nhập lý do yêu cầu điều chỉnh..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRequestAdjustTarget(null); setRequestAdjustReason(""); }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              disabled={requestAdjustMut.isPending}
+              onClick={() => {
+                if (!requestAdjustTarget) return;
+                requestAdjustMut.mutate({ id: requestAdjustTarget.id, reason: requestAdjustReason });
+              }}
+            >
+              {requestAdjustMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Gửi yêu cầu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog: Điều chỉnh lại giá (Sale) ────────────────────────────────── */}
+      <Dialog
+        open={adjustPriceOrderId !== null}
+        onOpenChange={(v) => { if (!v) { setAdjustPriceOrderId(null); setAdjustPriceItems([]); } }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Điều chỉnh lại giá đơn hàng</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Sau khi điều chỉnh, đơn hàng sẽ tự động chờ Admin xác nhận lại.
+            </p>
+          </DialogHeader>
+
+          {loadingAdjustDetail || adjustPriceItems.length === 0 ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Đang tải dữ liệu...</span>
+            </div>
+          ) : (
+            <div className="space-y-3 pt-2">
+              <div className="grid grid-cols-[2fr_80px_130px_100px] gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
+                <span>Sản phẩm</span>
+                <span>Số lượng</span>
+                <span>Đơn giá (₫)</span>
+                <span>Chiết khấu (%)</span>
+              </div>
+
+              {adjustPriceItems.map((item, idx) => (
+                <div key={idx} className="grid grid-cols-[2fr_80px_130px_100px] gap-2 items-center">
+                  <div>
+                    <div className="font-medium text-sm">{item.productName}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
+                  </div>
+                  <Input
+                    type="number" min="1" step="1"
+                    value={item.quantity}
+                    onChange={(e) =>
+                      setAdjustPriceItems((prev) =>
+                        prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))
+                    }
+                  />
+                  <Input
+                    type="number" min="0" step="1000"
+                    value={item.unitPrice}
+                    onChange={(e) =>
+                      setAdjustPriceItems((prev) =>
+                        prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))
+                    }
+                  />
+                  <Input
+                    type="number" min="0" max="100" step="1"
+                    value={item.discountPercent}
+                    onChange={(e) =>
+                      setAdjustPriceItems((prev) =>
+                        prev.map((it, i) => i === idx ? { ...it, discountPercent: Number(e.target.value) } : it))
+                    }
+                  />
+                </div>
+              ))}
+
+              <div className="border-t pt-3 flex justify-end gap-2 items-center">
+                <span className="text-sm text-muted-foreground">Tổng ước tính:</span>
+                <span className="font-semibold text-base tabular-nums">{vnd(calcAdjustTotal())}</span>
+              </div>
+
+              {adjustPriceItems.some((i) => i.unitPrice <= 0 || i.quantity <= 0) && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Đơn giá và số lượng phải lớn hơn 0
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setAdjustPriceOrderId(null); setAdjustPriceItems([]); }}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button
+              disabled={
+                adjustPricesMut.isPending
+                || adjustPriceItems.length === 0
+                || loadingAdjustDetail
+                || adjustPriceItems.some((i) => i.unitPrice <= 0 || i.quantity <= 0)
+              }
+              onClick={() => {
+                if (!adjustPriceOrderId) return;
+                adjustPricesMut.mutate({ id: adjustPriceOrderId, items: adjustPriceItems });
+              }}
+            >
+              {adjustPricesMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Gửi lại chờ duyệt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Dialog: Tạo đơn hàng ──────────────────────────────────────────────── */}
       <Dialog
         open={showCreate}
@@ -390,7 +682,7 @@ export default function SalesOrdersPage() {
           <DialogHeader>
             <DialogTitle>{t.orders.createTitle}</DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Chọn khách hàng và thêm sản phẩm. Đơn hàng tạo ở trạng thái <strong>Nháp</strong> — Admin sẽ xác nhận sau.
+              Chọn khách hàng và thêm sản phẩm. Đơn hàng tạo ở trạng thái <strong>Nháp</strong> — Admin sẽ xác nhận giá sau.
             </p>
           </DialogHeader>
           <form onSubmit={handleSubmit((v) => createMut.mutate(v))} className="space-y-4 pt-2">
