@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import {
   CreateQuotationDto, QuotationQueryDto,
@@ -45,6 +46,7 @@ export class SalesService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private inventory: InventoryService,
   ) {}
 
   // ─── Quotations ───────────────────────────────────────────────────────────
@@ -186,20 +188,75 @@ export class SalesService {
     return this.prisma.quotation.update({ where: { id }, data: { status: 'CANCELLED' }, select: QUOTATION_SELECT });
   }
 
-  async approveQuotation(id: number) {
+  async approveQuotation(id: number, actorId?: number) {
     const q = await this.getQuotation(id);
+
+    // Idempotency: nếu đã APPROVED và đơn hàng đã tồn tại, trả về đơn hàng đó
+    if (q.status === 'APPROVED') {
+      const existing = await this.prisma.salesOrder.findFirst({ where: { quotationId: id }, select: ORDER_SELECT });
+      if (existing) return existing;
+    }
+
     if (q.status !== 'PENDING_APPROVAL') throw new BadRequestException('Only PENDING_APPROVAL quotations can be approved');
-    const result = await this.prisma.quotation.update({ where: { id }, data: { status: 'APPROVED', approvalNotes: null }, select: QUOTATION_SELECT });
+
+    const orderNumber = await this.generateOrderNumber();
+    const { subtotal, taxAmount, totalAmount } = this.calcTotals(q.items.map((i) => ({
+      quantity: Number(i.quantity), unitPrice: Number(i.unitPrice), discountPercent: Number((i as any).discountPercent ?? 0),
+    })));
+
+    const order = await this.prisma.$transaction(async (tx) => {
+      await tx.quotation.update({ where: { id }, data: { status: 'APPROVED', approvalNotes: null } });
+      return tx.salesOrder.create({
+        data: {
+          orderNumber,
+          customerId: (q as any).customer.id,
+          quotationId: id,
+          status: 'CONFIRMED',
+          subtotal, taxAmount, totalAmount,
+          salesUserId: (q as any).salesUserId ?? undefined,
+          orderedAt: new Date(),
+          confirmedAt: new Date(),
+          items: {
+            create: q.items.map((i) => ({
+              productId: i.product.id,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discountPercent: (i as any).discountPercent ?? 0,
+              discountAmount: i.discountAmount,
+              totalAmount: i.totalAmount,
+              deliveredQuantity: 0,
+            })),
+          },
+        },
+        select: ORDER_SELECT,
+      });
+    });
+
+    // Idempotent inventory deduction — fire-and-forget, backorders created automatically
+    this.inventory.deductForOrder(order.id, actorId ?? 0).catch(() => {});
 
     if ((q as any).salesUserId) {
       this.notifyUser(
         (q as any).salesUserId,
         `Báo giá ${(q as any).quotationNumber} đã được duyệt`,
-        `Báo giá ${(q as any).quotationNumber} đã được phê duyệt. Bạn có thể gửi cho khách hàng.`,
+        `Báo giá ${(q as any).quotationNumber} đã được phê duyệt. Đơn hàng ${order.orderNumber} đã được tạo tự động.`,
       ).catch(() => {});
     }
 
-    return result;
+    // Thông báo cho khách hàng portal
+    const customerPortalUser = await this.prisma.user.findFirst({
+      where: { linkedCustomerId: (q as any).customer.id, deletedAt: null },
+      select: { id: true },
+    });
+    if (customerPortalUser) {
+      this.notifyUser(
+        customerPortalUser.id,
+        `Đơn hàng của bạn đã được tạo`,
+        `Báo giá ${(q as any).quotationNumber} đã được duyệt. Đơn hàng ${order.orderNumber} đã được tạo với giá đã xác nhận.`,
+      ).catch(() => {});
+    }
+
+    return order;
   }
 
   async requestRevision(id: number, dto: RequestRevisionDto) {

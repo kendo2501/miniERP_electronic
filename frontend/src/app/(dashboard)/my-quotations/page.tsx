@@ -3,11 +3,12 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, MessageSquare, CheckCircle, XCircle, Clock,
-  Loader2, ChevronDown, ChevronUp, Tag,
+  Loader2, ChevronDown, ChevronUp, Tag, ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -160,15 +161,19 @@ export default function MyQuotationsPage() {
 
                     {/* Total right */}
                     <div className="text-right shrink-0 space-y-1">
-                      <div className="font-semibold tabular-nums text-sm">{vnd(Number(q.totalAmount))}</div>
+                      {(q.status === "PENDING_APPROVAL" || q.status === "REVISION_REQUESTED") ? (
+                        <div className="text-xs text-muted-foreground italic">Đang xem xét</div>
+                      ) : (
+                        <div className="font-semibold tabular-nums text-sm">{vnd(Number(q.totalAmount))}</div>
+                      )}
                       <div className="text-xs text-muted-foreground">{(q as any)._count?.items ?? 0} sản phẩm</div>
                     </div>
                   </div>
 
                   {/* Actions row */}
                   <div className="flex items-center gap-2 pt-1 flex-wrap">
-                    {/* Toggle items */}
-                    {((q as any)._count?.items ?? 0) > 0 && (
+                    {/* Toggle items — chỉ hiển thị khi giá đã được duyệt */}
+                    {((q as any)._count?.items ?? 0) > 0 && q.status !== "PENDING_APPROVAL" && q.status !== "REVISION_REQUESTED" && (
                       <Button
                         variant="ghost" size="sm"
                         className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700"
@@ -177,6 +182,16 @@ export default function MyQuotationsPage() {
                         {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-1" /> : <ChevronDown className="h-3.5 w-3.5 mr-1" />}
                         {isExpanded ? "Ẩn sản phẩm" : "Xem sản phẩm"}
                       </Button>
+                    )}
+
+                    {/* Hướng dẫn xem đơn hàng khi báo giá đã được duyệt */}
+                    {(q.status === "APPROVED" || q.status === "CONFIRMED") && (
+                      <Link href="/my-orders">
+                        <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50">
+                          <ShoppingBag className="h-3.5 w-3.5" />
+                          Xem đơn hàng
+                        </Button>
+                      </Link>
                     )}
 
                     {/* Counter offer button */}

@@ -49,7 +49,7 @@ export class SalesController {
   rejectCounterOffer(@Param('id', ParseIntPipe) id: number) { return this.service.rejectCounterOffer(id); }
 
   @Post('quotations/:id/approve') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Manager approves quotation' })
-  approveQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.approveQuotation(id); }
+  approveQuotation(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.approveQuotation(id, req.user?.id); }
 
   @Post('quotations/:id/request-revision') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Manager requests revision with reason' })
   requestRevision(@Param('id', ParseIntPipe) id: number, @Body() dto: RequestRevisionDto) { return this.service.requestRevision(id, dto); }

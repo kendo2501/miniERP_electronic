@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, ArrowLeftRight, TrendingDown, Loader2, AlertTriangle } from "lucide-react";
+import { Search, ArrowLeftRight, SlidersHorizontal, Loader2, AlertTriangle, PackageX, Package, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -28,11 +28,21 @@ export default function InventoryPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["stocks", page, search, warehouseId],
-    queryFn: () => inventoryApi.listStocks({ page, limit: 15, search: search || undefined, warehouseId: warehouseId !== "all" ? parseInt(warehouseId) : undefined }),
+    queryFn: () =>
+      inventoryApi.listStocks({
+        page, limit: 15,
+        search: search || undefined,
+        warehouseId: warehouseId !== "all" ? parseInt(warehouseId) : undefined,
+      }),
     placeholderData: (prev) => prev,
+    refetchInterval: 30_000,
   });
 
-  const { data: lowStock } = useQuery({ queryKey: ["low-stock"], queryFn: () => inventoryApi.getLowStock(10) });
+  const { data: lowStock } = useQuery({
+    queryKey: ["low-stock"],
+    queryFn: () => inventoryApi.getLowStock(10),
+    refetchInterval: 60_000,
+  });
 
   const canAdjust = hasPermission("inventory.adjust");
   const canTransfer = hasPermission("inventory.transfer");
@@ -50,6 +60,12 @@ export default function InventoryPage() {
           <p className="text-muted-foreground mt-1">{t.inventory.subtitle}</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/inventory/replenishment">
+            <Button variant="outline">
+              <ClipboardList className="h-4 w-4" />
+              Yêu cầu bổ hàng
+            </Button>
+          </Link>
           {canTransfer && (
             <Button variant="outline" onClick={() => setShowTransfer(true)}>
               <ArrowLeftRight className="h-4 w-4" />
@@ -58,30 +74,36 @@ export default function InventoryPage() {
           )}
           {canAdjust && (
             <Button onClick={() => setShowAdjust(true)}>
-              <TrendingDown className="h-4 w-4" />
+              <SlidersHorizontal className="h-4 w-4" />
               {t.inventory.adjustStock}
             </Button>
           )}
         </div>
       </div>
 
+      {/* Low stock alert banner */}
       {lowStock && lowStock.items && lowStock.items.length > 0 && (
         <Card className="border-yellow-500/30 bg-yellow-500/5">
           <CardHeader className="pb-3 pt-4 px-5">
             <CardTitle className="text-sm flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
               <AlertTriangle className="h-4 w-4" />
-              {lowStock.items.length} {t.dashboard.lowStockItems} (≤10)
+              {lowStock.items.length} sản phẩm tồn kho thấp (≤10)
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5 pb-4">
             <div className="flex flex-wrap gap-2">
               {lowStock.items.slice(0, 8).map((s) => (
-                <Badge key={s.id} variant="warning" className="text-xs">
+                <Badge
+                  key={s.id}
+                  variant="outline"
+                  className={`text-xs ${Number(s.availableQuantity) <= 0 ? "border-red-300 text-red-600 bg-red-50" : "border-yellow-300 text-yellow-700 bg-yellow-50"}`}
+                >
+                  {Number(s.availableQuantity) <= 0 && <PackageX className="h-3 w-3 mr-1" />}
                   {s.product.sku} — {s.warehouse.warehouseName}: {Number(s.availableQuantity).toLocaleString()}
                 </Badge>
               ))}
               {lowStock.items.length > 8 && (
-                <Badge variant="outline" className="text-xs">+{lowStock.items.length - 8} more</Badge>
+                <Badge variant="outline" className="text-xs">+{lowStock.items.length - 8} thêm</Badge>
               )}
             </div>
           </CardContent>
@@ -94,7 +116,7 @@ export default function InventoryPage() {
             <div className="relative flex-1 min-w-48 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t.catalog.searchPlaceholder}
+                placeholder="Tìm theo tên, SKU..."
                 className="pl-9"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
@@ -102,10 +124,10 @@ export default function InventoryPage() {
             </div>
             <Select value={warehouseId} onValueChange={(v) => { setWarehouseId(v); setPage(1); }}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder={t.inventory.selectWarehouse} />
+                <SelectValue placeholder="Chọn kho" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t.common.all} {t.inventory.warehouses}</SelectItem>
+                <SelectItem value="all">Tất cả kho</SelectItem>
                 {warehouses?.map((w) => <SelectItem key={w.id} value={String(w.id)}>{w.warehouseName}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -117,7 +139,7 @@ export default function InventoryPage() {
                 <Button variant="outline" size="sm">{t.inventory.transactions}</Button>
               </Link>
             </div>
-            {data && <span className="text-sm text-muted-foreground">{data.total} records</span>}
+            {data && <span className="text-sm text-muted-foreground">{data.total} bản ghi</span>}
           </div>
         </CardHeader>
 
@@ -131,41 +153,58 @@ export default function InventoryPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.inventory.sku}</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.inventory.productName}</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.inventory.warehouseName}</th>
-                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">{t.inventory.available}</th>
-                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">{t.inventory.reserved}</th>
-                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">Damaged</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.unit}</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Updated</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">SKU</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Sản phẩm</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Kho</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
+                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">Tồn kho</th>
+                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">Đã giữ</th>
+                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">Ngưỡng</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">ĐVT</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Cập nhật</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data?.items.map((s) => {
                     const available = Number(s.availableQuantity);
-                    const isLow = available <= 10;
+                    const outOfStock = s.stockStatus === "OUT_OF_STOCK" || available <= 0;
+                    const lowS = s.isLowStock;
+
                     return (
                       <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                         <td className="px-6 py-3 font-mono text-xs">{s.product.sku}</td>
                         <td className="px-6 py-3 font-medium">{s.product.productName}</td>
                         <td className="px-6 py-3 text-muted-foreground">{s.warehouse.warehouseName}</td>
+                        <td className="px-6 py-3">
+                          {outOfStock ? (
+                            <Badge variant="outline" className="text-xs border-red-300 text-red-600 bg-red-50 flex w-fit items-center gap-1">
+                              <PackageX className="h-3 w-3" /> Hết hàng
+                            </Badge>
+                          ) : lowS ? (
+                            <Badge variant="outline" className="text-xs border-yellow-300 text-yellow-700 bg-yellow-50 flex w-fit items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" /> Sắp hết
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs border-green-300 text-green-700 bg-green-50 flex w-fit items-center gap-1">
+                              <Package className="h-3 w-3" /> Còn hàng
+                            </Badge>
+                          )}
+                        </td>
                         <td className="px-6 py-3 text-right">
-                          <span className={isLow ? "text-yellow-600 dark:text-yellow-400 font-semibold" : ""}>
+                          <span className={outOfStock ? "text-red-600 font-semibold" : lowS ? "text-yellow-600 font-semibold" : ""}>
                             {available.toLocaleString()}
                           </span>
-                          {isLow && <AlertTriangle className="inline h-3 w-3 ml-1 text-yellow-500" />}
                         </td>
                         <td className="px-6 py-3 text-right text-muted-foreground">{Number(s.reservedQuantity).toLocaleString()}</td>
-                        <td className="px-6 py-3 text-right text-muted-foreground">{Number(s.damagedQuantity).toLocaleString()}</td>
+                        <td className="px-6 py-3 text-right text-muted-foreground text-xs">{Number(s.reorderThreshold).toLocaleString()}</td>
                         <td className="px-6 py-3 text-muted-foreground">{s.product.unit ?? "—"}</td>
-                        <td className="px-6 py-3 text-muted-foreground text-xs">{new Date(s.updatedAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-3 text-muted-foreground text-xs">{new Date(s.updatedAt).toLocaleDateString("vi-VN")}</td>
                       </tr>
                     );
                   })}
                   {data?.items.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-muted-foreground">{t.inventory.noStock}</td>
+                      <td colSpan={9} className="py-12 text-center text-muted-foreground">{t.inventory.noStock}</td>
                     </tr>
                   )}
                 </tbody>
@@ -175,10 +214,10 @@ export default function InventoryPage() {
 
           {data && data.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-6 py-3">
-              <span className="text-sm text-muted-foreground">{t.common.page} {data.page} {t.common.of} {data.totalPages}</span>
+              <span className="text-sm text-muted-foreground">Trang {data.page} / {data.totalPages}</span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>{t.common.previous}</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>{t.common.next}</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>Trước</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>Sau</Button>
               </div>
             </div>
           )}

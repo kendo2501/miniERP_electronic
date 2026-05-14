@@ -7,6 +7,11 @@ import { InventoryService } from './inventory.service';
 import { CreateWarehouseDto, UpdateWarehouseDto } from './dto/warehouse.dto';
 import { AdjustStockDto, TransferStockDto } from './dto/adjustment.dto';
 import { StockQueryDto, TransactionQueryDto } from './dto/stock-query.dto';
+import {
+  CreateReplenishmentDto,
+  UpdateReplenishmentDto,
+  ReplenishmentQueryDto,
+} from './dto/replenishment.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -50,6 +55,20 @@ export class InventoryController {
     return this.service.updateWarehouse(id, dto);
   }
 
+  // ─── Product Search ───────────────────────────────────────────────────────
+
+  @Get('products/search')
+  @RequirePermissions('inventory.stock.view')
+  @ApiOperation({ summary: 'Smart product search with stock info' })
+  @ApiQuery({ name: 'q', required: true, type: String })
+  @ApiQuery({ name: 'warehouseId', required: false, type: Number })
+  searchProducts(
+    @Query('q') q: string,
+    @Query('warehouseId') warehouseId?: string,
+  ) {
+    return this.service.searchProducts(q, warehouseId ? parseInt(warehouseId, 10) : undefined);
+  }
+
   // ─── Stocks ───────────────────────────────────────────────────────────────
 
   @Get('stocks')
@@ -71,7 +90,7 @@ export class InventoryController {
 
   @Post('adjustments')
   @RequirePermissions('inventory.adjust')
-  @ApiOperation({ summary: 'Adjust stock (positive = in, negative = out)' })
+  @ApiOperation({ summary: 'Adjust stock with type (IN/OUT/DAMAGE/RETURN/CORRECTION)' })
   adjustStock(@Body() dto: AdjustStockDto, @CurrentUser() user: AuthUser) {
     return this.service.adjustStock(dto, user.id);
   }
@@ -84,6 +103,32 @@ export class InventoryController {
   @HttpCode(HttpStatus.OK)
   transferStock(@Body() dto: TransferStockDto, @CurrentUser() user: AuthUser) {
     return this.service.transferStock(dto, user.id);
+  }
+
+  // ─── Replenishment ────────────────────────────────────────────────────────
+
+  @Get('replenishment')
+  @RequirePermissions('inventory.stock.view')
+  @ApiOperation({ summary: 'List replenishment requests' })
+  listReplenishment(@Query() query: ReplenishmentQueryDto) {
+    return this.service.listReplenishment(query);
+  }
+
+  @Post('replenishment')
+  @RequirePermissions('inventory.adjust')
+  @ApiOperation({ summary: 'Create replenishment request' })
+  createReplenishment(@Body() dto: CreateReplenishmentDto, @CurrentUser() user: AuthUser) {
+    return this.service.createReplenishment(dto, user.id);
+  }
+
+  @Patch('replenishment/:id')
+  @RequirePermissions('inventory.adjust')
+  @ApiOperation({ summary: 'Update replenishment request status / assignment' })
+  updateReplenishment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateReplenishmentDto,
+  ) {
+    return this.service.updateReplenishment(id, dto);
   }
 
   // ─── Transaction History ──────────────────────────────────────────────────

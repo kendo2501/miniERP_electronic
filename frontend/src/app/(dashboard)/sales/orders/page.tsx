@@ -1,29 +1,24 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
-  Search, Plus, Loader2, Trash2, ShoppingCart,
+  Search, Loader2, ShoppingCart,
   CheckCircle2, CheckCircle, XCircle, Edit2, AlertCircle, Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
-  listOrders, confirmPayment, createOrder, listCustomers,
+  listOrders, confirmPayment,
   confirmOrder, cancelOrder, requestPriceAdjustment, adjustOrderPrices, getOrder, confirmReapproval,
   startDelivery, completeDelivery,
 } from "@/lib/api/sales";
-import { ProductSelect } from "@/components/product-select";
-import type { Product } from "@/types/catalog";
 import type { SalesOrderStatus, PaymentStatus, DeliveryStatus } from "@/types/sales";
 import { vnd } from "@/lib/format";
 import { useAuthStore } from "@/store/auth.store";
@@ -90,23 +85,6 @@ function DeliveryBadge({ status }: { status?: DeliveryStatus }) {
   );
 }
 
-// ─── Zod schemas ──────────────────────────────────────────────────────────────
-
-const itemSchema = z.object({
-  productId: z.string().min(1, "Chọn sản phẩm"),
-  quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Số lượng phải là số nguyên dương"),
-  unitPrice: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Đơn giá phải là số nguyên dương"),
-  discountPercent: z.string().optional().refine((v) => !v || (Number(v) >= 0 && Number(v) <= 100), "Chiết khấu 0–100"),
-});
-
-const schema = z.object({
-  customerId: z.string().min(1, "Chọn khách hàng"),
-  notes: z.string().optional(),
-  items: z.array(itemSchema).min(1),
-});
-
-type FormValues = z.infer<typeof schema>;
-
 type AdjustItem = {
   productId: number;
   productName: string;
@@ -127,7 +105,6 @@ export default function SalesOrdersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showCreate, setShowCreate] = useState(false);
 
   // Admin: yêu cầu điều chỉnh giá
   const [requestAdjustTarget, setRequestAdjustTarget] = useState<{ id: number; status: SalesOrderStatus } | null>(null);
@@ -157,12 +134,6 @@ export default function SalesOrdersPage() {
     placeholderData: (prev) => prev,
   });
 
-  const { data: customers } = useQuery({
-    queryKey: ["customers-list"],
-    queryFn: () => listCustomers({ limit: 200 }).then((r) => r.data),
-    enabled: showCreate,
-  });
-
   const { data: adjustOrderDetail, isFetching: loadingAdjustDetail } = useQuery({
     queryKey: ["order-detail-adjust", adjustPriceOrderId],
     queryFn: () => getOrder(adjustPriceOrderId!).then((r) => r.data),
@@ -184,39 +155,9 @@ export default function SalesOrdersPage() {
     }
   }, [adjustOrderDetail]);
 
-  // ─── Form ─────────────────────────────────────────────────────────────────
-
-  const { handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { items: [{ productId: "", quantity: "1", unitPrice: "0" }] },
-  });
-
-  const items = watch("items");
-
   // ─── Mutations ────────────────────────────────────────────────────────────
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["orders"] });
-
-  const createMut = useMutation({
-    mutationFn: (v: FormValues) =>
-      createOrder({
-        customerId: parseInt(v.customerId),
-        notes: v.notes || undefined,
-        items: v.items.map((i) => ({
-          productId: parseInt(i.productId),
-          quantity: parseInt(i.quantity, 10),
-          unitPrice: parseInt(i.unitPrice, 10),
-          discountPercent: i.discountPercent ? parseFloat(i.discountPercent) : undefined,
-        })),
-      }).then((r) => r.data),
-    onSuccess: () => {
-      toast.success(t.orders.orderCreated);
-      invalidate();
-      setShowCreate(false);
-      reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Tạo đơn hàng thất bại"),
-  });
 
   // Admin: xác nhận giá (DRAFT → CONFIRMED hoặc PENDING_REAPPROVAL → CONFIRMED)
   const confirmPriceMut = useMutation({
@@ -294,11 +235,6 @@ export default function SalesOrdersPage() {
     PENDING_REAPPROVAL: "Chờ duyệt lại",
   };
 
-  function handleProductChange(idx: number, productId: string, product?: Product) {
-    setValue(`items.${idx}.productId`, productId);
-    if (product?.standardPrice) setValue(`items.${idx}.unitPrice`, String(product.standardPrice));
-  }
-
   function calcAdjustTotal() {
     return adjustPriceItems.reduce((sum, i) => {
       const disc = i.quantity * i.unitPrice * (i.discountPercent / 100);
@@ -321,12 +257,6 @@ export default function SalesOrdersPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/sales/quotations"><Button variant="outline" size="sm">{t.quotations.title}</Button></Link>
-          {canCreate && (
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" />
-              {t.orders.newOrder}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -732,121 +662,6 @@ export default function SalesOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── Dialog: Tạo đơn hàng ──────────────────────────────────────────────── */}
-      <Dialog
-        open={showCreate}
-        onOpenChange={(v) => {
-          setShowCreate(v);
-          if (!v) reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
-        }}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t.orders.createTitle}</DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Chọn khách hàng và thêm sản phẩm. Đơn hàng tạo ở trạng thái <strong>Nháp</strong> — Admin sẽ xác nhận giá sau.
-            </p>
-          </DialogHeader>
-          <form onSubmit={handleSubmit((v) => createMut.mutate(v))} className="space-y-4 pt-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Khách hàng *</Label>
-                <Select onValueChange={(v) => setValue("customerId", v)}>
-                  <SelectTrigger><SelectValue placeholder="Tìm và chọn khách hàng" /></SelectTrigger>
-                  <SelectContent>
-                    {customers?.items.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.companyName}
-                        <span className="text-xs text-muted-foreground ml-1">({c.customerCode})</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Ghi chú</Label>
-                <Input
-                  placeholder="Ghi chú nội bộ hoặc yêu cầu đặc biệt..."
-                  onChange={(e) => setValue("notes", e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Danh sách sản phẩm *</Label>
-                <Button
-                  type="button" variant="outline" size="sm"
-                  onClick={() => setValue("items", [...(items ?? []), { productId: "", quantity: "1", unitPrice: "0" }])}
-                >
-                  <Plus className="h-3.5 w-3.5" /> Thêm sản phẩm
-                </Button>
-              </div>
-              <div className="space-y-2">
-                <div className="grid grid-cols-[2fr_64px_110px_80px_32px] gap-2">
-                  <span className="text-xs text-muted-foreground font-medium">Sản phẩm</span>
-                  <span className="text-xs text-muted-foreground font-medium">Số lượng</span>
-                  <span className="text-xs text-muted-foreground font-medium">Đơn giá (₫)</span>
-                  <span className="text-xs text-muted-foreground font-medium">Chiết khấu (%)</span>
-                  <span />
-                </div>
-                {(items ?? []).map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[2fr_64px_110px_80px_32px] gap-2 items-center">
-                    <ProductSelect
-                      value={item.productId}
-                      onChange={(pid, prod) => handleProductChange(idx, pid, prod)}
-                    />
-                    <Input
-                      type="number" min="1" step="1" placeholder="1"
-                      onChange={(e) => setValue(`items.${idx}.quantity`, e.target.value)}
-                      defaultValue="1"
-                    />
-                    <Input
-                      type="number" min="1" step="1000" placeholder="0"
-                      onChange={(e) => setValue(`items.${idx}.unitPrice`, e.target.value)}
-                      value={item.unitPrice}
-                    />
-                    <Input
-                      type="number" min="0" max="100" step="1" placeholder="0"
-                      onChange={(e) => setValue(`items.${idx}.discountPercent`, e.target.value)}
-                    />
-                    <Button
-                      type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive"
-                      onClick={() => {
-                        const cur = items ?? [];
-                        if (cur.length > 1) setValue("items", cur.filter((_, i) => i !== idx));
-                      }}
-                      disabled={(items ?? []).length <= 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <p className="text-xs text-muted-foreground mt-1">
-                  * Đơn giá tự động điền theo bảng giá khi chọn sản phẩm — có thể chỉnh lại trực tiếp.
-                </p>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button" variant="outline"
-                onClick={() => {
-                  setShowCreate(false);
-                  reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
-                }}
-              >
-                {t.common.cancel}
-              </Button>
-              <Button type="submit" disabled={createMut.isPending}>
-                {createMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Tạo đơn hàng
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
