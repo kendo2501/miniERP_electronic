@@ -26,7 +26,10 @@ export class SalesController {
   getQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.getQuotation(id); }
 
   @Post('quotations') @RequirePermissions('sales.quotation.create') @ApiOperation({ summary: 'Create quotation' })
-  createQuotation(@Body() dto: CreateQuotationDto) { return this.service.createQuotation(dto); }
+  createQuotation(@Body() dto: CreateQuotationDto, @Req() req: any) {
+    dto.salesUserId = req.user?.id ?? undefined;
+    return this.service.createQuotation(dto);
+  }
 
   @Post('quotations/:id/send') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Send quotation to customer' })
   sendQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.sendQuotation(id); }

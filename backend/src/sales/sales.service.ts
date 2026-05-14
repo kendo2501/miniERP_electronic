@@ -82,6 +82,7 @@ export class SalesService {
 
   async createQuotation(dto: CreateQuotationDto) {
     await this.ensureCustomerExists(dto.customerId);
+    await this.ensureProductsExist(dto.items.map((i) => i.productId));
     const number = await this.generateQuotationNumber();
     const { items, ...data } = dto;
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(items);
@@ -228,6 +229,7 @@ export class SalesService {
   async resubmitQuotation(id: number, dto: UpdateQuotationItemsDto) {
     const q = await this.getQuotation(id);
     if (q.status !== 'REVISION_REQUESTED') throw new BadRequestException('Only REVISION_REQUESTED quotations can be resubmitted');
+    await this.ensureProductsExist(dto.items.map((i) => i.productId));
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(dto.items);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -748,6 +750,18 @@ export class SalesService {
   private async ensureCustomerExists(id: number) {
     const c = await this.prisma.customer.findUnique({ where: { id }, select: { id: true, deletedAt: true } });
     if (!c || c.deletedAt) throw new NotFoundException(`Customer #${id} not found`);
+  }
+
+  private async ensureProductsExist(productIds: number[]) {
+    const unique = [...new Set(productIds)];
+    const found = await this.prisma.product.findMany({
+      where: { id: { in: unique }, deletedAt: null },
+      select: { id: true },
+    });
+    if (found.length !== unique.length) {
+      const missing = unique.filter((id) => !found.some((p) => p.id === id));
+      throw new BadRequestException(`Sản phẩm không tồn tại hoặc đã bị xóa: ID [${missing.join(', ')}]. Vui lòng tải lại trang.`);
+    }
   }
 
   private lineDiscount(qty: number, price: number, pct: number): number {

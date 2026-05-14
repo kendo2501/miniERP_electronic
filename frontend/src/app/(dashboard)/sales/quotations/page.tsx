@@ -175,7 +175,10 @@ export default function QuotationsPage() {
       setShowCreate(false);
       reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Tạo báo giá thất bại"),
+    onError: (e: any) => {
+      const msg = e.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg[0] : (msg ?? "Tạo báo giá thất bại"));
+    },
   });
 
   // Manager actions
@@ -647,7 +650,11 @@ export default function QuotationsPage() {
       </Dialog>
 
       {/* ─── Create Dialog ───────────────────────────────────────────────────── */}
-      <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] }); }}>
+      <Dialog open={showCreate} onOpenChange={(v) => {
+        setShowCreate(v);
+        if (v) qc.invalidateQueries({ queryKey: ["products-select"] });
+        if (!v) reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t.quotations.createTitle}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit((v) => createMut.mutate(v))} className="space-y-4 pt-2">
