@@ -30,7 +30,7 @@ export class NotificationsController {
     return this.service.markAllRead(req.user.sub);
   }
 
-  @Get() @RequirePermissions('notification.view_team') @ApiOperation({ summary: 'List all notifications (admin)' })
+  @Get() @RequirePermissions('notification.retry.manage') @ApiOperation({ summary: 'List all notifications (admin)' })
   listAll(@Query() query: NotificationQueryDto) {
     return this.service.listAll(query);
   }

@@ -24,7 +24,7 @@ export class ReportingController {
     return this.service.getTopCustomers(limit ? parseInt(limit) : 10);
   }
 
-  @Get('manager-dashboard') @RequirePermissions('reporting.dashboard.view_team') @ApiOperation({ summary: 'Manager dashboard KPIs' })
+  @Get('manager-dashboard') @RequirePermissions('reporting.dashboard.view_all') @ApiOperation({ summary: 'Manager dashboard KPIs' })
   getManagerDashboard() { return this.service.getManagerDashboard(); }
 
   @Get('sales-dashboard') @RequirePermissions('reporting.dashboard.view_self') @ApiOperation({ summary: 'Sales rep self-dashboard' })

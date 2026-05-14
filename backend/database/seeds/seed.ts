@@ -9,7 +9,6 @@ const prisma = new PrismaClient();
 
 const ROLES = [
   { code: 'ADMIN',      name: 'Administrator', description: 'Full system access' },
-  { code: 'MANAGER',    name: 'Manager',       description: 'Operational management and approvals' },
   { code: 'SALES',      name: 'Sales',         description: 'Sales operations' },
   { code: 'CUSTOMER',   name: 'Customer',      description: 'Customer self-service portal' },
   { code: 'ACCOUNTANT', name: 'Accountant',    description: 'Finance and accounting operations' },
@@ -129,19 +128,6 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'users.team.view', 'users.team.performance.view',
     'profile.view_self', 'profile.update_self',
   ],
-  MANAGER: [
-    'auth.password.change_self',
-    'catalog.product.view', 'catalog.search',
-    'inventory.stock.view', 'inventory.adjust.approve', 'inventory.transfer.approve', 'inventory.low_stock.view',
-    'customer.view_assigned',
-    'sales.order.view_team', 'sales.order.approve', 'sales.order.cancel_approve', 'sales.pricing.override_approve',
-    'sales.delivery.view',
-    'finance.invoice.view', 'finance.payment.view', 'finance.credit_limit.override_approve', 'finance.aging_report.view',
-    'reporting.dashboard.view_team', 'reporting.export_team', 'reporting.kpi.view',
-    'notification.view_team',
-    'users.team.view', 'users.team.performance.view',
-    'profile.view_self', 'profile.update_self',
-  ],
   SALES: [
     'auth.password.change_self',
     'catalog.product.view', 'catalog.search',
@@ -241,7 +227,6 @@ async function main() {
   // ── Users ─────────────────────────────────────────────
   const usersToSeed = [
     { email: 'admin@mini-erp.local',      password: 'Admin@123456',      fullName: 'Quản Trị Hệ Thống',   roleCode: 'ADMIN'      },
-    { email: 'manager@mini-erp.local',    password: 'Manager@123456',    fullName: 'Nguyễn Thị Hương',    roleCode: 'MANAGER'    },
     { email: 'sales@mini-erp.local',      password: 'Sales@123456',      fullName: 'Trần Văn Bình',        roleCode: 'SALES'      },
     { email: 'customer@mini-erp.local',   password: 'Customer@123456',   fullName: 'Lê Văn Thắng',         roleCode: 'CUSTOMER'   },
     { email: 'accountant@mini-erp.local', password: 'Accountant@123456', fullName: 'Phạm Thị Lan',         roleCode: 'ACCOUNTANT' },
@@ -819,14 +804,14 @@ async function main() {
           createdAt: new Date('2026-05-07'),
         },
         {
-          recipientId: userMap['MANAGER'].id, channel: 'IN_APP', notificationType: 'APPROVAL_REQUIRED',
+          recipientId: adminId, channel: 'IN_APP', notificationType: 'APPROVAL_REQUIRED',
           subject: 'Báo giá chờ duyệt — QUO-2026-00001',
           content: 'Báo giá QUO-2026-00001 từ Xây Dựng Hoàng Phát (70.400.000 ₫) đang chờ duyệt.',
           status: 'UNREAD', priority: 'HIGH',
           createdAt: new Date('2026-03-01'),
         },
         {
-          recipientId: userMap['MANAGER'].id, channel: 'IN_APP', notificationType: 'INVOICE_OVERDUE',
+          recipientId: adminId, channel: 'IN_APP', notificationType: 'INVOICE_OVERDUE',
           subject: 'Hóa đơn quá hạn — INV-2026-00002',
           content: 'Hóa đơn INV-2026-00002 từ Điện Nhật Minh (10.230.000 ₫) đã quá hạn 28 ngày.',
           status: 'UNREAD', priority: 'HIGH',
@@ -869,7 +854,6 @@ async function main() {
   console.log('  │ Role        │ Email                      │ Password         │');
   console.log('  ├─────────────┼────────────────────────────┼──────────────────┤');
   console.log('  │ Admin       │ admin@mini-erp.local       │ Admin@123456     │');
-  console.log('  │ Manager     │ manager@mini-erp.local     │ Manager@123456   │');
   console.log('  │ Sales       │ sales@mini-erp.local       │ Sales@123456     │');
   console.log('  │ Customer    │ customer@mini-erp.local    │ Customer@123456  │');
   console.log('  │ Accountant  │ accountant@mini-erp.local  │ Accountant@123456│');

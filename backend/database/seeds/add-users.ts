@@ -4,15 +4,6 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 const USERS = [
-  // Sales team
-  { email: 'sales2@mini-erp.local',   password: 'Sales@123456',     fullName: 'Nguyễn Văn Hùng',    roleCode: 'SALES'      },
-  { email: 'sales3@mini-erp.local',   password: 'Sales@123456',     fullName: 'Trần Thị Lan',       roleCode: 'SALES'      },
-  // Manager
-  { email: 'manager2@mini-erp.local', password: 'Manager@123456',   fullName: 'Lê Văn Đức',         roleCode: 'MANAGER'    },
-  // Warehouse
-  { email: 'warehouse2@mini-erp.local', password: 'Warehouse@123456', fullName: 'Phạm Thị Mai',     roleCode: 'WAREHOUSE'  },
-  // Accountant
-  { email: 'accountant2@mini-erp.local', password: 'Accountant@123456', fullName: 'Hoàng Văn Nam',  roleCode: 'ACCOUNTANT' },
   // Customer portal — linked to Điện Nhật Minh (CUST-002)
   { email: 'nhatminh@portal.local', password: 'Customer@123456',  fullName: 'Trần Thị Bích',     roleCode: 'CUSTOMER', linkCustomerCode: 'CUST-002' },
   // Customer portal — linked to Cơ Điện Phú Long (CUST-003)

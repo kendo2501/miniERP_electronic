@@ -38,13 +38,6 @@ interface RecentOrder {
   customer: { companyName: string } | null;
 }
 
-interface ManagerKpis {
-  orders: { thisMonth: number; revenueThisMonth: number };
-  finance: { outstandingAmount: number; outstandingCount: number };
-  operations: { pendingDeliveries: number; pendingQuotations: number };
-  recentOrders: RecentOrder[];
-}
-
 interface SalesKpis {
   myCustomers: number;
   orders: { thisMonth: number; revenueThisMonth: number };
@@ -302,121 +295,6 @@ function AdminDashboard({ user }: { user: any }) {
                 </CardContent>
               </Card>
             )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ─── Manager Dashboard ────────────────────────────────────────────────────────
-
-function ManagerDashboard({ user }: { user: any }) {
-  const { t } = useLanguage();
-  const { data: kpis } = useQuery({
-    queryKey: ["manager-dashboard"],
-    queryFn: () => apiClient.get<ManagerKpis>("/reporting/manager-dashboard").then((r) => r.data),
-  });
-  const { data: chart } = useQuery({
-    queryKey: ["sales-chart"],
-    queryFn: () => apiClient.get<SalesPoint[]>("/reporting/sales-chart", { params: { days: 14 } }).then((r) => r.data),
-  });
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t.dashboard.managerDash}</h1>
-        <p className="text-muted-foreground mt-1">
-          {t.dashboard.welcome}, <span className="font-medium text-foreground">{user?.fullName}</span>
-        </p>
-      </div>
-
-      {kpis && (
-        <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard
-              title={t.dashboard.revenueThisMonth}
-              value={`$${kpis.orders.revenueThisMonth.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-              icon={BarChart3} accent="text-green-500"
-            />
-            <KpiCard
-              title={`${t.dashboard.orders} (${t.common.thisMonth})`}
-              value={String(kpis.orders.thisMonth)}
-              sub="total confirmed orders"
-              icon={ShoppingCart}
-            />
-            <KpiCard
-              title={t.dashboard.outstandingAR}
-              value={`$${kpis.finance.outstandingAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-              sub={`${kpis.finance.outstandingCount} ${t.dashboard.invoicesDue}`}
-              icon={CircleDollarSign}
-              accent={kpis.finance.outstandingAmount > 0 ? "text-orange-500" : "text-muted-foreground"}
-            />
-            <div className="grid grid-rows-2 gap-2">
-              <Card className="shadow-none">
-                <CardContent className="p-3 flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-blue-500 shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">{t.dashboard.pendingDeliveries}</p>
-                    <p className="font-bold text-lg leading-none mt-0.5">{kpis.operations.pendingDeliveries}</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="shadow-none">
-                <CardContent className="p-3 flex items-center gap-3">
-                  <ClipboardList className="h-4 w-4 text-purple-500 shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">{t.dashboard.pendingQuotations}</p>
-                    <p className="font-bold text-lg leading-none mt-0.5">{kpis.operations.pendingQuotations}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {chart && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Sales — Last 14 days</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <MiniBarChart data={chart} />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                    <span>{chart[0]?.date}</span>
-                    <span>{chart[chart.length - 1]?.date}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{t.dashboard.recentOrders}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <RecentOrdersTable orders={kpis.recentOrders} emptyLabel={t.orders.noOrders} />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex gap-3 flex-wrap">
-            {[
-              { href: "/sales/quotations", icon: ClipboardList, label: t.quotations.title, color: "text-[#593E67]", bg: "bg-[#593E67]/8" },
-              { href: "/finance/invoices", icon: FileText, label: t.dashboard.viewInvoices, color: "text-[#DE741C]", bg: "bg-[#DE741C]/8" },
-              { href: "/sales/deliveries", icon: Truck, label: t.deliveries.title, color: "text-[#84495F]", bg: "bg-[#84495F]/8" },
-            ].map(({ href, icon: Icon, label, color, bg }) => (
-              <Link key={href} href={href}>
-                <Card className="cursor-pointer hover:border-[#593E67]/40 hover:shadow-md transition-all w-44">
-                  <CardContent className="p-4 flex flex-col items-center gap-3">
-                    <div className={`h-10 w-10 rounded-xl ${bg} flex items-center justify-center`}>
-                      <Icon className={`h-5 w-5 ${color}`} />
-                    </div>
-                    <span className="text-sm font-medium text-center">{label}</span>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
           </div>
         </>
       )}
@@ -935,7 +813,6 @@ export default function DashboardPage() {
   const { user, hasPermission } = useAuthStore();
 
   if (hasPermission("reporting.dashboard.view_all")) return <AdminDashboard user={user} />;
-  if (hasPermission("reporting.dashboard.view_team")) return <ManagerDashboard user={user} />;
   if (hasPermission("reporting.dashboard.view_finance")) return <AccountantDashboard user={user} />;
   if (hasPermission("reporting.dashboard.view_warehouse")) return <WarehouseDashboard user={user} />;
   if (hasPermission("reporting.dashboard.view_self") && hasPermission("reporting.sales_kpi.view_self")) return <SalesDashboard user={user} />;
