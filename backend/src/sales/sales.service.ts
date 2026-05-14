@@ -50,11 +50,24 @@ export class SalesService {
 
   // ─── Quotations ───────────────────────────────────────────────────────────
 
-  async listQuotations(query: QuotationQueryDto) {
+  async listQuotations(query: QuotationQueryDto, currentUser?: AuthUser) {
     const { page = 1, limit = 20, customerId, status, search } = query;
     const skip = (page - 1) * limit;
     const where: any = {};
-    if (customerId) where.customerId = customerId;
+
+    // Customer portal: only see own quotations
+    const isCustomerPortal = currentUser &&
+      currentUser.permissions.includes('sales.quotation.view_own') &&
+      !currentUser.permissions.includes('sales.quotation.create') &&
+      !currentUser.permissions.includes('sales.quotation.approve');
+
+    if (isCustomerPortal) {
+      if (!currentUser.linkedCustomerId) return { items: [], total: 0, page, limit, totalPages: 0 };
+      where.customerId = currentUser.linkedCustomerId;
+    } else {
+      if (customerId) where.customerId = customerId;
+    }
+
     if (status) where.status = status;
     if (search) where.quotationNumber = { contains: search, mode: 'insensitive' };
 
@@ -435,9 +448,24 @@ export class SalesService {
     return result;
   }
 
-  async submitCounterOffer(id: number, dto: SubmitCounterOfferDto) {
+  async submitCounterOffer(id: number, dto: SubmitCounterOfferDto, currentUser?: AuthUser) {
     const q = await this.getQuotation(id);
-    if (!['DRAFT', 'SENT'].includes(q.status ?? '')) throw new BadRequestException('Counter offer only allowed on DRAFT or SENT quotations');
+
+    // Customer can only counter-offer their own quotations, and only when SENT
+    const isCustomerPortal = currentUser &&
+      currentUser.permissions.includes('sales.quotation.view_own') &&
+      !currentUser.permissions.includes('sales.quotation.create');
+
+    if (isCustomerPortal) {
+      if (currentUser.linkedCustomerId !== (q as any).customer.id)
+        throw new BadRequestException('Bạn không có quyền đề xuất giá cho báo giá này');
+      if (q.status !== 'SENT')
+        throw new BadRequestException('Chỉ có thể đề xuất giá khi báo giá ở trạng thái "Đã gửi"');
+    } else {
+      if (!['DRAFT', 'SENT'].includes(q.status ?? ''))
+        throw new BadRequestException('Counter offer only allowed on DRAFT or SENT quotations');
+    }
+
     return this.prisma.quotation.update({
       where: { id },
       data: {

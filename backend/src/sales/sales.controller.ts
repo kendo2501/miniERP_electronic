@@ -20,7 +20,7 @@ export class SalesController {
   // ─── Quotations ───────────────────────────────────────────────────────────
 
   @Get('quotations') @AnyPermission('sales.quotation.create', 'sales.quotation.approve', 'sales.quotation.view_own') @ApiOperation({ summary: 'List quotations' })
-  listQuotations(@Query() query: QuotationQueryDto) { return this.service.listQuotations(query); }
+  listQuotations(@Query() query: QuotationQueryDto, @Req() req: any) { return this.service.listQuotations(query, req.user); }
 
   @Get('quotations/:id') @AnyPermission('sales.quotation.create', 'sales.quotation.approve', 'sales.quotation.view_own') @ApiOperation({ summary: 'Get quotation' })
   getQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.getQuotation(id); }
@@ -40,8 +40,8 @@ export class SalesController {
   @Post('quotations/:id/cancel') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Cancel quotation' })
   cancelQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.cancelQuotation(id); }
 
-  @Post('quotations/:id/counter-offer') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.update_own') @ApiOperation({ summary: 'Submit customer counter offer' })
-  submitCounterOffer(@Param('id', ParseIntPipe) id: number, @Body() dto: SubmitCounterOfferDto) { return this.service.submitCounterOffer(id, dto); }
+  @Post('quotations/:id/counter-offer') @HttpCode(HttpStatus.OK) @AnyPermission('sales.quotation.update_own', 'sales.quotation.view_own') @ApiOperation({ summary: 'Submit customer counter offer' })
+  submitCounterOffer(@Param('id', ParseIntPipe) id: number, @Body() dto: SubmitCounterOfferDto, @Req() req: any) { return this.service.submitCounterOffer(id, dto, req.user); }
 
   @Post('quotations/:id/accept-offer') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.quotation.approve') @ApiOperation({ summary: 'Admin accepts counter offer → creates order' })
   acceptCounterOffer(@Param('id', ParseIntPipe) id: number) { return this.service.acceptCounterOffer(id); }

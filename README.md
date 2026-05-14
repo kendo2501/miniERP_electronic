@@ -245,6 +245,7 @@ Quyền hạn: xem đơn hàng của mình, xem báo giá của mình, xem hoá 
 |----------|----------------------------|
 | Email    | accountant@mini-erp.local  |
 | Password | Accountant@123456          |
+
 Quyền hạn: xem & xuất hoá đơn, quản lý thanh toán, hoàn trả thanh toán, xem báo cáo tài chính, xem aging report (công nợ quá hạn).
 
 ---
@@ -255,6 +256,7 @@ Quyền hạn: xem & xuất hoá đơn, quản lý thanh toán, hoàn trả than
 |----------|---------------------------|
 | Email    | warehouse@mini-erp.local  |
 | Password | Warehouse@123456          |
+
 
 Quyền hạn: xem & điều chỉnh tồn kho, chuyển kho, duyệt điều chỉnh/chuyển kho, quản lý nhà kho, xem cảnh báo hàng sắp hết.
 
