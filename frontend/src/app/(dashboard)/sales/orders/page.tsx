@@ -1,13 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  Search, Plus, Loader2, Trash2, CheckCircle, XCircle, Truck,
-  ShoppingCart, Edit2, AlertCircle, CheckCircle2, RefreshCw,
-} from "lucide-react";
+import { Search, Plus, Loader2, Trash2, ShoppingCart, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import {
-  listOrders, confirmOrder, cancelOrder, createOrder, listCustomers, confirmPayment,
-  requestPriceAdjustment, adjustOrderPrices, getOrder, confirmReapproval,
-} from "@/lib/api/sales";
+import { listOrders, confirmPayment, createOrder, listCustomers } from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
 import type { SalesOrderStatus, PaymentStatus } from "@/types/sales";
@@ -51,20 +44,6 @@ const STATUS_COLORS: Record<SalesOrderStatus, string> = {
   PENDING_REAPPROVAL: "text-purple-700 border-purple-300",
 };
 
-// Saler-facing inline status chips shown in the order-number cell (no status column for Saler)
-const SALER_INLINE_STATUS: Partial<Record<SalesOrderStatus, { label: string; cls: string; icon: React.ReactNode }>> = {
-  PRICE_ADJUSTMENT_REQUESTED: {
-    label: "Chờ điều chỉnh",
-    cls: "text-orange-700 bg-orange-50 border border-orange-200",
-    icon: <AlertCircle className="h-3 w-3" />,
-  },
-  PENDING_REAPPROVAL: {
-    label: "Đã điều chỉnh — Chờ duyệt lại",
-    cls: "text-purple-700 bg-purple-50 border border-purple-200",
-    icon: <RefreshCw className="h-3 w-3" />,
-  },
-};
-
 // ─── Payment badge ─────────────────────────────────────────────────────────────
 
 function PaymentBadge({ status }: { status?: PaymentStatus }) {
@@ -87,7 +66,7 @@ const itemSchema = z.object({
   productId: z.string().min(1, "Chọn sản phẩm"),
   quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Số lượng phải là số nguyên dương"),
   unitPrice: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Đơn giá phải là số nguyên dương"),
-  discountPercent: z.string().optional().refine((v) => !v || (Number(v) >= 0 && Number(v) <= 100), "CK 0–100"),
+  discountPercent: z.string().optional().refine((v) => !v || (Number(v) >= 0 && Number(v) <= 100), "Chiết khấu 0–100"),
 });
 
 const schema = z.object({
@@ -98,16 +77,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-type AdjustItem = {
-  productId: number;
-  productName: string;
-  sku: string;
-  quantity: number;
-  unitPrice: number;
-  discountPercent: number;
-};
-
-// ─── Statuses that block payment confirmation ─────────────────────────────────
+// Trạng thái chặn xác nhận thanh toán
 const NO_PAYMENT_STATUSES: SalesOrderStatus[] = [
   "CANCELLED", "DRAFT", "PRICE_ADJUSTMENT_REQUESTED", "PENDING_REAPPROVAL",
 ];
@@ -119,14 +89,6 @@ export default function SalesOrdersPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
-
-  // Request price adjustment dialog (Manager)
-  const [requestAdjustTarget, setRequestAdjustTarget] = useState<number | null>(null);
-  const [requestAdjustReason, setRequestAdjustReason] = useState("");
-
-  // Adjust prices dialog (Saler)
-  const [adjustPriceOrderId, setAdjustPriceOrderId] = useState<number | null>(null);
-  const [adjustPriceItems, setAdjustPriceItems] = useState<AdjustItem[]>([]);
 
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
@@ -153,27 +115,6 @@ export default function SalesOrdersPage() {
     queryFn: () => listCustomers({ limit: 200 }).then((r) => r.data),
     enabled: showCreate,
   });
-
-  const { data: adjustOrderDetail, isFetching: loadingAdjustDetail } = useQuery({
-    queryKey: ["order-detail-adjust", adjustPriceOrderId],
-    queryFn: () => getOrder(adjustPriceOrderId!).then((r) => r.data),
-    enabled: adjustPriceOrderId !== null,
-  });
-
-  useEffect(() => {
-    if (adjustOrderDetail?.items) {
-      setAdjustPriceItems(
-        adjustOrderDetail.items.map((i) => ({
-          productId: i.product.id,
-          productName: i.product.productName,
-          sku: i.product.sku,
-          quantity: Number(i.quantity),
-          unitPrice: Number(i.unitPrice),
-          discountPercent: Number((i as any).discountPercent ?? 0),
-        })),
-      );
-    }
-  }, [adjustOrderDetail]);
 
   // ─── Form ─────────────────────────────────────────────────────────────────
 
@@ -209,64 +150,10 @@ export default function SalesOrdersPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Tạo đơn hàng thất bại"),
   });
 
-  const confirmMut = useMutation({
-    mutationFn: (id: number) => confirmOrder(id),
-    onSuccess: () => { toast.success(t.orders.confirmed); invalidate(); },
-    onError: () => toast.error("Xác nhận đơn thất bại"),
-  });
-
-  const cancelMut = useMutation({
-    mutationFn: (id: number) => cancelOrder(id),
-    onSuccess: () => { toast.success(t.orders.cancelledMsg); invalidate(); },
-    onError: () => toast.error("Hủy đơn thất bại"),
-  });
-
   const paymentMut = useMutation({
     mutationFn: (id: number) => confirmPayment(id),
-    onSuccess: () => {
-      toast.success("Xác nhận thanh toán thành công");
-      invalidate();
-    },
+    onSuccess: () => { toast.success("Xác nhận thanh toán thành công"); invalidate(); },
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận thanh toán thất bại"),
-  });
-
-  const requestAdjustMut = useMutation({
-    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
-      requestPriceAdjustment(id, reason || undefined),
-    onSuccess: () => {
-      toast.success("Đã gửi yêu cầu điều chỉnh giá cho nhân viên");
-      invalidate();
-      setRequestAdjustTarget(null);
-      setRequestAdjustReason("");
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Yêu cầu thất bại"),
-  });
-
-  const adjustPricesMut = useMutation({
-    mutationFn: ({ id, items }: { id: number; items: AdjustItem[] }) =>
-      adjustOrderPrices(id, items.map((i) => ({
-        productId: i.productId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-        discountPercent: i.discountPercent,
-      }))),
-    onSuccess: () => {
-      toast.success("Đã điều chỉnh giá — đơn hàng đang chờ quản lý xét duyệt lại");
-      invalidate();
-      setAdjustPriceOrderId(null);
-      setAdjustPriceItems([]);
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Điều chỉnh giá thất bại"),
-  });
-
-  // Manager re-approves after Saler's adjustment
-  const reapprovalMut = useMutation({
-    mutationFn: (id: number) => confirmReapproval(id),
-    onSuccess: () => {
-      toast.success("Đã xác nhận lại — đơn hàng tiếp tục xử lý");
-      invalidate();
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Xét duyệt lại thất bại"),
   });
 
   // ─── Status labels ─────────────────────────────────────────────────────────
@@ -284,15 +171,6 @@ export default function SalesOrdersPage() {
   function handleProductChange(idx: number, productId: string, product?: Product) {
     setValue(`items.${idx}.productId`, productId);
     if (product?.standardPrice) setValue(`items.${idx}.unitPrice`, String(product.standardPrice));
-  }
-
-  // ─── Derived helpers ───────────────────────────────────────────────────────
-
-  function calcAdjustTotal() {
-    return adjustPriceItems.reduce((sum, i) => {
-      const disc = i.quantity * i.unitPrice * (i.discountPercent / 100);
-      return sum + i.quantity * i.unitPrice - disc;
-    }, 0);
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -366,7 +244,7 @@ export default function SalesOrdersPage() {
                   <tr className="border-b bg-muted/50">
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Số đơn</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Khách hàng</th>
-                    {/* Trạng thái chỉ hiển thị cho Manager (canApprove) */}
+                    {/* Cột trạng thái chỉ hiển thị cho Admin */}
                     {canApprove && (
                       <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
                     )}
@@ -382,21 +260,14 @@ export default function SalesOrdersPage() {
                     const orderStatus = o.status as SalesOrderStatus;
                     const payStatus = (o as any).paymentStatus as PaymentStatus | undefined;
                     const isUnpaid = !payStatus || payStatus === "UNPAID";
-                    const salerInline = SALER_INLINE_STATUS[orderStatus];
 
                     return (
                       <tr key={o.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                        {/* Số đơn + inline status chip for Saler */}
+                        {/* Số đơn */}
                         <td className="px-6 py-3">
                           <div className="font-mono text-xs font-medium">{o.orderNumber}</div>
                           {o.quotation && (
                             <div className="text-xs text-muted-foreground">từ {o.quotation.quotationNumber}</div>
-                          )}
-                          {!canApprove && salerInline && (
-                            <div className={`inline-flex items-center gap-1 text-xs mt-1 px-1.5 py-0.5 rounded ${salerInline.cls}`}>
-                              {salerInline.icon}
-                              {salerInline.label}
-                            </div>
                           )}
                         </td>
 
@@ -406,7 +277,7 @@ export default function SalesOrdersPage() {
                           <div className="text-xs text-muted-foreground">{o.customer.customerCode}</div>
                         </td>
 
-                        {/* Trạng thái — Manager only */}
+                        {/* Trạng thái — Admin only */}
                         {canApprove && (
                           <td className="px-6 py-3">
                             <Badge
@@ -438,7 +309,7 @@ export default function SalesOrdersPage() {
                           )}
                         </td>
 
-                        {/* Giao hàng */}
+                        {/* Số phiếu giao hàng */}
                         <td className="px-6 py-3 text-center">
                           <span className={`text-sm font-medium ${(o._count?.deliveries ?? 0) > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
                             {o._count?.deliveries ?? 0}
@@ -450,104 +321,25 @@ export default function SalesOrdersPage() {
                           {new Date(o.orderedAt).toLocaleDateString("vi-VN")}
                         </td>
 
-                        {/* ── Thao tác ── */}
+                        {/* ── Thao tác: chỉ Xác nhận thanh toán ── */}
                         <td className="px-6 py-3">
-                          <div className="flex items-center gap-1 flex-wrap">
-
-                            {/* Manager: xác nhận DRAFT */}
-                            {canApprove && orderStatus === "DRAFT" && (
+                          {(canApprove || canCreate)
+                            && isUnpaid
+                            && !NO_PAYMENT_STATUSES.includes(orderStatus)
+                            && (
                               <Button
-                                size="sm" variant="ghost"
-                                className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
-                                onClick={() => confirmMut.mutate(o.id)}
-                                disabled={confirmMut.isPending}
+                                size="sm"
+                                className="h-7 px-2.5 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+                                onClick={() => paymentMut.mutate(o.id)}
+                                disabled={paymentMut.isPending}
                               >
-                                <CheckCircle className="h-3 w-3" /> Xác nhận
-                              </Button>
-                            )}
-
-                            {/* Manager: yêu cầu điều chỉnh giá (từ CONFIRMED hoặc PENDING_REAPPROVAL) */}
-                            {canApprove && ["CONFIRMED", "PENDING_REAPPROVAL"].includes(orderStatus) && (
-                              <Button
-                                size="sm" variant="ghost"
-                                className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
-                                onClick={() => { setRequestAdjustTarget(o.id); setRequestAdjustReason(""); }}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                                {orderStatus === "PENDING_REAPPROVAL" ? "Yêu cầu chỉnh lại" : "Yêu cầu điều chỉnh giá"}
-                              </Button>
-                            )}
-
-                            {/* Manager: duyệt lại sau khi Saler điều chỉnh (PENDING_REAPPROVAL) */}
-                            {canApprove && orderStatus === "PENDING_REAPPROVAL" && (
-                              <Button
-                                size="sm" variant="ghost"
-                                className="h-7 px-2 text-xs gap-1 text-purple-700 hover:text-purple-800 border border-purple-200 bg-purple-50"
-                                onClick={() => reapprovalMut.mutate(o.id)}
-                                disabled={reapprovalMut.isPending}
-                              >
-                                {reapprovalMut.isPending
+                                {paymentMut.isPending
                                   ? <Loader2 className="h-3 w-3 animate-spin" />
                                   : <CheckCircle2 className="h-3 w-3" />
                                 }
-                                Duyệt lại
+                                Xác nhận thanh toán
                               </Button>
                             )}
-
-                            {/* Saler: điều chỉnh lại giá */}
-                            {canCreate && !canApprove && orderStatus === "PRICE_ADJUSTMENT_REQUESTED" && (
-                              <Button
-                                size="sm" variant="ghost"
-                                className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 border border-orange-200 bg-orange-50"
-                                onClick={() => { setAdjustPriceItems([]); setAdjustPriceOrderId(o.id); }}
-                              >
-                                <Edit2 className="h-3 w-3" /> Điều chỉnh lại
-                              </Button>
-                            )}
-
-                            {/* Shared: giao hàng */}
-                            {["CONFIRMED", "PARTIALLY_DELIVERED"].includes(orderStatus) && (
-                              <Link href="/sales/deliveries">
-                                <Button
-                                  size="sm" variant="ghost"
-                                  className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700"
-                                >
-                                  <Truck className="h-3 w-3" /> Giao hàng
-                                </Button>
-                              </Link>
-                            )}
-
-                            {/* Shared: xác nhận thanh toán — chỉ hiển thị khi chưa thanh toán và không ở trạng thái chặn */}
-                            {(canApprove || canCreate)
-                              && isUnpaid
-                              && !NO_PAYMENT_STATUSES.includes(orderStatus)
-                              && (
-                                <Button
-                                  size="sm"
-                                  className="h-7 px-2.5 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
-                                  onClick={() => paymentMut.mutate(o.id)}
-                                  disabled={paymentMut.isPending}
-                                >
-                                  {paymentMut.isPending
-                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                    : <CheckCircle2 className="h-3 w-3" />
-                                  }
-                                  Xác nhận thanh toán
-                                </Button>
-                              )}
-
-                            {/* Shared: hủy */}
-                            {!["CANCELLED", "DELIVERED", "PRICE_ADJUSTMENT_REQUESTED", "PENDING_REAPPROVAL"].includes(orderStatus) && (
-                              <Button
-                                size="sm" variant="ghost"
-                                className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
-                                onClick={() => cancelMut.mutate(o.id)}
-                                disabled={cancelMut.isPending}
-                              >
-                                <XCircle className="h-3 w-3" /> Hủy
-                              </Button>
-                            )}
-                          </div>
                         </td>
                       </tr>
                     );
@@ -586,148 +378,6 @@ export default function SalesOrdersPage() {
         </CardContent>
       </Card>
 
-      {/* ─── Dialog: Yêu cầu điều chỉnh giá (Manager) ─────────────────────────── */}
-      <Dialog
-        open={requestAdjustTarget !== null}
-        onOpenChange={(v) => { if (!v) { setRequestAdjustTarget(null); setRequestAdjustReason(""); } }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Yêu cầu điều chỉnh giá</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <p className="text-sm text-muted-foreground">
-              Nhân viên kinh doanh sẽ được thông báo để điều chỉnh lại giá và gửi lên duyệt.
-            </p>
-            <Label>Lý do (tuỳ chọn)</Label>
-            <Textarea
-              value={requestAdjustReason}
-              onChange={(e) => setRequestAdjustReason(e.target.value)}
-              placeholder="Nhập lý do yêu cầu điều chỉnh..."
-              rows={3}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setRequestAdjustTarget(null); setRequestAdjustReason(""); }}>
-              {t.common.cancel}
-            </Button>
-            <Button
-              disabled={requestAdjustMut.isPending}
-              onClick={() => {
-                if (requestAdjustTarget === null) return;
-                requestAdjustMut.mutate({ id: requestAdjustTarget, reason: requestAdjustReason });
-              }}
-            >
-              {requestAdjustMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Gửi yêu cầu
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── Dialog: Điều chỉnh lại giá (Saler) ───────────────────────────────── */}
-      <Dialog
-        open={adjustPriceOrderId !== null}
-        onOpenChange={(v) => { if (!v) { setAdjustPriceOrderId(null); setAdjustPriceItems([]); } }}
-      >
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Điều chỉnh lại giá đơn hàng</DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Sau khi điều chỉnh, hệ thống sẽ tự động gửi lại yêu cầu phê duyệt lên quản lý.
-            </p>
-          </DialogHeader>
-
-          {loadingAdjustDetail || adjustPriceItems.length === 0 ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">Đang tải dữ liệu...</span>
-            </div>
-          ) : (
-            <div className="space-y-3 pt-2">
-              {/* Column headers */}
-              <div className="grid grid-cols-[2fr_80px_130px_100px] gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
-                <span>Sản phẩm</span>
-                <span>SL</span>
-                <span>Đơn giá (₫)</span>
-                <span>CK (%)</span>
-              </div>
-
-              {adjustPriceItems.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-[2fr_80px_130px_100px] gap-2 items-center">
-                  <div>
-                    <div className="font-medium text-sm">{item.productName}</div>
-                    <div className="text-xs text-muted-foreground font-mono">{item.sku}</div>
-                  </div>
-                  <Input
-                    type="number" min="1" step="1"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      setAdjustPriceItems((prev) =>
-                        prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))
-                    }
-                  />
-                  <Input
-                    type="number" min="0" step="1000"
-                    value={item.unitPrice}
-                    onChange={(e) =>
-                      setAdjustPriceItems((prev) =>
-                        prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))
-                    }
-                  />
-                  <Input
-                    type="number" min="0" max="100" step="1"
-                    value={item.discountPercent}
-                    onChange={(e) =>
-                      setAdjustPriceItems((prev) =>
-                        prev.map((it, i) => i === idx ? { ...it, discountPercent: Number(e.target.value) } : it))
-                    }
-                  />
-                </div>
-              ))}
-
-              {/* Preview total */}
-              <div className="border-t pt-3 flex justify-end gap-2 items-center">
-                <span className="text-sm text-muted-foreground">Tổng ước tính:</span>
-                <span className="font-semibold text-base tabular-nums">{vnd(calcAdjustTotal())}</span>
-              </div>
-
-              {/* Validation: prices must be > 0 */}
-              {adjustPriceItems.some((i) => i.unitPrice <= 0 || i.quantity <= 0) && (
-                <p className="text-xs text-destructive flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  Đơn giá và số lượng phải lớn hơn 0
-                </p>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => { setAdjustPriceOrderId(null); setAdjustPriceItems([]); }}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              disabled={
-                adjustPricesMut.isPending
-                || adjustPriceItems.length === 0
-                || loadingAdjustDetail
-                || adjustPriceItems.some((i) => i.unitPrice <= 0 || i.quantity <= 0)
-              }
-              onClick={() => {
-                if (!adjustPriceOrderId) return;
-                adjustPricesMut.mutate({ id: adjustPriceOrderId, items: adjustPriceItems });
-              }}
-            >
-              {adjustPricesMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Gửi lại chờ duyệt
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* ─── Dialog: Tạo đơn hàng ──────────────────────────────────────────────── */}
       <Dialog
         open={showCreate}
@@ -737,13 +387,18 @@ export default function SalesOrdersPage() {
         }}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{t.orders.createTitle}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{t.orders.createTitle}</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Chọn khách hàng và thêm sản phẩm. Đơn hàng tạo ở trạng thái <strong>Nháp</strong> — Admin sẽ xác nhận sau.
+            </p>
+          </DialogHeader>
           <form onSubmit={handleSubmit((v) => createMut.mutate(v))} className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Khách hàng *</Label>
                 <Select onValueChange={(v) => setValue("customerId", v)}>
-                  <SelectTrigger><SelectValue placeholder="Chọn khách hàng" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Tìm và chọn khách hàng" /></SelectTrigger>
                   <SelectContent>
                     {customers?.items.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
@@ -757,30 +412,33 @@ export default function SalesOrdersPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Ghi chú</Label>
-                <Input placeholder="Ghi chú thêm..." onChange={(e) => setValue("notes", e.target.value)} />
+                <Input
+                  placeholder="Ghi chú nội bộ hoặc yêu cầu đặc biệt..."
+                  onChange={(e) => setValue("notes", e.target.value)}
+                />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>Sản phẩm *</Label>
+                <Label>Danh sách sản phẩm *</Label>
                 <Button
                   type="button" variant="outline" size="sm"
                   onClick={() => setValue("items", [...(items ?? []), { productId: "", quantity: "1", unitPrice: "0" }])}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Thêm SP
+                  <Plus className="h-3.5 w-3.5" /> Thêm sản phẩm
                 </Button>
               </div>
               <div className="space-y-2">
-                <div className="grid grid-cols-[2fr_64px_100px_80px_32px] gap-2">
-                  <span className="text-xs text-muted-foreground font-medium">Sản phẩm (SKU)</span>
-                  <span className="text-xs text-muted-foreground font-medium">SL</span>
+                <div className="grid grid-cols-[2fr_64px_110px_80px_32px] gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">Sản phẩm</span>
+                  <span className="text-xs text-muted-foreground font-medium">Số lượng</span>
                   <span className="text-xs text-muted-foreground font-medium">Đơn giá (₫)</span>
-                  <span className="text-xs text-muted-foreground font-medium">CK (%)</span>
+                  <span className="text-xs text-muted-foreground font-medium">Chiết khấu (%)</span>
                   <span />
                 </div>
                 {(items ?? []).map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[2fr_64px_100px_80px_32px] gap-2 items-center">
+                  <div key={idx} className="grid grid-cols-[2fr_64px_110px_80px_32px] gap-2 items-center">
                     <ProductSelect
                       value={item.productId}
                       onChange={(pid, prod) => handleProductChange(idx, pid, prod)}
@@ -811,6 +469,9 @@ export default function SalesOrdersPage() {
                     </Button>
                   </div>
                 ))}
+                <p className="text-xs text-muted-foreground mt-1">
+                  * Đơn giá tự động điền theo bảng giá khi chọn sản phẩm — có thể chỉnh lại trực tiếp.
+                </p>
               </div>
             </div>
 
