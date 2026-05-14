@@ -47,6 +47,7 @@ export interface Product {
   minPrice?: number;
   weight?: number;
   isActive: boolean;
+  totalStock?: number;
   imageUrls?: string[];
   createdAt: string;
   updatedAt: string;

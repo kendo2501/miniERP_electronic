@@ -44,7 +44,7 @@ export default function MyQuotationsPage() {
 
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["my-quotations", page],
     queryFn: () => listQuotations({ page, limit: 10 } as any).then((r) => r.data),
     placeholderData: (prev) => prev,
@@ -84,6 +84,12 @@ export default function MyQuotationsPage() {
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="py-16 text-center text-muted-foreground">
+            <p>Không thể tải danh sách báo giá. Vui lòng thử lại.</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-3">
           {data?.items.length === 0 && (

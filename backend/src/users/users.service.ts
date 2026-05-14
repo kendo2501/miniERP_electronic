@@ -75,6 +75,7 @@ export class UsersService {
         updatedAt: true,
         lastLoginAt: true,
         organizationId: true,
+        linkedCustomerId: true,
         userRoles: {
           include: {
             role: {
@@ -94,6 +95,7 @@ export class UsersService {
       fullName: user.fullName,
       status: user.status,
       organizationId: user.organizationId,
+      linkedCustomerId: user.linkedCustomerId,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       lastLoginAt: user.lastLoginAt,

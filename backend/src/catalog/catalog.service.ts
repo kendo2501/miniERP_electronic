@@ -134,14 +134,17 @@ export class CatalogService {
           category: { select: { id: true, name: true } },
           brand: { select: { id: true, name: true } },
           images: { select: { imageUrl: true, sortOrder: true }, orderBy: { sortOrder: 'asc' }, take: 1 },
-          _count: { select: { inventoryStocks: true } },
+          inventoryStocks: { select: { availableQuantity: true } },
         },
       }),
       this.prisma.product.count({ where }),
     ]);
 
     return {
-      items,
+      items: items.map(({ inventoryStocks, ...p }) => ({
+        ...p,
+        totalStock: inventoryStocks.reduce((sum, s) => sum + Number(s.availableQuantity), 0),
+      })),
       total,
       page,
       limit,

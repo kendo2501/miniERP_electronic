@@ -107,6 +107,12 @@ export const adjustOrderPrices = (id: number, items: { productId: number; quanti
 export const confirmReapproval = (id: number) =>
   apiClient.post<SalesOrder>(`/sales/orders/${id}/confirm-reapproval`);
 
+export const startDelivery = (id: number) =>
+  apiClient.post<SalesOrder>(`/sales/orders/${id}/start-delivery`);
+
+export const completeDelivery = (id: number) =>
+  apiClient.post<SalesOrder>(`/sales/orders/${id}/complete-delivery`);
+
 // ─── Stock Inquiries ──────────────────────────────────────────────────────────
 
 export const listStockInquiries = (params?: Record<string, unknown>) =>

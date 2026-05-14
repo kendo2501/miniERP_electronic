@@ -333,9 +333,11 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-6 py-3 text-muted-foreground">{p.unit ?? "—"}</td>
                       <td className="px-6 py-3">
-                        <Badge variant={p.isActive ? "success" : "secondary"}>
-                          {p.isActive ? t.common.active : t.common.inactive}
-                        </Badge>
+                        {(p as any).totalStock > 0 ? (
+                          <Badge variant="success">Còn hàng</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-red-600 border-red-200 bg-red-50">Hết hàng</Badge>
+                        )}
                       </td>
                       <td className="px-6 py-3">
                         <div className="flex items-center gap-1">

@@ -26,7 +26,7 @@ const QUOTATION_SELECT = {
 };
 
 const ORDER_SELECT = {
-  id: true, orderNumber: true, status: true, paymentStatus: true, paidAt: true, subtotal: true,
+  id: true, orderNumber: true, status: true, paymentStatus: true, deliveryStatus: true, paidAt: true, subtotal: true,
   taxAmount: true, totalAmount: true, orderedAt: true, confirmedAt: true, notes: true,
   salesUserId: true,
   createdAt: true, updatedAt: true,
@@ -54,14 +54,8 @@ export class SalesService {
     const skip = (page - 1) * limit;
     const where: any = {};
 
-    // Customer portal: only see own quotations
-    const isCustomerPortal = currentUser &&
-      currentUser.permissions.includes('sales.quotation.view_own') &&
-      !currentUser.permissions.includes('sales.quotation.create') &&
-      !currentUser.permissions.includes('sales.quotation.approve');
-
-    if (isCustomerPortal) {
-      if (!currentUser.linkedCustomerId) return { items: [], total: 0, page, limit, totalPages: 0 };
+    // Customer portal: linkedCustomerId presence is the authoritative check
+    if (currentUser?.linkedCustomerId) {
       where.customerId = currentUser.linkedCustomerId;
     } else {
       if (customerId) where.customerId = customerId;
@@ -86,9 +80,12 @@ export class SalesService {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async getQuotation(id: number) {
+  async getQuotation(id: number, currentUser?: AuthUser) {
     const q = await this.prisma.quotation.findUnique({ where: { id }, select: QUOTATION_SELECT });
     if (!q) throw new NotFoundException(`Quotation #${id} not found`);
+    // Customer ownership check — 403-safe: return 404 to avoid leaking existence
+    if (currentUser?.linkedCustomerId && (q as any).customer.id !== currentUser.linkedCustomerId)
+      throw new NotFoundException(`Quotation #${id} not found`);
     return q;
   }
 
@@ -456,16 +453,11 @@ export class SalesService {
   }
 
   async submitCounterOffer(id: number, dto: SubmitCounterOfferDto, currentUser?: AuthUser) {
-    const q = await this.getQuotation(id);
+    // getQuotation already enforces customer ownership via linkedCustomerId
+    const q = await this.getQuotation(id, currentUser);
 
-    // Customer can only counter-offer their own quotations, and only when SENT
-    const isCustomerPortal = currentUser &&
-      currentUser.permissions.includes('sales.quotation.view_own') &&
-      !currentUser.permissions.includes('sales.quotation.create');
-
-    if (isCustomerPortal) {
-      if (currentUser.linkedCustomerId !== (q as any).customer.id)
-        throw new BadRequestException('Bạn không có quyền đề xuất giá cho báo giá này');
+    if (currentUser?.linkedCustomerId) {
+      // Customer: can only counter-offer when SENT
       if (q.status !== 'SENT')
         throw new BadRequestException('Chỉ có thể đề xuất giá khi báo giá ở trạng thái "Đã gửi"');
     } else {
@@ -554,13 +546,18 @@ export class SalesService {
 
     const scope = this.resolveOrderScope(currentUser);
     if (scope === 'own') {
+      // Customer portal: only their own orders
       const cid = currentUser?.linkedCustomerId;
       if (!cid) return { items: [], total: 0, page, limit, totalPages: 0 };
       where.customerId = cid;
     } else if (scope === 'assigned') {
-      const ids = await this.getAssignedCustomerIds(currentUser!.id);
-      where.customerId = ids.length ? { in: ids } : { in: [] };
+      // Sales staff: orders they created OR orders for their assigned customers
+      const assignedCustomerIds = await this.getAssignedCustomerIds(currentUser!.id);
+      const conditions: any[] = [{ salesUserId: currentUser!.id }];
+      if (assignedCustomerIds.length) conditions.push({ customerId: { in: assignedCustomerIds } });
+      where.OR = conditions;
     } else {
+      // Admin/Manager: all orders, optional customer filter
       if (customerId) where.customerId = customerId;
     }
 
@@ -568,7 +565,8 @@ export class SalesService {
       this.prisma.salesOrder.findMany({
         where, skip, take: limit, orderBy: { createdAt: 'desc' },
         select: {
-          id: true, orderNumber: true, status: true, paymentStatus: true, totalAmount: true, subtotal: true, taxAmount: true, orderedAt: true, confirmedAt: true, createdAt: true,
+          id: true, orderNumber: true, status: true, paymentStatus: true, deliveryStatus: true,
+          totalAmount: true, subtotal: true, taxAmount: true, orderedAt: true, confirmedAt: true, createdAt: true,
           customer: { select: { id: true, companyName: true, customerCode: true } },
           quotation: { select: { id: true, quotationNumber: true } },
           _count: { select: { items: true } },
@@ -583,11 +581,19 @@ export class SalesService {
     const o = await this.prisma.salesOrder.findUnique({ where: { id }, select: ORDER_SELECT });
     if (!o) throw new NotFoundException(`Sales Order #${id} not found`);
 
+    // Customer: can only view their own orders
+    if (currentUser?.linkedCustomerId) {
+      if ((o as any).customer.id !== currentUser.linkedCustomerId)
+        throw new NotFoundException(`Sales Order #${id} not found`);
+      return o;
+    }
+
     const scope = this.resolveOrderScope(currentUser);
-    if (scope === 'own') throw new NotFoundException(`Sales Order #${id} not found`);
     if (scope === 'assigned') {
       const ids = await this.getAssignedCustomerIds(currentUser!.id);
-      if (!ids.includes((o as any).customer.id)) throw new NotFoundException(`Sales Order #${id} not found`);
+      const ownOrder = (o as any).salesUserId === currentUser!.id;
+      if (!ownOrder && !ids.includes((o as any).customer.id))
+        throw new NotFoundException(`Sales Order #${id} not found`);
     }
 
     return o;
@@ -640,6 +646,28 @@ export class SalesService {
     return this.prisma.salesOrder.update({ where: { id }, data: { status: 'CANCELLED' }, select: ORDER_SELECT });
   }
 
+  async startDelivery(id: number) {
+    const o = await this.getOrder(id);
+    if (o.status === 'CANCELLED') throw new BadRequestException('Không thể giao đơn hàng đã hủy');
+    if ((o as any).deliveryStatus === 'IN_TRANSIT') throw new BadRequestException('Đơn hàng đang trong quá trình giao hàng');
+    if ((o as any).deliveryStatus === 'DELIVERED') throw new BadRequestException('Đơn hàng đã được giao');
+    return this.prisma.salesOrder.update({
+      where: { id },
+      data: { deliveryStatus: 'IN_TRANSIT' },
+      select: ORDER_SELECT,
+    });
+  }
+
+  async completeDelivery(id: number) {
+    const o = await this.getOrder(id);
+    if ((o as any).deliveryStatus !== 'IN_TRANSIT') throw new BadRequestException('Đơn hàng chưa ở trạng thái đang giao');
+    return this.prisma.salesOrder.update({
+      where: { id },
+      data: { deliveryStatus: 'DELIVERED' },
+      select: ORDER_SELECT,
+    });
+  }
+
   async getCustomerBalance(customerId: number) {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
@@ -669,10 +697,11 @@ export class SalesService {
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private resolveOrderScope(user?: AuthUser): 'all' | 'assigned' | 'own' {
-    if (!user) return 'all'; // internal service call — bypass scope restriction
+    if (!user) return 'all'; // internal service call
+    if (user.linkedCustomerId) return 'own'; // customer portal always filters by own
     const perms = user.permissions;
     if (perms.includes('sales.order.view_all') || perms.includes('sales.order.view_team')) return 'all';
-    if (perms.includes('sales.order.view_assigned')) return 'assigned';
+    if (perms.includes('sales.order.view_assigned') || perms.includes('sales.order.create')) return 'assigned';
     return 'own';
   }
 

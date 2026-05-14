@@ -1,13 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Package, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
+import { Package, CheckCircle, Clock, XCircle, Loader2, Truck, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { listOrders } from "@/lib/api/sales";
 import { vnd } from "@/lib/format";
-import type { SalesOrderStatus } from "@/types/sales";
+import type { SalesOrderStatus, DeliveryStatus } from "@/types/sales";
 
 const ORDER_STATUS_CONFIG: Record<SalesOrderStatus, { label: string; icon: React.ReactNode; className: string }> = {
   DRAFT:                       { label: "Chờ xác nhận",    icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
@@ -19,10 +19,16 @@ const ORDER_STATUS_CONFIG: Record<SalesOrderStatus, { label: string; icon: React
   PENDING_REAPPROVAL:          { label: "Đang xử lý",      icon: <Clock className="h-3.5 w-3.5" />,        className: "text-purple-700 bg-purple-50 border-purple-200" },
 };
 
+const DELIVERY_CONFIG: Record<DeliveryStatus, { label: string; icon: React.ReactNode; className: string }> = {
+  PENDING:    { label: "Chưa giao",  icon: <Package className="h-3.5 w-3.5" />,  className: "text-gray-600 bg-gray-50 border-gray-200" },
+  IN_TRANSIT: { label: "Đang giao", icon: <Truck className="h-3.5 w-3.5" />,     className: "text-orange-700 bg-orange-50 border-orange-200" },
+  DELIVERED:  { label: "Đã giao",   icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-green-700 bg-green-50 border-green-200" },
+};
+
 export default function MyOrdersPage() {
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["my-orders", page],
     queryFn: () => listOrders({ page, limit: 10 }).then((r) => r.data),
     placeholderData: (prev) => prev,
@@ -42,18 +48,27 @@ export default function MyOrdersPage() {
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="py-16 text-center text-muted-foreground">
+            <AlertCircle className="h-8 w-8 mx-auto mb-2 text-red-400" />
+            <p>Không thể tải danh sách đơn hàng. Vui lòng thử lại.</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-3">
           {data?.items.length === 0 && (
             <Card>
               <CardContent className="py-16 text-center text-muted-foreground">
-                Chưa có đơn hàng nào
+                <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p>Chưa có đơn hàng nào</p>
               </CardContent>
             </Card>
           )}
 
           {data?.items.map((order) => {
             const cfg = ORDER_STATUS_CONFIG[order.status];
+            const delivery = DELIVERY_CONFIG[order.deliveryStatus ?? 'PENDING'];
 
             return (
               <Card key={order.id} className="overflow-hidden">
@@ -66,6 +81,10 @@ export default function MyOrdersPage() {
                         <Badge variant="outline" className={`text-xs flex items-center gap-1 ${cfg.className}`}>
                           {cfg.icon}
                           {cfg.label}
+                        </Badge>
+                        <Badge variant="outline" className={`text-xs flex items-center gap-1 ${delivery.className}`}>
+                          {delivery.icon}
+                          {delivery.label}
                         </Badge>
                         {order.quotation && (
                           <span className="text-xs text-muted-foreground">từ báo giá {order.quotation.quotationNumber}</span>

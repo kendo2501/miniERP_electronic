@@ -161,12 +161,14 @@ export interface SalesOrderItem {
 }
 
 export type PaymentStatus = 'UNPAID' | 'PAID';
+export type DeliveryStatus = 'PENDING' | 'IN_TRANSIT' | 'DELIVERED';
 
 export interface SalesOrder {
   id: number;
   orderNumber: string;
   status: SalesOrderStatus;
   paymentStatus: PaymentStatus;
+  deliveryStatus: DeliveryStatus;
   paidAt?: string;
   subtotal: number;
   taxAmount: number;

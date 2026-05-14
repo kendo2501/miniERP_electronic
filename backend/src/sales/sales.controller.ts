@@ -22,7 +22,7 @@ export class SalesController {
   listQuotations(@Query() query: QuotationQueryDto, @Req() req: any) { return this.service.listQuotations(query, req.user); }
 
   @Get('quotations/:id') @AnyPermission('sales.quotation.create', 'sales.quotation.approve', 'sales.quotation.view_own') @ApiOperation({ summary: 'Get quotation' })
-  getQuotation(@Param('id', ParseIntPipe) id: number) { return this.service.getQuotation(id); }
+  getQuotation(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.getQuotation(id, req.user); }
 
   @Post('quotations') @RequirePermissions('sales.quotation.create') @ApiOperation({ summary: 'Create quotation' })
   createQuotation(@Body() dto: CreateQuotationDto, @Req() req: any) {
@@ -88,6 +88,12 @@ export class SalesController {
 
   @Post('orders/:id/confirm-reapproval') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.approve') @ApiOperation({ summary: 'Manager re-approves adjusted order — PENDING_REAPPROVAL → CONFIRMED' })
   confirmReapproval(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.confirmReapproval(id, req.user?.id); }
+
+  @Post('orders/:id/start-delivery') @HttpCode(HttpStatus.OK) @AnyPermission('sales.order.approve', 'sales.order.create') @ApiOperation({ summary: 'Start delivery — sets deliveryStatus to IN_TRANSIT' })
+  startDelivery(@Param('id', ParseIntPipe) id: number) { return this.service.startDelivery(id); }
+
+  @Post('orders/:id/complete-delivery') @HttpCode(HttpStatus.OK) @AnyPermission('sales.order.approve', 'sales.order.create') @ApiOperation({ summary: 'Complete delivery — sets deliveryStatus to DELIVERED' })
+  completeDelivery(@Param('id', ParseIntPipe) id: number) { return this.service.completeDelivery(id); }
 
   // ─── Customer balance ─────────────────────────────────────────────────────
 

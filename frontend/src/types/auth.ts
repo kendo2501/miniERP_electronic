@@ -9,6 +9,7 @@ export interface AuthUser {
   email: string;
   fullName: string;
   organizationId: number | null;
+  linkedCustomerId?: number | null;
   roles: string[];
   permissions: string[];
 }

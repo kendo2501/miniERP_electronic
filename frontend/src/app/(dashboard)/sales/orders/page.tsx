@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Search, Plus, Loader2, Trash2, ShoppingCart,
-  CheckCircle2, CheckCircle, XCircle, Edit2, AlertCircle,
+  CheckCircle2, CheckCircle, XCircle, Edit2, AlertCircle, Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,10 +20,11 @@ import { toast } from "sonner";
 import {
   listOrders, confirmPayment, createOrder, listCustomers,
   confirmOrder, cancelOrder, requestPriceAdjustment, adjustOrderPrices, getOrder, confirmReapproval,
+  startDelivery, completeDelivery,
 } from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
-import type { SalesOrderStatus, PaymentStatus } from "@/types/sales";
+import type { SalesOrderStatus, PaymentStatus, DeliveryStatus } from "@/types/sales";
 import { vnd } from "@/lib/format";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
@@ -63,6 +64,28 @@ function PaymentBadge({ status }: { status?: PaymentStatus }) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
       <CheckCircle2 className="h-3 w-3" /> Đã thanh toán
+    </span>
+  );
+}
+
+// ─── Delivery badge ────────────────────────────────────────────────────────────
+
+function DeliveryBadge({ status }: { status?: DeliveryStatus }) {
+  if (!status || status === "PENDING")
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+        Chưa giao
+      </span>
+    );
+  if (status === "IN_TRANSIT")
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+        <Truck className="h-3 w-3" /> Đang giao
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+      <CheckCircle2 className="h-3 w-3" /> Đã giao
     </span>
   );
 }
@@ -247,6 +270,18 @@ export default function SalesOrdersPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận thanh toán thất bại"),
   });
 
+  const startDeliveryMut = useMutation({
+    mutationFn: (id: number) => startDelivery(id),
+    onSuccess: () => { toast.success("Đã bắt đầu giao hàng"); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Thất bại"),
+  });
+
+  const completeDeliveryMut = useMutation({
+    mutationFn: (id: number) => completeDelivery(id),
+    onSuccess: () => { toast.success("Đã hoàn tất giao hàng"); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Thất bại"),
+  });
+
   // ─── Status labels ─────────────────────────────────────────────────────────
 
   const STATUS_LABELS: Record<SalesOrderStatus, string> = {
@@ -345,6 +380,7 @@ export default function SalesOrdersPage() {
                     {canApprove && (
                       <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
                     )}
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Giao hàng</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thanh toán</th>
                     <th className="h-10 px-6 text-right font-medium text-muted-foreground">Tổng tiền</th>
                     <th className="h-10 px-6 text-left font-medium text-muted-foreground">Ngày đặt</th>
@@ -355,10 +391,16 @@ export default function SalesOrdersPage() {
                   {data?.items.map((o) => {
                     const orderStatus = o.status as SalesOrderStatus;
                     const payStatus = (o as any).paymentStatus as PaymentStatus | undefined;
+                    const delivStatus = (o as any).deliveryStatus as DeliveryStatus | undefined;
                     const isUnpaid = !payStatus || payStatus === "UNPAID";
                     const canPay = (canApprove || canCreate)
                       && isUnpaid
                       && !NO_PAYMENT_STATUSES.includes(orderStatus);
+                    const canStartDelivery = (canApprove || canCreate)
+                      && orderStatus === "CONFIRMED"
+                      && (!delivStatus || delivStatus === "PENDING");
+                    const canCompleteDelivery = (canApprove || canCreate)
+                      && delivStatus === "IN_TRANSIT";
 
                     return (
                       <tr key={o.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
@@ -392,6 +434,11 @@ export default function SalesOrdersPage() {
                             </Badge>
                           </td>
                         )}
+
+                        {/* Giao hàng */}
+                        <td className="px-6 py-3">
+                          <DeliveryBadge status={delivStatus} />
+                        </td>
 
                         {/* Thanh toán */}
                         <td className="px-6 py-3">
@@ -468,6 +515,30 @@ export default function SalesOrdersPage() {
                               </Button>
                             )}
 
+                            {/* Giao hàng (Admin + Sale, khi CONFIRMED và chưa giao) */}
+                            {canStartDelivery && (
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
+                                onClick={() => startDeliveryMut.mutate(o.id)}
+                                disabled={startDeliveryMut.isPending}
+                              >
+                                <Truck className="h-3 w-3" /> Giao hàng
+                              </Button>
+                            )}
+
+                            {/* Hoàn tất giao hàng (Admin + Sale, khi đang giao) */}
+                            {canCompleteDelivery && (
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
+                                onClick={() => completeDeliveryMut.mutate(o.id)}
+                                disabled={completeDeliveryMut.isPending}
+                              >
+                                <CheckCircle className="h-3 w-3" /> Hoàn tất giao
+                              </Button>
+                            )}
+
                             {/* Xác nhận thanh toán (Admin + Sale, khi đủ điều kiện) */}
                             {canPay && (
                               <Button
@@ -492,7 +563,7 @@ export default function SalesOrdersPage() {
                   {data?.items.length === 0 && (
                     <tr>
                       <td
-                        colSpan={canApprove ? 7 : 6}
+                        colSpan={canApprove ? 8 : 7}
                         className="py-12 text-center text-muted-foreground"
                       >
                         {t.orders.noOrders}
