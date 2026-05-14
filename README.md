@@ -200,22 +200,6 @@ Quyền hạn: quản lý users, roles, permissions, toàn bộ catalog, invento
 
 ---
 
-### Manager — Quản lý vận hành
-
-| Trường   | Giá trị                  |
-|----------|--------------------------|
-| Email    | manager@mini-erp.local   |
-| Password | Manager@123456           |
-
-| Trường   | Giá trị                  |
-|----------|--------------------------|
-| Email    | manager2@mini-erp.local  |
-| Password | Manager@123456           |
-| Họ tên   | Lê Văn Đức               |
-
-Quyền hạn: duyệt báo giá, duyệt đơn hàng, xem báo cáo team, xem tồn kho, xem hoá đơn & công nợ.
-
----
 
 ### Sales — Nhân viên kinh doanh
 
@@ -224,17 +208,6 @@ Quyền hạn: duyệt báo giá, duyệt đơn hàng, xem báo cáo team, xem t
 | Email    | sales@mini-erp.local  |
 | Password | Sales@123456          |
 
-| Trường   | Giá trị                 |
-|----------|-------------------------|
-| Email    | sales2@mini-erp.local   |
-| Password | Sales@123456            |
-| Họ tên   | Nguyễn Văn Hùng         |
-
-| Trường   | Giá trị                 |
-|----------|-------------------------|
-| Email    | sales3@mini-erp.local   |
-| Password | Sales@123456            |
-| Họ tên   | Trần Thị Lan            |
 
 Quyền hạn: tạo báo giá, tạo đơn hàng, quản lý khách hàng được phân công, xem hoá đơn & thanh toán của khách hàng mình phụ trách.
 
@@ -272,13 +245,6 @@ Quyền hạn: xem đơn hàng của mình, xem báo giá của mình, xem hoá 
 |----------|----------------------------|
 | Email    | accountant@mini-erp.local  |
 | Password | Accountant@123456          |
-
-| Trường   | Giá trị                    |
-|----------|----------------------------|
-| Email    | accountant2@mini-erp.local |
-| Password | Accountant@123456          |
-| Họ tên   | Hoàng Văn Nam              |
-
 Quyền hạn: xem & xuất hoá đơn, quản lý thanh toán, hoàn trả thanh toán, xem báo cáo tài chính, xem aging report (công nợ quá hạn).
 
 ---
@@ -289,12 +255,6 @@ Quyền hạn: xem & xuất hoá đơn, quản lý thanh toán, hoàn trả than
 |----------|---------------------------|
 | Email    | warehouse@mini-erp.local  |
 | Password | Warehouse@123456          |
-
-| Trường   | Giá trị                   |
-|----------|---------------------------|
-| Email    | warehouse2@mini-erp.local |
-| Password | Warehouse@123456          |
-| Họ tên   | Phạm Thị Mai              |
 
 Quyền hạn: xem & điều chỉnh tồn kho, chuyển kho, duyệt điều chỉnh/chuyển kho, quản lý nhà kho, xem cảnh báo hàng sắp hết.
 
