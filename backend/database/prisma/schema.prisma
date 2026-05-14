@@ -40,6 +40,7 @@ model User {
   stockInquiriesRequested   StockInquiry[]         @relation("InquiryRequester")
   stockInquiriesResponded   StockInquiry[]         @relation("InquiryResponder")
   replenishmentRequests     ReplenishmentRequest[] @relation("ReplenRequester")
+  confirmedPaymentOrders    SalesOrder[]           @relation("OrderPaidBy")
   settingsUpdated           Setting[]
   generatedReports      GeneratedReport[]
   scheduledReports      ScheduledReport[]
@@ -589,6 +590,7 @@ model SalesOrder {
   inventoryDeducted  Boolean   @default(false) @map("inventory_deducted")
   backorderStatus    String?   @map("backorder_status") @db.VarChar(50)
   paidAt             DateTime? @map("paid_at")
+  paidByUserId       Int?      @map("paid_by_user_id")
   orderedAt          DateTime? @map("ordered_at")
   confirmedAt        DateTime? @map("confirmed_at")
   notes             String?   @db.Text
@@ -597,6 +599,7 @@ model SalesOrder {
 
   customer      Customer         @relation(fields: [customerId], references: [id])
   quotation     Quotation?       @relation(fields: [quotationId], references: [id])
+  paidByUser    User?            @relation("OrderPaidBy", fields: [paidByUserId], references: [id])
   items         SalesOrderItem[]
   deliveries    Delivery[]
   invoices      Invoice[]

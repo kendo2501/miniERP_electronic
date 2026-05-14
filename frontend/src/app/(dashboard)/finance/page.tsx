@@ -1,14 +1,23 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, FileText, CreditCard, AlertTriangle, TrendingUp } from "lucide-react";
+import { Loader2, TrendingUp, AlertCircle, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getOutstanding, getAgingReport } from "@/lib/api/finance";
+import { getOrderSummary } from "@/lib/api/finance";
+import { useAuthStore } from "@/store/auth.store";
 import Link from "next/link";
 import { useLanguage } from "@/context/language-context";
 
-function StatCard({ title, value, sub, icon: Icon, accent }: { title: string; value: string; sub?: string; icon: any; accent?: string }) {
+function fmt(value: number) {
+  return value.toLocaleString("vi-VN") + " ₫";
+}
+
+function StatCard({
+  title, value, sub, icon: Icon, accent,
+}: {
+  title: string; value: string; sub?: string; icon: any; accent?: string;
+}) {
   return (
     <Card>
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
@@ -25,20 +34,13 @@ function StatCard({ title, value, sub, icon: Icon, accent }: { title: string; va
 
 export default function FinancePage() {
   const { t } = useLanguage();
+  const { hasPermission } = useAuthStore();
 
-  const { data: outstanding, isLoading: loadOut } = useQuery({
-    queryKey: ["outstanding"],
-    queryFn: () => getOutstanding({ limit: 5 }).then((r) => r.data),
+  const { data: summary, isLoading } = useQuery({
+    queryKey: ["finance-order-summary"],
+    queryFn: () => getOrderSummary().then((r) => r.data),
+    refetchInterval: 30000,
   });
-
-  const { data: aging, isLoading: loadAging } = useQuery({
-    queryKey: ["aging"],
-    queryFn: () => getAgingReport().then((r) => r.data),
-  });
-
-  const totalOutstanding = aging?.summary.total ?? 0;
-  const overdue = (aging?.summary.days1_30 ?? 0) + (aging?.summary.days31_60 ?? 0) +
-    (aging?.summary.days61_90 ?? 0) + (aging?.summary.over90 ?? 0);
 
   return (
     <div className="space-y-6">
@@ -48,51 +50,55 @@ export default function FinancePage() {
           <p className="text-muted-foreground mt-1">{t.finance.subtitle}</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/finance/invoices"><Button variant="outline" size="sm">{t.finance.invoices}</Button></Link>
-          <Link href="/finance/payments"><Button variant="outline" size="sm">{t.finance.payments}</Button></Link>
-          <Link href="/finance/aging"><Button variant="outline" size="sm">{t.finance.agingReport}</Button></Link>
+          <Link href="/finance/invoices">
+            <Button variant="outline" size="sm">{t.finance.invoices}</Button>
+          </Link>
+          <Link href="/finance/payments">
+            <Button variant="outline" size="sm">{t.finance.payments}</Button>
+          </Link>
+          {hasPermission("finance.credit_limit.view") && (
+            <Link href="/finance/credit-limits">
+              <Button variant="outline" size="sm">Hạn mức tín dụng</Button>
+            </Link>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── 3 Metric Cards ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
-          title={t.finance.totalOutstanding}
-          value={loadAging ? "…" : `$${totalOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-          sub={t.finance.unpaidInvoicesSub}
+          title={t.finance.totalOrderValue}
+          value={isLoading ? "…" : fmt(summary?.totalOrderValue ?? 0)}
+          sub={t.finance.totalOrderValueSub}
           icon={TrendingUp}
           accent="text-primary"
         />
         <StatCard
-          title={t.finance.overdue}
-          value={loadAging ? "…" : `$${overdue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-          sub={t.finance.pastDue}
-          icon={AlertTriangle}
-          accent="text-yellow-500"
+          title={t.finance.totalDebt}
+          value={isLoading ? "…" : fmt(summary?.totalDebt ?? 0)}
+          sub={t.finance.totalDebtSub}
+          icon={AlertCircle}
+          accent="text-red-500"
         />
         <StatCard
-          title={t.finance.unpaidInvoices}
-          value={loadOut ? "…" : String(outstanding?.total ?? 0)}
-          sub={t.finance.unpaidInvoicesSub}
-          icon={FileText}
-        />
-        <StatCard
-          title={t.finance.currentNotDue}
-          value={loadAging ? "…" : `$${(aging?.summary.current ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-          sub={t.finance.withinTerms}
-          icon={CreditCard}
+          title={t.finance.totalCash}
+          value={isLoading ? "…" : fmt(summary?.totalCash ?? 0)}
+          sub={t.finance.totalCashSub}
+          icon={DollarSign}
           accent="text-green-500"
         />
       </div>
 
+      {/* ── Debt Table ── */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">{t.finance.outstandingInvoices}</CardTitle>
-          <Link href="/finance/invoices?status=SENT">
-            <Button variant="ghost" size="sm" className="text-xs">{t.common.viewAll}</Button>
-          </Link>
+          <CardTitle className="text-base">{t.finance.debtList}</CardTitle>
+          <Badge variant="destructive" className="text-xs">
+            {isLoading ? "…" : summary?.unpaidOrders.length ?? 0} {"đơn"}
+          </Badge>
         </CardHeader>
         <CardContent className="p-0">
-          {loadOut ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
@@ -100,40 +106,32 @@ export default function FinancePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.invoices.invoiceNumber}</th>
+                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{"Mã đơn hàng"}</th>
                   <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.common.customer}</th>
+                  <th className="h-9 px-6 text-right font-medium text-muted-foreground">{t.common.total}</th>
+                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.finance.orderDate}</th>
                   <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.common.status}</th>
-                  <th className="h-9 px-6 text-right font-medium text-muted-foreground">{t.invoices.outstanding}</th>
-                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.invoices.dueDate}</th>
                 </tr>
               </thead>
               <tbody>
-                {outstanding?.items.map((inv) => {
-                  const isOverdue = inv.dueDate && new Date(inv.dueDate) < new Date();
-                  return (
-                    <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-6 py-3 font-mono text-xs font-medium">{inv.invoiceNumber}</td>
-                      <td className="px-6 py-3 font-medium">{inv.customer.companyName}</td>
-                      <td className="px-6 py-3">
-                        <Badge variant={inv.status === "PARTIALLY_PAID" ? "warning" : "default"}>
-                          {inv.status === "PARTIALLY_PAID" ? t.common.partial : inv.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-3 text-right font-medium">
-                        ${Number(inv.outstandingAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-6 py-3 text-xs">
-                        <span className={isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"}>
-                          {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
-                          {isOverdue && ` (${t.common.overdue})`}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {outstanding?.items.length === 0 && (
+                {summary?.unpaidOrders.map((order) => (
+                  <tr key={order.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-6 py-3 font-mono text-xs font-medium">{order.orderNumber}</td>
+                    <td className="px-6 py-3 font-medium">{order.customer.companyName}</td>
+                    <td className="px-6 py-3 text-right font-medium text-red-600">
+                      {fmt(Number(order.totalAmount))}
+                    </td>
+                    <td className="px-6 py-3 text-xs text-muted-foreground">
+                      {new Date(order.createdAt).toLocaleDateString("vi-VN")}
+                    </td>
+                    <td className="px-6 py-3">
+                      <Badge variant="destructive" className="text-xs">Chưa thanh toán</Badge>
+                    </td>
+                  </tr>
+                ))}
+                {!summary?.unpaidOrders.length && (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-muted-foreground">{t.finance.noOutstanding}</td>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">{t.finance.noDebt}</td>
                   </tr>
                 )}
               </tbody>
@@ -142,36 +140,56 @@ export default function FinancePage() {
         </CardContent>
       </Card>
 
-      {!loadAging && aging && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t.finance.agingSummary}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-5 gap-4 text-center">
-              {[
-                { label: t.aging.current, value: aging.summary.current, color: "text-green-500" },
-                { label: t.aging.days1_30, value: aging.summary.days1_30, color: "text-yellow-500" },
-                { label: t.aging.days31_60, value: aging.summary.days31_60, color: "text-orange-500" },
-                { label: t.aging.days61_90, value: aging.summary.days61_90, color: "text-red-400" },
-                { label: t.aging.over90, value: aging.summary.over90, color: "text-red-600" },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="space-y-1">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className={`text-lg font-bold ${color}`}>
-                    ${value.toLocaleString(undefined, { minimumFractionDigits: 0 })}
-                  </p>
-                </div>
-              ))}
+      {/* ── Paid Orders Table ── */}
+      <Card>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base">{t.finance.cashList}</CardTitle>
+          <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+            {isLoading ? "…" : summary?.paidOrders.length ?? 0} {"đơn"}
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-            <div className="mt-4 text-right">
-              <Link href="/finance/aging">
-                <Button variant="outline" size="sm" className="text-xs">{t.finance.agingReport}</Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{"Mã đơn hàng"}</th>
+                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.common.customer}</th>
+                  <th className="h-9 px-6 text-right font-medium text-muted-foreground">{t.common.total}</th>
+                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.finance.paidDate}</th>
+                  <th className="h-9 px-6 text-left font-medium text-muted-foreground">{t.finance.confirmedBy}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary?.paidOrders.map((order) => (
+                  <tr key={order.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="px-6 py-3 font-mono text-xs font-medium">{order.orderNumber}</td>
+                    <td className="px-6 py-3 font-medium">{order.customer.companyName}</td>
+                    <td className="px-6 py-3 text-right font-medium text-green-600">
+                      {fmt(Number(order.totalAmount))}
+                    </td>
+                    <td className="px-6 py-3 text-xs text-muted-foreground">
+                      {order.paidAt ? new Date(order.paidAt).toLocaleDateString("vi-VN") : "—"}
+                    </td>
+                    <td className="px-6 py-3 text-xs">
+                      {order.paidByUser?.fullName ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+                {!summary?.paidOrders.length && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">{t.finance.noCash}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

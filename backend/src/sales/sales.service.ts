@@ -140,8 +140,8 @@ export class SalesService {
   async confirmQuotation(id: number) {
     const q = await this.getQuotation(id);
 
-    // Idempotency: return existing order if already confirmed
-    if (q.status === 'CONFIRMED') {
+    // Idempotency: return existing order if quotation already has an order (CONFIRMED or APPROVED)
+    if (['CONFIRMED', 'APPROVED'].includes(q.status ?? '')) {
       const existing = await this.prisma.salesOrder.findFirst({ where: { quotationId: id }, select: ORDER_SELECT });
       if (existing) return existing;
     }
@@ -485,11 +485,12 @@ export class SalesService {
 
   async confirmPayment(id: number, actorId?: number) {
     const o = await this.getOrder(id);
+    if (o.status === 'CANCELLED') throw new BadRequestException('Cannot confirm payment for a cancelled order');
     if ((o as any).paymentStatus === 'PAID') throw new BadRequestException('Order already marked as paid');
 
     const result = await this.prisma.salesOrder.update({
       where: { id },
-      data: { paymentStatus: 'PAID', paidAt: new Date() },
+      data: { paymentStatus: 'PAID', paidAt: new Date(), paidByUserId: actorId ?? null },
       select: ORDER_SELECT,
     });
 

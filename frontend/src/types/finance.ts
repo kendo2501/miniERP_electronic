@@ -111,6 +111,37 @@ export interface AgingBucket {
   total: number;
 }
 
+export interface CreditLimitItem {
+  id: number;
+  customerCode: string;
+  companyName: string;
+  status: string | null;
+  creditLimit: number;
+  currentDebt: number;
+  availableCredit: number;
+  usagePercent: number;
+  isOverLimit: boolean;
+}
+
+export interface OrderSummaryItem {
+  id: number;
+  orderNumber: string;
+  totalAmount: number;
+  createdAt: string;
+  paidAt?: string;
+  paymentStatus: string;
+  customer: { id: number; companyName: string; customerCode: string };
+  paidByUser?: { id: number; fullName: string } | null;
+}
+
+export interface OrderSummary {
+  totalOrderValue: number;
+  totalDebt: number;
+  totalCash: number;
+  unpaidOrders: OrderSummaryItem[];
+  paidOrders: OrderSummaryItem[];
+}
+
 export interface AgingReport {
   summary: {
     current: number;

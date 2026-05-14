@@ -606,9 +606,11 @@ function AccountantDashboard({ user }: { user: any }) {
 
           <div className="flex gap-3 flex-wrap">
             {[
+              { href: "/finance", icon: BarChart3, label: t.finance.title, color: "text-primary" },
               { href: "/finance/invoices", icon: FileText, label: t.finance.invoices, color: "text-blue-500" },
               { href: "/finance/payments", icon: DollarSign, label: t.finance.payments, color: "text-green-500" },
               { href: "/finance/aging", icon: AlertTriangle, label: t.finance.agingReport, color: "text-orange-500" },
+              { href: "/finance/credit-limits", icon: TrendingUp, label: "Hạn mức tín dụng", color: "text-red-500" },
               { href: "/sales/orders", icon: ShoppingCart, label: t.orders.title, color: "text-purple-500" },
             ].map(({ href, icon: Icon, label, color }) => (
               <Link key={href} href={href}>

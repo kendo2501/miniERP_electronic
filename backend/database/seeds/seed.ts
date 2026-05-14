@@ -67,10 +67,13 @@ const PERMISSIONS = [
   { code: 'finance.invoice.view',              description: 'View invoices' },
   { code: 'finance.invoice.view_assigned',     description: 'View assigned invoices' },
   { code: 'finance.invoice.view_own',          description: 'View own invoices' },
+  { code: 'finance.invoice.create',            description: 'Create and manage invoices' },
   { code: 'finance.payment.view',              description: 'View payments' },
+  { code: 'finance.payment.create',            description: 'Record and manage payments' },
   { code: 'finance.payment.reverse',           description: 'Reverse payments' },
   { code: 'finance.payment_status.view_assigned', description: 'View assigned payment status' },
   { code: 'finance.payment_status.view_own',   description: 'View own payment status' },
+  { code: 'finance.credit_limit.view',          description: 'View customer credit limits and debt exposure' },
   { code: 'finance.credit_limit.override',     description: 'Override credit limits' },
   { code: 'finance.credit_limit.override_approve', description: 'Approve credit limit overrides' },
   { code: 'finance.outstanding.view_assigned', description: 'View assigned outstanding balances' },
@@ -120,7 +123,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'sales.quotation.create', 'sales.quotation.approve', 'sales.quotation.update_own',
     'sales.order.create', 'sales.order.view_all', 'sales.order.cancel', 'sales.order.approve',
     'sales.order.override', 'sales.pricing.manage', 'sales.delivery.view',
-    'finance.invoice.view', 'finance.payment.view', 'finance.payment.reverse',
+    'finance.invoice.view', 'finance.invoice.create',
+    'finance.payment.view', 'finance.payment.create', 'finance.payment.reverse',
     'finance.credit_limit.override', 'finance.report.export', 'finance.aging_report.view',
     'reporting.dashboard.view_all', 'reporting.export', 'reporting.schedule.manage', 'reporting.kpi.view',
     'settings.manage', 'feature_flags.manage', 'organization.settings.manage',
@@ -152,11 +156,23 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   ACCOUNTANT: [
     'auth.password.change_self',
+    // ── Read-only cross-domain access (no write) ──────────────────────────────
     'catalog.product.view', 'catalog.search',
-    'sales.order.view_all', 'sales.delivery.view',
-    'finance.invoice.view', 'finance.payment.view', 'finance.payment.reverse',
-    'finance.report.export', 'finance.aging_report.view',
-    'reporting.dashboard.view_finance', 'reporting.kpi.view', 'reporting.export',
+    'sales.order.view_all',       // read-only: view order totals & payment status
+    'sales.delivery.view',        // read-only: delivery records for invoice matching
+    // ── Finance domain (full CRUD within scope) ───────────────────────────────
+    'finance.invoice.view',
+    'finance.payment.view',
+    'finance.payment.reverse',    // payment allocation / reconciliation
+    'finance.credit_limit.view',  // customer credit limit + debt exposure monitoring
+    'finance.aging_report.view',
+    'finance.report.export',
+    'finance.outstanding.view_assigned',
+    // ── Reporting / dashboard ─────────────────────────────────────────────────
+    'reporting.dashboard.view_finance',
+    'reporting.kpi.view',
+    'reporting.export',
+    // ── Self-service ──────────────────────────────────────────────────────────
     'notification.preferences.manage_self',
     'profile.view_self', 'profile.update_self',
   ],

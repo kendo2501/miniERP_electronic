@@ -396,6 +396,87 @@ export class FinanceService {
     };
   }
 
+  // ─── Credit Limits & Debt Exposure ───────────────────────────────────────
+
+  async getCreditLimits() {
+    const customers = await this.prisma.customer.findMany({
+      where: { deletedAt: null },
+      orderBy: { companyName: 'asc' },
+      select: {
+        id: true, customerCode: true, companyName: true, creditLimit: true, status: true,
+        salesOrders: {
+          where: { paymentStatus: 'UNPAID', status: { notIn: ['DRAFT', 'CANCELLED'] } },
+          select: { totalAmount: true },
+        },
+      },
+    });
+
+    return customers.map((c) => {
+      const currentDebt = c.salesOrders.reduce((s, o) => s + Number(o.totalAmount ?? 0), 0);
+      const limit = Number(c.creditLimit);
+      const available = Math.max(0, limit - currentDebt);
+      const usagePct = limit > 0 ? Math.min(100, (currentDebt / limit) * 100) : 0;
+      const isOverLimit = currentDebt > limit && limit > 0;
+      return {
+        id: c.id,
+        customerCode: c.customerCode,
+        companyName: c.companyName,
+        status: c.status,
+        creditLimit: limit,
+        currentDebt,
+        availableCredit: available,
+        usagePercent: Math.round(usagePct * 10) / 10,
+        isOverLimit,
+      };
+    });
+  }
+
+  // ─── Order Summary (Finance Dashboard) ───────────────────────────────────
+
+  async getOrderSummary() {
+    const DEBT_STATUSES = ['CONFIRMED', 'PARTIALLY_DELIVERED', 'DELIVERED', 'PRICE_ADJUSTMENT_REQUESTED', 'PENDING_REAPPROVAL'];
+
+    const [totalAgg, debtAgg, cashAgg, unpaidOrders, paidOrders] = await Promise.all([
+      this.prisma.salesOrder.aggregate({
+        _sum: { totalAmount: true },
+        where: { status: { notIn: ['CANCELLED'] } },
+      }),
+      this.prisma.salesOrder.aggregate({
+        _sum: { totalAmount: true },
+        where: { paymentStatus: 'UNPAID', status: { in: DEBT_STATUSES } },
+      }),
+      this.prisma.salesOrder.aggregate({
+        _sum: { totalAmount: true },
+        where: { paymentStatus: 'PAID' },
+      }),
+      this.prisma.salesOrder.findMany({
+        where: { paymentStatus: 'UNPAID', status: { in: DEBT_STATUSES } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, orderNumber: true, totalAmount: true, createdAt: true, paymentStatus: true,
+          customer: { select: { id: true, companyName: true, customerCode: true } },
+        },
+      }),
+      this.prisma.salesOrder.findMany({
+        where: { paymentStatus: 'PAID' },
+        orderBy: { paidAt: 'desc' },
+        select: {
+          id: true, orderNumber: true, totalAmount: true, paidAt: true, paymentStatus: true,
+          customer: { select: { id: true, companyName: true, customerCode: true } },
+          paidByUser: { select: { id: true, fullName: true } },
+        },
+      }),
+    ]);
+
+    return {
+      totalOrderValue: Number(totalAgg._sum.totalAmount ?? 0),
+      totalDebt: Number(debtAgg._sum.totalAmount ?? 0),
+      totalCash: Number(cashAgg._sum.totalAmount ?? 0),
+      unpaidOrders,
+      paidOrders,
+    };
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async getAssignedCustomerIds(salesUserId: number): Promise<number[]> {

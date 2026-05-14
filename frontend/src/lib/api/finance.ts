@@ -2,7 +2,7 @@ import { apiClient } from './client';
 import type {
   Invoice, InvoiceListResponse, CreateInvoicePayload,
   Payment, PaymentListResponse, CreatePaymentPayload,
-  AllocatePaymentPayload, ArLedgerListResponse, AgingReport,
+  AllocatePaymentPayload, ArLedgerListResponse, AgingReport, OrderSummary, CreditLimitItem,
 } from '@/types/finance';
 
 // ─── Invoices ─────────────────────────────────────────────────────────────────
@@ -48,3 +48,9 @@ export const getOutstanding = (params?: Record<string, unknown>) =>
 
 export const getAgingReport = () =>
   apiClient.get<AgingReport>('/finance/aging');
+
+export const getOrderSummary = () =>
+  apiClient.get<OrderSummary>('/finance/order-summary');
+
+export const getCreditLimits = () =>
+  apiClient.get<CreditLimitItem[]>('/finance/credit-limits');

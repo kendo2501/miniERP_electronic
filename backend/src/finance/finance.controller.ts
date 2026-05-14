@@ -22,13 +22,13 @@ export class FinanceController {
   @Get('invoices/:id') @AnyPermission('finance.invoice.view', 'finance.invoice.view_assigned', 'finance.invoice.view_own') @ApiOperation({ summary: 'Get invoice' })
   getInvoice(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.getInvoice(id, req.user); }
 
-  @Post('invoices') @RequirePermissions('finance.invoice.view') @ApiOperation({ summary: 'Create invoice' })
+  @Post('invoices') @RequirePermissions('finance.invoice.create') @ApiOperation({ summary: 'Create invoice' })
   createInvoice(@Body() dto: CreateInvoiceDto) { return this.service.createInvoice(dto); }
 
-  @Post('invoices/:id/send') @HttpCode(HttpStatus.OK) @RequirePermissions('finance.invoice.view') @ApiOperation({ summary: 'Send invoice' })
+  @Post('invoices/:id/send') @HttpCode(HttpStatus.OK) @RequirePermissions('finance.invoice.create') @ApiOperation({ summary: 'Send invoice' })
   sendInvoice(@Param('id', ParseIntPipe) id: number) { return this.service.sendInvoice(id); }
 
-  @Post('invoices/:id/cancel') @HttpCode(HttpStatus.OK) @RequirePermissions('finance.invoice.view') @ApiOperation({ summary: 'Cancel invoice' })
+  @Post('invoices/:id/cancel') @HttpCode(HttpStatus.OK) @RequirePermissions('finance.invoice.create') @ApiOperation({ summary: 'Cancel invoice' })
   cancelInvoice(@Param('id', ParseIntPipe) id: number) { return this.service.cancelInvoice(id); }
 
   // ─── Payments ─────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ export class FinanceController {
   @Get('payments/:id') @RequirePermissions('finance.payment.view') @ApiOperation({ summary: 'Get payment' })
   getPayment(@Param('id', ParseIntPipe) id: number) { return this.service.getPayment(id); }
 
-  @Post('payments') @RequirePermissions('finance.payment.view') @ApiOperation({ summary: 'Record payment' })
+  @Post('payments') @RequirePermissions('finance.payment.create') @ApiOperation({ summary: 'Record payment' })
   createPayment(@Body() dto: CreatePaymentDto) { return this.service.createPayment(dto); }
 
   @Post('payments/:id/allocate') @HttpCode(HttpStatus.OK) @RequirePermissions('finance.payment.reverse') @ApiOperation({ summary: 'Allocate payment to invoice(s)' })
@@ -51,6 +51,16 @@ export class FinanceController {
 
   @Get('ar-ledger') @RequirePermissions('finance.invoice.view') @ApiOperation({ summary: 'AR ledger entries (immutable)' })
   listArLedger(@Query() query: ArLedgerQueryDto) { return this.service.listArLedger(query); }
+
+  // ─── Credit Limits ────────────────────────────────────────────────────────
+
+  @Get('credit-limits') @AnyPermission('finance.credit_limit.view', 'finance.invoice.view') @ApiOperation({ summary: 'Customer credit limits with current debt exposure' })
+  getCreditLimits() { return this.service.getCreditLimits(); }
+
+  // ─── Order Summary ────────────────────────────────────────────────────────
+
+  @Get('order-summary') @AnyPermission('finance.invoice.view', 'reporting.dashboard.view_finance', 'sales.order.approve', 'sales.order.create') @ApiOperation({ summary: 'Finance dashboard summary based on SalesOrder payment status' })
+  getOrderSummary() { return this.service.getOrderSummary(); }
 
   // ─── Outstanding / Aging ──────────────────────────────────────────────────
 
