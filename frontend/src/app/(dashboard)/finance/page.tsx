@@ -34,7 +34,8 @@ function StatCard({
 
 export default function FinancePage() {
   const { t } = useLanguage();
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, hasRole } = useAuthStore();
+  const hideFinanceNav = hasRole("admin") || hasRole("accountant");
 
   const { data: summary, isLoading } = useQuery({
     queryKey: ["finance-order-summary"],
@@ -50,12 +51,16 @@ export default function FinancePage() {
           <p className="text-muted-foreground mt-1">{t.finance.subtitle}</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/finance/invoices">
-            <Button variant="outline" size="sm">{t.finance.invoices}</Button>
-          </Link>
-          <Link href="/finance/payments">
-            <Button variant="outline" size="sm">{t.finance.payments}</Button>
-          </Link>
+          {!hideFinanceNav && (
+            <>
+              <Link href="/finance/invoices">
+                <Button variant="outline" size="sm">{t.finance.invoices}</Button>
+              </Link>
+              <Link href="/finance/payments">
+                <Button variant="outline" size="sm">{t.finance.payments}</Button>
+              </Link>
+            </>
+          )}
           {hasPermission("finance.credit_limit.view") && (
             <Link href="/finance/credit-limits">
               <Button variant="outline" size="sm">Hạn mức tín dụng</Button>

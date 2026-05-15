@@ -11,6 +11,7 @@ interface AuthState {
   setUser: (user: AuthUser) => void;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
+  hasRole: (role: string) => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -42,6 +43,11 @@ export const useAuthStore = create<AuthState>()(
       hasPermission: (permission) => {
         const { user } = get();
         return user?.permissions?.includes(permission) ?? false;
+      },
+
+      hasRole: (role) => {
+        const { user } = get();
+        return user?.roles?.some((r) => r.toLowerCase() === role.toLowerCase()) ?? false;
       },
     }),
     {

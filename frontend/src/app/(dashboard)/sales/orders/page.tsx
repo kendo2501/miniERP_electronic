@@ -114,12 +114,13 @@ export default function SalesOrdersPage() {
   const [adjustPriceOrderId, setAdjustPriceOrderId] = useState<number | null>(null);
   const [adjustPriceItems, setAdjustPriceItems] = useState<AdjustItem[]>([]);
 
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, hasRole } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
 
   const canCreate = hasPermission("sales.order.create");
   const canApprove = hasPermission("sales.order.approve");
+  const canShowRestrictedActions = !hasRole("admin") && !hasRole("saler");
 
   // ─── Queries ──────────────────────────────────────────────────────────────
 
@@ -411,8 +412,8 @@ export default function SalesOrdersPage() {
                               </Button>
                             )}
 
-                            {/* Admin: yêu cầu điều chỉnh giá (DRAFT, CONFIRMED hoặc PENDING_REAPPROVAL) */}
-                            {canApprove && ["DRAFT", "CONFIRMED", "PENDING_REAPPROVAL"].includes(orderStatus) && (
+                            {/* Admin: yêu cầu điều chỉnh giá — ẩn với Admin & Saler */}
+                            {canApprove && canShowRestrictedActions && ["DRAFT", "CONFIRMED", "PENDING_REAPPROVAL"].includes(orderStatus) && (
                               <Button
                                 size="sm" variant="ghost"
                                 className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
@@ -422,8 +423,8 @@ export default function SalesOrdersPage() {
                               </Button>
                             )}
 
-                            {/* Admin: hủy đơn (chỉ khi CONFIRMED) */}
-                            {canApprove && orderStatus === "CONFIRMED" && (
+                            {/* Admin: hủy đơn — ẩn với Admin & Saler */}
+                            {canApprove && canShowRestrictedActions && orderStatus === "CONFIRMED" && (
                               <Button
                                 size="sm" variant="ghost"
                                 className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
@@ -523,9 +524,9 @@ export default function SalesOrdersPage() {
         </CardContent>
       </Card>
 
-      {/* ─── Dialog: Yêu cầu điều chỉnh giá (Admin) ─────────────────────────────── */}
+      {/* ─── Dialog: Yêu cầu điều chỉnh giá (Admin) — không render với Admin & Saler ── */}
       <Dialog
-        open={requestAdjustTarget !== null}
+        open={requestAdjustTarget !== null && canShowRestrictedActions}
         onOpenChange={(v) => { if (!v) { setRequestAdjustTarget(null); setRequestAdjustReason(""); } }}
       >
         <DialogContent className="max-w-sm">

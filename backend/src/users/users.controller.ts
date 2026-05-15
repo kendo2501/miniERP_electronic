@@ -44,6 +44,13 @@ export class UsersController {
     return this.usersService.findOne(user.id);
   }
 
+  @Get('roles')
+  @RequirePermissions('auth.user.read')
+  @ApiOperation({ summary: 'Get all available roles' })
+  getRoles() {
+    return this.usersService.getAllRoles();
+  }
+
   @Get(':id')
   @RequirePermissions('auth.user.read')
   @ApiOperation({ summary: 'Get user by ID' })

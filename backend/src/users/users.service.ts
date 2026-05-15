@@ -110,6 +110,14 @@ export class UsersService {
     };
   }
 
+  async getAllRoles() {
+    const roles = await this.prisma.role.findMany({
+      select: { id: true, name: true, code: true },
+      orderBy: { name: 'asc' },
+    });
+    return { items: roles };
+  }
+
   async create(dto: CreateUserDto) {
     const exists = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (exists) throw new ConflictException('Email already in use');

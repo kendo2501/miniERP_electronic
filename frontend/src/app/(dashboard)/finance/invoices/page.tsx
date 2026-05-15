@@ -44,7 +44,8 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, hasRole } = useAuthStore();
+  const hideFinanceNav = hasRole("admin") || hasRole("accountant");
   const qc = useQueryClient();
   const { t } = useLanguage();
 
@@ -122,7 +123,9 @@ export default function InvoicesPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/finance"><Button variant="outline" size="sm">{t.common.overview}</Button></Link>
-          <Link href="/finance/payments"><Button variant="outline" size="sm">{t.finance.payments}</Button></Link>
+          {!hideFinanceNav && (
+            <Link href="/finance/payments"><Button variant="outline" size="sm">{t.finance.payments}</Button></Link>
+          )}
           {canCreate && (
             <Button onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />

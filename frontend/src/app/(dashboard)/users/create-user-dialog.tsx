@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod/v4";
@@ -11,6 +12,9 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { usersApi } from "@/lib/api/users";
 import { apiClient } from "@/lib/api/client";
 import { useLanguage } from "@/context/language-context";
@@ -22,6 +26,12 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
+interface RoleItem {
+  id: number;
+  name: string;
+  code: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,9 +40,12 @@ interface Props {
 
 export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
   const { t } = useLanguage();
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+
   const { data: rolesData } = useQuery({
-    queryKey: ["roles"],
-    queryFn: () => apiClient.get<{ items: { id: number; name: string; code: string }[] }>("/roles").then((r) => r.data),
+    queryKey: ["users-roles"],
+    queryFn: () =>
+      apiClient.get<{ items: RoleItem[] }>("/users/roles").then((r) => r.data),
     enabled: open,
   });
 
@@ -41,10 +54,15 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
   });
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => usersApi.create(values),
+    mutationFn: (values: FormValues) =>
+      usersApi.create({
+        ...values,
+        roleIds: selectedRoleId ? [parseInt(selectedRoleId, 10)] : undefined,
+      }),
     onSuccess: () => {
       toast.success(t.users.created);
       reset();
+      setSelectedRoleId("");
       onOpenChange(false);
       onSuccess();
     },
@@ -54,8 +72,16 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
     },
   });
 
+  function handleClose(v: boolean) {
+    if (!v) {
+      reset();
+      setSelectedRoleId("");
+    }
+    onOpenChange(v);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{t.users.createTitle}</DialogTitle>
@@ -78,8 +104,24 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             <Input placeholder={t.users.namePlaceholder} {...register("fullName")} />
           </div>
 
+          <div className="space-y-2">
+            <Label>{t.users.role}</Label>
+            <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+              <SelectTrigger>
+                <SelectValue placeholder={t.users.selectRole} />
+              </SelectTrigger>
+              <SelectContent>
+                {rolesData?.items.map((role) => (
+                  <SelectItem key={role.id} value={String(role.id)}>
+                    {role.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleClose(false)}>
               {t.common.cancel}
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
