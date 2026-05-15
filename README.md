@@ -1,348 +1,286 @@
-# Mini-ERP Electronic V2
+<div align="center">
 
-Production-ready Fullstack B2B Mini-ERP — NestJS · Next.js · PostgreSQL · Prisma · Redis · MinIO
+# miniERP Electronic V2
+
+**Production-ready B2B Mini-ERP for electronic goods distribution**
+
+![Node.js](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?logo=nestjs&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+
+</div>
 
 ---
 
-## Stack
+## Tech Stack
 
-| Layer    | Tech                                           |
-|----------|------------------------------------------------|
-| Backend  | NestJS 10 · Prisma 5 · PostgreSQL · Redis      |
-| Frontend | Next.js 16 · TailwindCSS 4 · Radix UI · Zustand|
-| Infra    | Docker · MinIO · Mailpit · Nginx               |
-| Monorepo | npm workspaces                                 |
+| Layer     | Technologies                                              |
+|-----------|-----------------------------------------------------------|
+| Backend   | NestJS 10 · Prisma 5 · PostgreSQL 16 · Redis 7           |
+| Frontend  | Next.js 16 · TailwindCSS 4 · Radix UI · Zustand          |
+| Infra     | Docker · MinIO · Mailpit · PgAdmin · Nginx                |
+| Monorepo  | npm workspaces                                            |
 
 ---
 
-## Yêu cầu cài đặt (Prerequisites)
+## Modules
 
-Trước khi bắt đầu, cần cài sẵn các phần mềm sau:
+| Module       | Features                                                                 |
+|--------------|--------------------------------------------------------------------------|
+| Auth         | JWT + refresh tokens · RBAC (roles & permissions) · session management  |
+| Users        | User management · role assignment · account lock/unlock                  |
+| Catalog      | Products · categories · brands · UOM conversions · product images        |
+| Inventory    | Stock tracking · warehouse management · transfers · stock counts         |
+| Sales        | Quotations · customer counter-offers · sales orders · deliveries · returns |
+| Finance      | Invoices · payments · AR/AP ledger · supplier payments                   |
+| Customers    | Customer portal · self-service order/quotation/invoice view              |
+| Reporting    | Dashboard · aging report · financial summaries                           |
 
-| Phần mềm       | Phiên bản tối thiểu | Tải về                                         |
-|----------------|---------------------|------------------------------------------------|
-| Node.js        | >= 22               | https://nodejs.org                             |
-| Docker Desktop | mới nhất            | https://www.docker.com/products/docker-desktop |
-| Git            | mới nhất            | https://git-scm.com                            |
+---
 
-Kiểm tra đã cài đúng chưa (chạy trong terminal):
+## Prerequisites
+
+| Software       | Minimum version | Download                                          |
+|----------------|-----------------|---------------------------------------------------|
+| Node.js        | 22+             | https://nodejs.org                                |
+| Docker Desktop | latest          | https://www.docker.com/products/docker-desktop    |
+| Git            | latest          | https://git-scm.com                               |
+
+Verify your setup:
 
 ```powershell
-node -v     # phải in ra v22.x.x trở lên
-docker -v   # phải in ra Docker version ...
+node -v      # must be v22.x.x or higher
+docker -v    # must show Docker version
 git --version
 ```
 
 ---
 
-## Hướng dẫn cài đặt cho máy mới (từng bước chi tiết)
+## Setup (Fresh Machine)
 
-### Bước 1 — Mở Docker Desktop
+### Step 1 — Start Docker Desktop
 
-**Quan trọng:** Docker Desktop phải đang **chạy** (không chỉ cài), biểu tượng Docker phải xuất hiện ở system tray (góc dưới bên phải màn hình Windows).
+Docker Desktop must be **running** — the Docker icon should appear in the Windows system tray. Find it in the Start Menu if it's not open. Wait until the icon stops loading before continuing.
 
-Nếu chưa mở: tìm **Docker Desktop** trong Start Menu và mở lên, chờ đến khi icon Docker không còn loading.
-
----
-
-### Bước 2 — Clone project
+### Step 2 — Clone the repository
 
 ```powershell
 git clone https://github.com/kendo2501/miniERP_electronic.git
 cd miniERP_electronic
 ```
 
----
-
-### Bước 3 — Cài dependencies
-
-Chạy 1 lệnh ở root, npm tự cài cho cả backend lẫn frontend:
+### Step 3 — Install dependencies
 
 ```powershell
 npm install
 ```
 
-> Quá trình này mất 1–3 phút lần đầu.
+> This installs dependencies for both backend and frontend. Takes 1–3 minutes on first run.
 
----
-
-### Bước 4 — Khởi động hạ tầng (Docker)
+### Step 4 — Start infrastructure
 
 ```powershell
 npm run infra:up
 ```
 
-Lệnh này pull images (lần đầu) và khởi động: PostgreSQL · Redis · MinIO · Mailpit · PgAdmin.
+This pulls Docker images (first time only) and starts: PostgreSQL · Redis · MinIO · Mailpit · PgAdmin.
 
-> **Lần đầu chạy** Docker sẽ tải images về — có thể mất 3–10 phút tùy tốc độ mạng.
+> First run may take 3–10 minutes depending on network speed.
 
-Kiểm tra tất cả containers đã lên và **healthy** chưa:
+Verify all containers are **healthy**:
 
 ```powershell
 docker ps
 ```
 
-Chờ đến khi cột `STATUS` của `mini-erp-postgres` hiển thị `healthy` (không phải `starting`):
+Wait until `mini-erp-postgres` shows `(healthy)` in the STATUS column:
 
 ```
-CONTAINER ID   IMAGE              ...   STATUS
-xxxxxxxxxxxx   postgres:16-alpine ...   Up 30 seconds (healthy)   ← phải thấy (healthy)
-xxxxxxxxxxxx   redis:7-alpine     ...   Up 30 seconds (healthy)
-...
+CONTAINER ID   IMAGE              STATUS
+xxxxxxxxxxxx   postgres:16-alpine Up 30 seconds (healthy)   ← required
+xxxxxxxxxxxx   redis:7-alpine     Up 30 seconds (healthy)
 ```
 
-> Nếu PostgreSQL vẫn `starting` sau 30 giây, chạy `docker ps` lại sau vài giây.
-
----
-
-### Bước 5 — Tạo bảng database (Migration)
-
-**Chỉ chạy bước này sau khi `mini-erp-postgres` đã `healthy`.**
+### Step 5 — Run database migrations
 
 ```powershell
 npm run db:migrate
 ```
 
-Prisma sẽ tạo toàn bộ bảng trong database `mini_erp`.
+> Only run this after `mini-erp-postgres` is healthy. Prisma will create all tables in the `mini_erp` database.
 
----
-
-### Bước 6 — Tạo dữ liệu mẫu (Seed)
+### Step 6 — Seed sample data
 
 ```powershell
 npm run db:seed
 ```
 
-Lệnh này tạo: 6 tài khoản người dùng, roles, permissions, sản phẩm mẫu, kho hàng, đơn hàng, hoá đơn...
+Creates: 6 user accounts · roles · permissions · sample products · warehouse · orders · invoices.
 
----
+### Step 7 — Start the application
 
-### Bước 7 — Chạy dự án
-
-Mở **2 terminal riêng biệt** (cả 2 đều ở thư mục root của project):
+Open **two separate terminals** in the project root:
 
 **Terminal 1 — Backend:**
 ```powershell
 npm run dev
 ```
-Backend chạy tại: http://localhost:3001
+Backend API: http://localhost:3001
 
 **Terminal 2 — Frontend:**
 ```powershell
 npm run dev:fe
 ```
-Frontend chạy tại: http://localhost:3000
+Frontend: http://localhost:3000
 
 ---
 
-## Xử lý lỗi thường gặp khi cài máy mới
+## Login Credentials
 
-### Lỗi: `P1000: Authentication failed` khi chạy `db:migrate`
+After seeding, log in at http://localhost:3000 with any of the following accounts:
 
-**Nguyên nhân:** Docker chưa chạy hoặc container PostgreSQL chưa healthy.
+| Role        | Email                      | Password          | Access                                                      |
+|-------------|----------------------------|-------------------|-------------------------------------------------------------|
+| Admin       | admin@mini-erp.local       | Admin@123456      | Full system access — users, RBAC, catalog, inventory, finance |
+| Sales       | sales@mini-erp.local       | Sales@123456      | Quotations, orders, assigned customers, related invoices     |
+| Accountant  | accountant@mini-erp.local  | Accountant@123456 | Invoices, payments, AR/AP, financial reports, aging report   |
+| Warehouse   | warehouse@mini-erp.local   | Warehouse@123456  | Stock management, transfers, adjustments, warehouse config   |
 
-**Cách fix:**
-1. Kiểm tra Docker Desktop đang mở
-2. Chạy `docker ps` — xem `mini-erp-postgres` có STATUS `healthy` chưa
-3. Nếu chưa có container nào, chạy lại: `npm run infra:up`
-4. Chờ healthy rồi mới chạy `npm run db:migrate`
+**Customer portal accounts** (linked to specific companies):
+
+| Email                     | Password        | Linked Company              |
+|---------------------------|-----------------|-----------------------------|
+| customer@mini-erp.local   | Customer@123456 | Xây Dựng Hoàng Phát (CUST-001) |
+| nhatminh@portal.local     | Customer@123456 | Điện Nhật Minh (CUST-002)      |
+| phulong@portal.local      | Customer@123456 | Cơ Điện Phú Long (CUST-003)    |
+
+Customer access: view own quotations · orders · invoices · payment status · attachments.
 
 ---
 
-### Lỗi: `address already in use` hoặc port conflict khi `infra:up`
+## Services & Ports
 
-**Nguyên nhân:** Máy đang có PostgreSQL local hoặc dịch vụ khác chiếm port 5433.
+| Service      | URL                             | Credentials                    |
+|--------------|---------------------------------|--------------------------------|
+| Frontend     | http://localhost:3000           | See table above                |
+| Backend API  | http://localhost:3001           | —                              |
+| Swagger Docs | http://localhost:3001/api/docs  | —                              |
+| PgAdmin      | http://localhost:5050           | admin@example.com / admin      |
+| MinIO        | http://localhost:9001           | minioadmin / minioadmin        |
+| Mailpit      | http://localhost:8025           | —                              |
+| PostgreSQL   | localhost:5433                  | postgres / postgres            |
+| Redis        | localhost:6379                  | —                              |
 
-**Cách kiểm tra (PowerShell):**
+---
+
+## Scripts
+
+```bash
+# Infrastructure
+npm run infra:up          # start all Docker services
+npm run infra:down        # stop services
+npm run infra:reset       # stop and delete all data volumes (destructive)
+
+# Database
+npm run db:migrate        # apply schema migrations
+npm run db:generate       # regenerate Prisma client after schema changes
+npm run db:seed           # seed sample data
+npm run db:reset          # delete all transactional data (keep users/catalog/inventory)
+npm run db:studio         # open Prisma Studio at http://localhost:5555
+
+# Development
+npm run dev               # start backend with hot-reload
+npm run dev:fe            # start frontend with hot-reload
+
+# Build
+npm run build             # build backend
+npm run build:fe          # build frontend
+
+# Quality
+npm run test              # run backend unit tests
+npm run lint              # lint and auto-fix backend
+```
+
+---
+
+## Health Check
+
+```
+GET http://localhost:3001/health        # memory/process health
+GET http://localhost:3001/health/db     # PostgreSQL connectivity
+GET http://localhost:3001/health/redis  # Redis connectivity
+```
+
+---
+
+## Project Structure
+
+```
+├── backend/                    NestJS REST API
+│   ├── database/
+│   │   ├── prisma/             Schema & migrations
+│   │   ├── seeds/              Sample data seeder
+│   │   └── scripts/            Utility scripts (reset, etc.)
+│   └── src/
+│       ├── auth/               JWT auth, refresh tokens, sessions
+│       ├── users/              User management, RBAC
+│       ├── catalog/            Products, categories, brands, UOM
+│       ├── inventory/          Stock, warehouses, transfers
+│       ├── sales/              Quotations, orders, deliveries, returns
+│       ├── finance/            Invoices, payments, AR/AP ledger
+│       ├── customers/          Customer portal API
+│       ├── notifications/      In-app notifications
+│       ├── audit/              Audit logging
+│       ├── reporting/          Reports & dashboard data
+│       └── common/             Guards, decorators, shared types
+├── frontend/                   Next.js App Router (TypeScript)
+│   └── src/
+│       ├── app/                Pages — dashboard, auth, portal
+│       ├── components/         Shared UI components (shadcn/ui)
+│       ├── lib/                API client, i18n (EN/VI), utilities
+│       ├── store/              Zustand state (auth, permissions)
+│       └── types/              TypeScript type definitions
+├── docker-compose.yml          Development infrastructure
+├── docker-compose.prod.yml     Production deployment
+└── package.json                npm workspaces root
+```
+
+---
+
+## Troubleshooting
+
+**`P1000: Authentication failed` on `db:migrate`**
+PostgreSQL is not ready yet. Run `docker ps` and wait for `mini-erp-postgres` to show `(healthy)`, then retry.
+
+**`address already in use` on `infra:up`**
+Another process is using port 5433 or 6379. Check with:
 ```powershell
 netstat -ano | findstr :5433
 netstat -ano | findstr :6379
 ```
+Stop the conflicting process or adjust ports in `docker-compose.yml` and `backend/.env`.
 
-Nếu có process lạ giữ port, dừng dịch vụ đó hoặc báo lại với team để chỉnh port trong `docker-compose.yml` và `backend/.env`.
-
----
-
-### Lỗi: `Cannot find module` sau khi `npm install`
-
+**`Cannot find module` after `npm install`**
+Regenerate the Prisma client:
 ```powershell
 npm run db:generate
 ```
+Then restart the backend.
 
-Lệnh này tái tạo Prisma client. Chạy lại `npm run dev` sau đó.
-
----
-
-### Reset hoàn toàn (khi muốn làm mới từ đầu)
-
+**Full reset (start from scratch)**
 ```powershell
-npm run infra:reset   # xoá toàn bộ Docker volumes (mất data)
-npm run infra:up      # khởi động lại
-# chờ postgres healthy
+npm run infra:reset
+npm run infra:up
+# wait for postgres (healthy)
 npm run db:migrate
 npm run db:seed
 ```
 
----
-
-## Tài khoản đăng nhập theo từng Role
-
-Sau khi seed xong, có thể đăng nhập tại http://localhost:3001 với các tài khoản sau:
-
-### Admin — Toàn quyền hệ thống
-
-| Trường   | Giá trị                  |
-|----------|--------------------------|
-| Email    | admin@mini-erp.local     |
-| Password | Admin@123456             |
-
-Quyền hạn: quản lý users, roles, permissions, toàn bộ catalog, inventory, sales, finance, settings, audit log.
-
----
-
-
-### Sales — Nhân viên kinh doanh
-
-| Trường   | Giá trị               |
-|----------|-----------------------|
-| Email    | sales@mini-erp.local  |
-| Password | Sales@123456          |
-
-
-Quyền hạn: tạo báo giá, tạo đơn hàng, quản lý khách hàng được phân công, xem hoá đơn & thanh toán của khách hàng mình phụ trách.
-
----
-
-### Customer — Khách hàng tự phục vụ
-
-| Trường   | Giá trị                   |
-|----------|---------------------------|
-| Email    | customer@mini-erp.local   |
-| Password | Customer@123456           |
-| Liên kết | Xây Dựng Hoàng Phát (CUST-001) |
-
-| Trường      | Giá trị                             |
-|-------------|-------------------------------------|
-| Email       | nhatminh@portal.local               |
-| Password    | Customer@123456                     |
-| Họ tên      | Trần Thị Bích                       |
-| Liên kết    | Điện Nhật Minh (CUST-002)           |
-
-| Trường      | Giá trị                             |
-|-------------|-------------------------------------|
-| Email       | phulong@portal.local                |
-| Password    | Customer@123456                     |
-| Họ tên      | Lê Văn Cường                        |
-| Liên kết    | Cơ Điện Phú Long (CUST-003)         |
-
-Quyền hạn: xem đơn hàng của mình, xem báo giá của mình, xem hoá đơn & trạng thái thanh toán của mình, tải file đính kèm.
-
----
-
-### Accountant — Kế toán
-
-| Trường   | Giá trị                    |
-|----------|----------------------------|
-| Email    | accountant@mini-erp.local  |
-| Password | Accountant@123456          |
-
-Quyền hạn: xem & xuất hoá đơn, quản lý thanh toán, hoàn trả thanh toán, xem báo cáo tài chính, xem aging report (công nợ quá hạn).
-
----
-
-### Warehouse — Thủ kho
-
-| Trường   | Giá trị                   |
-|----------|---------------------------|
-| Email    | warehouse@mini-erp.local  |
-| Password | Warehouse@123456          |
-
-
-Quyền hạn: xem & điều chỉnh tồn kho, chuyển kho, duyệt điều chỉnh/chuyển kho, quản lý nhà kho, xem cảnh báo hàng sắp hết.
-
----
-
-## Services & URLs
-
-| Service    | URL                              | Tài khoản                        |
-|------------|----------------------------------|----------------------------------|
-| Frontend   | http://localhost:3000            | Xem bảng tài khoản ở trên        |
-| Backend API| http://localhost:3001            | —                                |
-| Swagger    | http://localhost:3001/api/docs   | —                                |
-| PgAdmin    | http://localhost:5050            | admin@example.com / admin        |
-| MinIO      | http://localhost:9001            | minioadmin / minioadmin          |
-| Mailpit    | http://localhost:8025            | —                                |
-| PostgreSQL | localhost:5433                   | postgres / postgres              |
-| Redis      | localhost:6379                   | —                                |
-
----
-
-## Lệnh thường dùng
-
-```bash
-# Infrastructure
-npm run infra:up       # khởi động tất cả Docker services
-npm run infra:down     # tắt services
-npm run infra:reset    # tắt và xoá toàn bộ data volumes
-
-# Database
-npm run db:migrate     # chạy migration (tạo/cập nhật bảng)
-npm run db:generate    # tái tạo Prisma client sau khi sửa schema
-npm run db:seed        # seed dữ liệu mẫu
-
-# Development
-npm run dev            # chạy backend (hot-reload)
-npm run dev:fe         # chạy frontend (hot-reload)
-
-# Build
-npm run build          # build backend
-npm run build:fe       # build frontend
-
-# Test & Lint
-npm run test
-npm run lint
-```
-
----
-
-## Health Check API
-
-```
-GET http://localhost:3001/health        # kiểm tra bộ nhớ
-GET http://localhost:3001/health/db     # kiểm tra kết nối PostgreSQL
-GET http://localhost:3001/health/redis  # kiểm tra kết nối Redis
-```
-
----
-
-## Cấu trúc thư mục
-
-```
-├── backend/                    NestJS API
-│   ├── database/
-│   │   ├── prisma/             Schema, migrations
-│   │   └── seeds/              Seed data
-│   ├── src/
-│   │   ├── auth/               Xác thực JWT
-│   │   ├── users/              Quản lý người dùng
-│   │   ├── catalog/            Sản phẩm, danh mục, thương hiệu
-│   │   ├── inventory/          Tồn kho, kho hàng
-│   │   ├── sales/              Báo giá, đơn hàng, giao hàng
-│   │   ├── finance/            Hoá đơn, thanh toán
-│   │   ├── customers/          Quản lý khách hàng
-│   │   ├── notifications/      Thông báo
-│   │   ├── audit/              Audit log
-│   │   ├── reporting/          Báo cáo & dashboard
-│   │   └── common/             Guards, decorators, types dùng chung
-│   └── .env                    Cấu hình môi trường
-├── frontend/                   Next.js App Router
-│   └── src/
-│       ├── app/                Pages (dashboard, auth)
-│       ├── components/         UI components
-│       ├── lib/                API client, i18n, utils
-│       ├── store/              Zustand state (auth)
-│       └── types/              TypeScript types
-├── docker-compose.yml          Dev infrastructure
-├── docker-compose.prod.yml     Production deployment
-└── package.json                npm workspaces root
+**Reset business data only (keep users, catalog, inventory)**
+```powershell
+npm run db:reset
 ```
