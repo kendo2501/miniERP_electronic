@@ -66,6 +66,12 @@ export class UpdateAddressDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isDefault?: boolean;
 }
 
+export class UpdateCreditLimitDto {
+  @ApiProperty({ description: 'Credit limit in VND (0 = unlimited)' })
+  @IsNumber() @Min(0) @Type(() => Number)
+  creditLimit!: number;
+}
+
 export class CustomerQueryDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) page?: number = 1;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) limit?: number = 20;

@@ -12,6 +12,11 @@ import {
   UpdateReplenishmentDto,
   ReplenishmentQueryDto,
 } from './dto/replenishment.dto';
+import {
+  CreateStockCountDto,
+  UpdateStockCountItemsDto,
+  StockCountQueryDto,
+} from './dto/stock-count.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -138,5 +143,55 @@ export class InventoryController {
   @ApiOperation({ summary: 'List inventory transaction history' })
   getTransactions(@Query() query: TransactionQueryDto) {
     return this.service.getTransactions(query);
+  }
+
+  // ─── Stock Counts ─────────────────────────────────────────────────────────
+
+  @Get('stock-counts')
+  @RequirePermissions('inventory.stock.view')
+  @ApiOperation({ summary: 'List stock counts' })
+  listStockCounts(@Query() query: StockCountQueryDto) {
+    return this.service.listStockCounts(query);
+  }
+
+  @Get('stock-counts/:id')
+  @RequirePermissions('inventory.stock.view')
+  @ApiOperation({ summary: 'Get stock count detail' })
+  getStockCount(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getStockCount(id);
+  }
+
+  @Post('stock-counts')
+  @RequirePermissions('inventory.adjust')
+  @ApiOperation({ summary: 'Create stock count session' })
+  createStockCount(@Body() dto: CreateStockCountDto, @CurrentUser() user: AuthUser) {
+    return this.service.createStockCount(dto, user.id);
+  }
+
+  @Patch('stock-counts/:id/items')
+  @RequirePermissions('inventory.adjust')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update counted quantities' })
+  updateStockCountItems(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStockCountItemsDto,
+  ) {
+    return this.service.updateStockCountItems(id, dto);
+  }
+
+  @Post('stock-counts/:id/submit')
+  @RequirePermissions('inventory.adjust')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Submit stock count for approval' })
+  submitStockCount(@Param('id', ParseIntPipe) id: number) {
+    return this.service.submitStockCount(id);
+  }
+
+  @Post('stock-counts/:id/approve')
+  @RequirePermissions('inventory.adjust.approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve stock count and apply adjustments' })
+  approveStockCount(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
+    return this.service.approveStockCount(id, user.id);
   }
 }

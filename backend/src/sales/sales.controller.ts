@@ -7,6 +7,7 @@ import {
   SubmitCounterOfferDto,
   CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
   RequestPriceAdjustmentDto, AdjustOrderPricesDto,
+  CreateSalesReturnDto, RejectReturnDto, SalesReturnQueryDto,
 } from './dto/sales.dto';
 import { RequirePermissions, AnyPermission } from '../common/decorators/permissions.decorator';
 
@@ -24,9 +25,10 @@ export class SalesController {
   @Get('quotations/:id') @AnyPermission('sales.quotation.create', 'sales.quotation.approve', 'sales.quotation.view_own') @ApiOperation({ summary: 'Get quotation' })
   getQuotation(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.getQuotation(id, req.user); }
 
-  @Post('quotations') @RequirePermissions('sales.quotation.create') @ApiOperation({ summary: 'Create quotation' })
+  @Post('quotations') @AnyPermission('sales.quotation.create', 'sales.quotation.create_request') @ApiOperation({ summary: 'Create quotation (staff or customer self-service request)' })
   createQuotation(@Body() dto: CreateQuotationDto, @Req() req: any) {
-    dto.salesUserId = req.user?.id ?? undefined;
+    if (!req.user?.linkedCustomerId) dto.salesUserId = req.user?.id ?? undefined;
+    if (req.user?.linkedCustomerId) dto.customerId = req.user.linkedCustomerId;
     return this.service.createQuotation(dto);
   }
 
@@ -99,4 +101,21 @@ export class SalesController {
 
   @Get('customers/:id/balance') @AnyPermission('customer.view_assigned', 'customers.customer.view') @ApiOperation({ summary: 'Get customer outstanding balance and invoices' })
   getCustomerBalance(@Param('id', ParseIntPipe) id: number) { return this.service.getCustomerBalance(id); }
+
+  // ─── Sales Returns ────────────────────────────────────────────────────────
+
+  @Get('returns') @AnyPermission('sales.order.view_all', 'sales.order.view_team') @ApiOperation({ summary: 'List sales returns' })
+  listReturns(@Query() query: SalesReturnQueryDto) { return this.service.listReturns(query); }
+
+  @Get('returns/:id') @AnyPermission('sales.order.view_all', 'sales.order.view_team') @ApiOperation({ summary: 'Get sales return' })
+  getReturn(@Param('id', ParseIntPipe) id: number) { return this.service.getReturn(id); }
+
+  @Post('returns') @RequirePermissions('sales.order.create') @ApiOperation({ summary: 'Create sales return request' })
+  createReturn(@Body() dto: CreateSalesReturnDto) { return this.service.createReturn(dto); }
+
+  @Post('returns/:id/approve') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.approve') @ApiOperation({ summary: 'Approve sales return → restores inventory + AR credit note' })
+  approveReturn(@Param('id', ParseIntPipe) id: number, @Req() req: any) { return this.service.approveReturn(id, req.user?.id); }
+
+  @Post('returns/:id/reject') @HttpCode(HttpStatus.OK) @RequirePermissions('sales.order.approve') @ApiOperation({ summary: 'Reject sales return with reason' })
+  rejectReturn(@Param('id', ParseIntPipe) id: number, @Body() dto: RejectReturnDto) { return this.service.rejectReturn(id, dto); }
 }

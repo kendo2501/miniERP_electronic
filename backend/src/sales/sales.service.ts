@@ -1,14 +1,18 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { PriceListService } from '../catalog/price-list.service';
 import { AuthUser } from '../common/types/auth-user.type';
+import { DeliveryConfirmedEvent } from '../common/events/sales.events';
 import {
   CreateQuotationDto, QuotationQueryDto,
   CreateSalesOrderDto, SalesOrderQueryDto,
   SubmitCounterOfferDto,
   CancelWithReasonDto, RequestRevisionDto, UpdateQuotationItemsDto,
   RequestPriceAdjustmentDto, AdjustOrderPricesDto,
+  CreateSalesReturnDto, RejectReturnDto, SalesReturnQueryDto,
 } from './dto/sales.dto';
 
 const QUOTATION_SELECT = {
@@ -47,6 +51,8 @@ export class SalesService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private inventory: InventoryService,
+    private eventEmitter: EventEmitter2,
+    private priceList: PriceListService,
   ) {}
 
   // ─── Quotations ───────────────────────────────────────────────────────────
@@ -94,8 +100,31 @@ export class SalesService {
   async createQuotation(dto: CreateQuotationDto) {
     await this.ensureCustomerExists(dto.customerId);
     await this.ensureProductsExist(dto.items.map((i) => i.productId));
+
+    // Auto-lookup price for items with no unitPrice provided
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: dto.customerId },
+      select: { customerType: true },
+    });
+    const resolvedItems: Array<{ productId: number; quantity: number; unitPrice: number; discountPercent?: number }> =
+      await Promise.all(
+        dto.items.map(async (item) => {
+          if (item.unitPrice !== undefined && item.unitPrice > 0) {
+            return { ...item, unitPrice: item.unitPrice };
+          }
+          const lookup = await this.priceList.lookupPrice({
+            productId: item.productId,
+            customerId: dto.customerId,
+            customerTier: customer?.customerType ?? undefined,
+            quantity: item.quantity,
+          }).catch(() => ({ unitPrice: '0', source: 'fallback-minprice' }));
+          return { ...item, unitPrice: parseFloat(lookup.unitPrice) };
+        }),
+      );
+
     const number = await this.generateQuotationNumber();
-    const { items, ...data } = dto;
+    const { items: _items, ...data } = dto;
+    const items = resolvedItems;
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(items);
 
     const quotation = await this.prisma.quotation.create({
@@ -659,6 +688,30 @@ export class SalesService {
 
   async createOrder(dto: CreateSalesOrderDto) {
     await this.ensureCustomerExists(dto.customerId);
+
+    // Credit limit check
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: dto.customerId },
+      select: { creditLimit: true },
+    });
+    const limit = Number(customer!.creditLimit);
+    if (limit > 0) {
+      const agg = await this.prisma.accountsReceivableLedger.aggregate({
+        where: { customerId: dto.customerId },
+        _sum: { debitAmount: true, creditAmount: true },
+      });
+      const outstandingDebt = Math.max(0, Number(agg._sum.debitAmount ?? 0) - Number(agg._sum.creditAmount ?? 0));
+      const { totalAmount } = this.calcTotals(dto.items);
+      if (outstandingDebt + totalAmount > limit) {
+        throw new BadRequestException({
+          message: 'Vượt hạn mức tín dụng',
+          creditLimit: limit,
+          outstandingDebt,
+          availableCredit: limit - outstandingDebt,
+        });
+      }
+    }
+
     const orderNumber = await this.generateOrderNumber();
     const { items, ...data } = dto;
     const { subtotal, taxAmount, totalAmount } = this.calcTotals(items);
@@ -719,11 +772,16 @@ export class SalesService {
   async completeDelivery(id: number) {
     const o = await this.getOrder(id);
     if ((o as any).deliveryStatus !== 'IN_TRANSIT') throw new BadRequestException('Đơn hàng chưa ở trạng thái đang giao');
-    return this.prisma.salesOrder.update({
+    const updated = await this.prisma.salesOrder.update({
       where: { id },
       data: { deliveryStatus: 'DELIVERED' },
       select: ORDER_SELECT,
     });
+    this.eventEmitter.emit(
+      'sales.order.delivered',
+      new DeliveryConfirmedEvent(id, (updated as any).orderNumber),
+    );
+    return updated;
   }
 
   async getCustomerBalance(customerId: number) {
@@ -803,15 +861,27 @@ export class SalesService {
   }
 
   private async generateQuotationNumber(): Promise<string> {
-    const count = await this.prisma.quotation.count();
     const year = new Date().getFullYear();
-    return `QUO-${year}-${String(count + 1).padStart(5, '0')}`;
+    const prefix = `QUO-${year}`;
+    const last = await this.prisma.quotation.findFirst({
+      where: { quotationNumber: { startsWith: prefix } },
+      orderBy: { id: 'desc' },
+      select: { quotationNumber: true },
+    });
+    const seq = last ? parseInt(last.quotationNumber.split('-').pop() ?? '0', 10) + 1 : 1;
+    return `${prefix}-${String(seq).padStart(5, '0')}`;
   }
 
   private async generateOrderNumber(): Promise<string> {
-    const count = await this.prisma.salesOrder.count();
     const year = new Date().getFullYear();
-    return `SO-${year}-${String(count + 1).padStart(5, '0')}`;
+    const prefix = `SO-${year}`;
+    const last = await this.prisma.salesOrder.findFirst({
+      where: { orderNumber: { startsWith: prefix } },
+      orderBy: { id: 'desc' },
+      select: { orderNumber: true },
+    });
+    const seq = last ? parseInt(last.orderNumber.split('-').pop() ?? '0', 10) + 1 : 1;
+    return `${prefix}-${String(seq).padStart(5, '0')}`;
   }
 
   private async notifyManagers(subject: string, content: string): Promise<void> {
@@ -853,5 +923,183 @@ export class SalesService {
       content,
       priority: 'NORMAL',
     });
+  }
+
+  // ─── Sales Returns ────────────────────────────────────────────────────────
+
+  async listReturns(query: SalesReturnQueryDto) {
+    const { page = 1, limit = 20, status, salesOrderId } = query;
+    const where: any = {};
+    if (status) where.status = status;
+    if (salesOrderId) where.salesOrderId = salesOrderId;
+
+    const [items, total] = await Promise.all([
+      this.prisma.salesReturn.findMany({
+        where, skip: (page - 1) * limit, take: limit,
+        include: {
+          salesOrder: { select: { id: true, orderNumber: true } },
+          items: { include: { product: { select: { id: true, sku: true, productName: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.salesReturn.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getReturn(id: number) {
+    const r = await this.prisma.salesReturn.findUnique({
+      where: { id },
+      include: {
+        salesOrder: { select: { id: true, orderNumber: true, deliveryStatus: true, customerId: true } },
+        items: { include: { product: { select: { id: true, sku: true, productName: true, unit: true } } } },
+      },
+    });
+    if (!r) throw new NotFoundException(`SalesReturn #${id} not found`);
+    return r;
+  }
+
+  async createReturn(dto: CreateSalesReturnDto) {
+    const order = await this.getOrder(dto.salesOrderId);
+    if ((order as any).deliveryStatus !== 'DELIVERED') {
+      throw new BadRequestException('Returns can only be created for DELIVERED orders');
+    }
+
+    // Validate all return items are products that existed in the original order
+    const orderProductIds = new Set((order as any).items?.map((i: any) => i.product.id) ?? []);
+    const invalidItems = dto.items.filter((i) => !orderProductIds.has(i.productId));
+    if (invalidItems.length > 0) {
+      throw new BadRequestException(
+        `Sản phẩm không thuộc đơn hàng: ID [${invalidItems.map((i) => i.productId).join(', ')}]`,
+      );
+    }
+
+    const returnNumber = await this.generateReturnNumber();
+    return this.prisma.$transaction(async (tx) => {
+      const sr = await tx.salesReturn.create({
+        data: {
+          returnNumber,
+          salesOrderId: dto.salesOrderId,
+          reason: dto.reason,
+          status: 'PENDING',
+        },
+      });
+      for (const item of dto.items) {
+        await tx.salesReturnItem.create({
+          data: {
+            salesReturnId: sr.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            reason: item.reason,
+            warehouseId: item.warehouseId,
+          },
+        });
+      }
+      return tx.salesReturn.findUniqueOrThrow({
+        where: { id: sr.id },
+        include: {
+          items: { include: { product: { select: { id: true, sku: true, productName: true, unit: true } } } },
+        },
+      });
+    });
+  }
+
+  async approveReturn(id: number, userId: number) {
+    const sr = await this.getReturn(id);
+    if (sr.status !== 'PENDING') throw new BadRequestException('Only PENDING returns can be approved');
+
+    const customerId = (sr.salesOrder as any).customerId as number;
+
+    // Look up unit prices from the original order items to compute credit amount
+    const orderItems = await this.prisma.salesOrderItem.findMany({
+      where: { salesOrderId: sr.salesOrderId },
+      select: { productId: true, unitPrice: true, discountPercent: true },
+    });
+    const priceByProduct = new Map(orderItems.map((i) => [i.productId, { unitPrice: Number(i.unitPrice), discountPercent: Number(i.discountPercent ?? 0) }]));
+
+    let creditAmount = 0;
+    for (const item of sr.items) {
+      const p = priceByProduct.get(item.productId);
+      if (p) {
+        const lineTotal = Number(item.quantity) * p.unitPrice * (1 - p.discountPercent / 100);
+        creditAmount += lineTotal;
+      }
+    }
+    creditAmount = Math.round(creditAmount * 100) / 100;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Restore inventory for each item
+      for (const item of sr.items) {
+        const warehouseId = (item as any).warehouseId;
+        if (!warehouseId) continue;
+
+        const stock = await tx.inventoryStock.findUnique({
+          where: { warehouseId_productId: { warehouseId, productId: item.productId } },
+        });
+        const currentQty = stock ? Number(stock.availableQuantity) : 0;
+        const newQty = currentQty + Number(item.quantity);
+
+        await tx.inventoryStock.upsert({
+          where: { warehouseId_productId: { warehouseId, productId: item.productId } },
+          create: { warehouseId, productId: item.productId, availableQuantity: newQty, reservedQuantity: 0, damagedQuantity: 0 },
+          update: { availableQuantity: newQty },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            warehouseId,
+            productId: item.productId,
+            transactionType: 'RETURN_IN',
+            referenceType: 'SALES_RETURN',
+            referenceId: id,
+            quantity: Number(item.quantity),
+            balanceAfter: newQty,
+            notes: `Return ${sr.returnNumber}`,
+            createdBy: userId,
+          },
+        });
+      }
+
+      // Create AR credit note (reduces customer debt)
+      await tx.accountsReceivableLedger.create({
+        data: {
+          customerId,
+          transactionType: 'CREDIT_NOTE',
+          referenceType: 'SALES_RETURN',
+          referenceId: id,
+          debitAmount: 0,
+          creditAmount,
+          notes: `Credit note for return ${sr.returnNumber} — amount ${creditAmount}`,
+        },
+      });
+
+      return tx.salesReturn.update({
+        where: { id },
+        data: { status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
+        select: { id: true, returnNumber: true, status: true, approvedBy: true, approvedAt: true },
+      });
+    });
+  }
+
+  async rejectReturn(id: number, dto: RejectReturnDto) {
+    const sr = await this.getReturn(id);
+    if (sr.status !== 'PENDING') throw new BadRequestException('Only PENDING returns can be rejected');
+    return this.prisma.salesReturn.update({
+      where: { id },
+      data: { status: 'REJECTED', rejectionReason: dto.reason },
+      select: { id: true, returnNumber: true, status: true, rejectionReason: true },
+    });
+  }
+
+  private async generateReturnNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `RET-${year}`;
+    const last = await this.prisma.salesReturn.findFirst({
+      where: { returnNumber: { startsWith: prefix } },
+      orderBy: { id: 'desc' },
+      select: { returnNumber: true },
+    });
+    const seq = last ? parseInt(last.returnNumber.split('-').pop() ?? '0', 10) + 1 : 1;
+    return `${prefix}-${String(seq).padStart(5, '0')}`;
   }
 }

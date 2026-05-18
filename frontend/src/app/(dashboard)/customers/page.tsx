@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown, UserCheck, UserPlus, UserX, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus, Loader2, Building2, Phone, Mail, AlertCircle, TrendingDown, UserCheck, UserPlus, UserX, MapPin, Pencil, Trash2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { listCustomers, createCustomer, getCustomer, getCustomerBalance, createPortalAccount, unlinkPortalAccount, addCustomerAddress, updateCustomerAddress, deleteCustomerAddress } from "@/lib/api/sales";
-import type { CustomerType, CustomerBalanceInvoice, CustomerAddress } from "@/types/sales";
+import { listCustomers, createCustomer, getCustomer, getCustomerBalance, createPortalAccount, unlinkPortalAccount, addCustomerAddress, updateCustomerAddress, deleteCustomerAddress, updateCreditLimit, getCreditStatus } from "@/lib/api/sales";
+import type { CustomerType, CustomerBalanceInvoice, CustomerAddress, CreditStatus } from "@/types/sales";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 
@@ -71,6 +71,8 @@ export default function CustomersPage() {
   const [balanceCustomer, setBalanceCustomer] = useState<{ id: number; name: string } | null>(null);
   const [portalTarget, setPortalTarget] = useState<{ id: number; name: string } | null>(null);
   const [addressCustomer, setAddressCustomer] = useState<{ id: number; name: string } | null>(null);
+  const [creditCustomer, setCreditCustomer] = useState<{ id: number; name: string } | null>(null);
+  const [newCreditLimit, setNewCreditLimit] = useState("");
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null);
   const [addrLabel, setAddrLabel] = useState("");
@@ -181,6 +183,24 @@ export default function CustomersPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Xóa địa chỉ thất bại"),
   });
 
+  const { data: creditStatus, isLoading: creditLoading } = useQuery({
+    queryKey: ["credit-status", creditCustomer?.id],
+    queryFn: () => getCreditStatus(creditCustomer!.id).then((r) => r.data),
+    enabled: !!creditCustomer,
+  });
+
+  const updateCreditMut = useMutation({
+    mutationFn: ({ id, limit }: { id: number; limit: number }) =>
+      updateCreditLimit(id, limit),
+    onSuccess: () => {
+      toast.success(t.customers.creditLimitUpdated);
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["credit-status", creditCustomer?.id] });
+      setNewCreditLimit("");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Cập nhật thất bại"),
+  });
+
   function openEditAddress(addr: CustomerAddress) {
     setEditingAddress(addr);
     setAddrLabel(addr.label ?? "");
@@ -207,6 +227,8 @@ export default function CustomersPage() {
   }
 
   const canCreate = hasPermission("customer.create");
+  const canViewCredit = hasPermission("finance.credit_limit.view");
+  const canEditCredit = hasPermission("finance.credit_limit.override");
 
   return (
     <div className="space-y-6">
@@ -332,14 +354,26 @@ export default function CustomersPage() {
                         </Button>
                       </td>
                       <td className="px-6 py-3">
-                        <Button
-                          size="sm" variant="ghost"
-                          className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700"
-                          onClick={() => { setAddressCustomer({ id: c.id, name: c.companyName }); resetAddressForm(); }}
-                        >
-                          <MapPin className="h-3 w-3" />
-                          {t.customers.addresses}
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700"
+                            onClick={() => { setAddressCustomer({ id: c.id, name: c.companyName }); resetAddressForm(); }}
+                          >
+                            <MapPin className="h-3 w-3" />
+                            {t.customers.addresses}
+                          </Button>
+                          {canViewCredit && (
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 px-2 text-xs gap-1 text-purple-600 hover:text-purple-700"
+                              onClick={() => { setCreditCustomer({ id: c.id, name: c.companyName }); setNewCreditLimit(""); }}
+                            >
+                              <CreditCard className="h-3 w-3" />
+                              {t.customers.creditLimit}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -563,6 +597,74 @@ export default function CustomersPage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Credit Status Dialog */}
+      <Dialog open={!!creditCustomer} onOpenChange={(v) => { if (!v) { setCreditCustomer(null); setNewCreditLimit(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-purple-600" />
+              {t.customers.creditStatus} — {creditCustomer?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {creditLoading ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : creditStatus ? (
+            <div className="space-y-4 pt-1">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center py-2 border-b">
+                  <span className="text-sm text-muted-foreground">{t.customers.creditLimit}</span>
+                  <span className="font-semibold text-sm">
+                    {creditStatus.creditLimit === 0 ? t.customers.unlimited : vnd(creditStatus.creditLimit)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b">
+                  <span className="text-sm text-muted-foreground">{t.customers.outstandingDebt}</span>
+                  <span className={`font-semibold text-sm ${creditStatus.outstandingDebt > 0 ? "text-red-600" : "text-green-600"}`}>
+                    {vnd(creditStatus.outstandingDebt)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-muted-foreground">{t.customers.availableCredit}</span>
+                  <span className={`font-semibold text-sm ${
+                    creditStatus.availableCredit === null ? "text-muted-foreground" :
+                    creditStatus.availableCredit < 0 ? "text-red-600" : "text-green-600"
+                  }`}>
+                    {creditStatus.availableCredit === null
+                      ? t.customers.unlimited
+                      : vnd(creditStatus.availableCredit)}
+                  </span>
+                </div>
+              </div>
+              {canEditCredit && (
+                <div className="border-t pt-3 space-y-2">
+                  <p className="text-sm font-medium">{t.customers.editCreditLimit}</p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1000000}
+                      placeholder="0 = không giới hạn"
+                      value={newCreditLimit}
+                      onChange={(e) => setNewCreditLimit(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!newCreditLimit || updateCreditMut.isPending}
+                      onClick={() => updateCreditMut.mutate({ id: creditCustomer!.id, limit: Number(newCreditLimit) })}
+                    >
+                      {updateCreditMut.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                      {t.common.save}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">0 = không giới hạn</p>
+                </div>
+              )}
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 

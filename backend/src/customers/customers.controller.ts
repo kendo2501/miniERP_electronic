@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto, CreateAddressDto, UpdateAddressDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto, CreateAddressDto, UpdateAddressDto, UpdateCreditLimitDto } from './dto/customer.dto';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 
 @ApiTags('Customers')
@@ -24,6 +24,20 @@ export class CustomersController {
 
   @Delete(':id') @HttpCode(HttpStatus.OK) @RequirePermissions('customer.update_assigned') @ApiOperation({ summary: 'Soft-delete customer' })
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove(id); }
+
+  @Patch(':id/credit-limit')
+  @RequirePermissions('finance.credit_limit.override')
+  @ApiOperation({ summary: 'Update customer credit limit' })
+  updateCreditLimit(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCreditLimitDto) {
+    return this.service.updateCreditLimit(id, dto);
+  }
+
+  @Get(':id/credit-status')
+  @RequirePermissions('finance.credit_limit.view')
+  @ApiOperation({ summary: 'Get customer credit status (limit, outstanding, available)' })
+  getCreditStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getCreditStatus(id);
+  }
 
   @Post(':id/addresses')
   @RequirePermissions('customer.update_assigned')

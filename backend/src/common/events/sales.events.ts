@@ -31,6 +31,13 @@ export class OrderDeliveredEvent {
   ) {}
 }
 
+export class DeliveryConfirmedEvent {
+  constructor(
+    public readonly orderId: number,
+    public readonly orderNumber: string,
+  ) {}
+}
+
 export class PaymentReceivedEvent {
   constructor(
     public readonly orderId: string,

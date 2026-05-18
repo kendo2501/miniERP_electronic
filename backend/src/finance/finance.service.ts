@@ -5,6 +5,7 @@ import {
   CreateInvoiceDto, InvoiceQueryDto,
   CreatePaymentDto, PaymentQueryDto,
   AllocatePaymentDto, ArLedgerQueryDto, OutstandingQueryDto,
+  ApLedgerQueryDto,
 } from './dto/finance.dto';
 
 const INVOICE_SELECT = {
@@ -477,6 +478,48 @@ export class FinanceService {
     };
   }
 
+  // ─── AP Ledger ────────────────────────────────────────────────────────────
+
+  async listApLedger(query: ApLedgerQueryDto) {
+    const { page = 1, limit = 20, supplierId, transactionType } = query;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (supplierId) where.supplierId = supplierId;
+    if (transactionType) where.transactionType = transactionType;
+
+    const [items, total] = await Promise.all([
+      this.prisma.accountsPayableLedger.findMany({
+        where, skip, take: limit, orderBy: { createdAt: 'desc' },
+        include: { supplier: { select: { id: true, companyName: true, supplierCode: true } } },
+      }),
+      this.prisma.accountsPayableLedger.count({ where }),
+    ]);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getSupplierBalance(supplierId: number) {
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+      select: { id: true, companyName: true, supplierCode: true },
+    });
+    if (!supplier) throw new NotFoundException(`Supplier #${supplierId} not found`);
+
+    const agg = await this.prisma.accountsPayableLedger.aggregate({
+      where: { supplierId },
+      _sum: { debitAmount: true, creditAmount: true },
+    });
+
+    const totalDebt = Math.max(0, Number(agg._sum.debitAmount ?? 0) - Number(agg._sum.creditAmount ?? 0));
+
+    const recentEntries = await this.prisma.accountsPayableLedger.findMany({
+      where: { supplierId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    return { supplier, totalDebt, recentEntries };
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async getAssignedCustomerIds(salesUserId: number): Promise<number[]> {
@@ -488,14 +531,26 @@ export class FinanceService {
   }
 
   private async generateInvoiceNumber(): Promise<string> {
-    const count = await this.prisma.invoice.count();
     const year = new Date().getFullYear();
-    return `INV-${year}-${String(count + 1).padStart(5, '0')}`;
+    const prefix = `INV-${year}`;
+    const last = await this.prisma.invoice.findFirst({
+      where: { invoiceNumber: { startsWith: prefix } },
+      orderBy: { id: 'desc' },
+      select: { invoiceNumber: true },
+    });
+    const seq = last ? parseInt(last.invoiceNumber.split('-').pop() ?? '0', 10) + 1 : 1;
+    return `${prefix}-${String(seq).padStart(5, '0')}`;
   }
 
   private async generatePaymentNumber(): Promise<string> {
-    const count = await this.prisma.payment.count();
     const year = new Date().getFullYear();
-    return `PAY-${year}-${String(count + 1).padStart(5, '0')}`;
+    const prefix = `PAY-${year}`;
+    const last = await this.prisma.payment.findFirst({
+      where: { paymentNumber: { startsWith: prefix } },
+      orderBy: { id: 'desc' },
+      select: { paymentNumber: true },
+    });
+    const seq = last ? parseInt(last.paymentNumber.split('-').pop() ?? '0', 10) + 1 : 1;
+    return `${prefix}-${String(seq).padStart(5, '0')}`;
   }
 }

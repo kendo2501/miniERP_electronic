@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto, CreateAddressDto, UpdateAddressDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerQueryDto, CreatePortalAccountDto, CreateAddressDto, UpdateAddressDto, UpdateCreditLimitDto } from './dto/customer.dto';
 
 const SELECT_CUSTOMER = {
   id: true, customerCode: true, companyName: true, contactName: true,
@@ -95,6 +95,57 @@ export class CustomersService {
     const existing = await this.prisma.customerAddress.findFirst({ where: { id: addressId, customerId } });
     if (!existing) throw new NotFoundException(`Address #${addressId} not found for customer #${customerId}`);
     return this.prisma.customerAddress.delete({ where: { id: addressId } });
+  }
+
+  async updateCreditLimit(customerId: number, dto: UpdateCreditLimitDto) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, creditLimit: true },
+    });
+    if (!customer) throw new NotFoundException(`Customer #${customerId} not found`);
+
+    const oldValue = Number(customer.creditLimit);
+    const updated = await this.prisma.customer.update({
+      where: { id: customerId },
+      data: { creditLimit: dto.creditLimit },
+      select: { id: true, companyName: true, creditLimit: true },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        action: 'UPDATE',
+        entityType: 'Customer',
+        entityId: customerId,
+        beforeSnapshot: { creditLimit: oldValue },
+        afterSnapshot: { creditLimit: dto.creditLimit },
+      },
+    });
+
+    return updated;
+  }
+
+  async getCreditStatus(customerId: number) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, companyName: true, creditLimit: true, deletedAt: true },
+    });
+    if (!customer || customer.deletedAt) throw new NotFoundException(`Customer #${customerId} not found`);
+
+    const agg = await this.prisma.accountsReceivableLedger.aggregate({
+      where: { customerId },
+      _sum: { debitAmount: true, creditAmount: true },
+    });
+
+    const totalDebit = Number(agg._sum.debitAmount ?? 0);
+    const totalCredit = Number(agg._sum.creditAmount ?? 0);
+    const outstandingDebt = Math.max(0, totalDebit - totalCredit);
+    const limit = Number(customer.creditLimit);
+
+    return {
+      creditLimit: limit,
+      outstandingDebt,
+      availableCredit: limit === 0 ? null : limit - outstandingDebt,
+    };
   }
 
   async create(dto: CreateCustomerDto) {

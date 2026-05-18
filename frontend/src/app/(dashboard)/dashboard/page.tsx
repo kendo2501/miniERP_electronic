@@ -395,10 +395,10 @@ function CustomerDashboard({ user }: { user: any }) {
 
   const portalCards = [
     {
-      href: "/catalog",
+      href: "/my-catalog",
       icon: Package,
-      label: t.catalog.title,
-      description: t.catalog.subtitle,
+      label: t.myCatalog.title,
+      description: t.myCatalog.subtitle,
       color: "text-[#593E67]",
       bg: "bg-[#593E67]/10",
       border: "hover:border-[#593E67]/40",

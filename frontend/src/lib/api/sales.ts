@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import type {
-  Customer, CustomerListResponse, CreateCustomerPayload, UpdateCustomerPayload, CustomerBalance,
+  Customer, CustomerListResponse, CreateCustomerPayload, UpdateCustomerPayload, CustomerBalance, CreditStatus,
   Quotation, QuotationListResponse, CreateQuotationPayload,
   SalesOrder, SalesOrderListResponse, CreateSalesOrderPayload,
 } from '@/types/sales';
@@ -36,6 +36,12 @@ export const updateCustomerAddress = (customerId: number, addressId: number, dat
 
 export const deleteCustomerAddress = (customerId: number, addressId: number) =>
   apiClient.delete(`/customers/${customerId}/addresses/${addressId}`);
+
+export const updateCreditLimit = (customerId: number, creditLimit: number) =>
+  apiClient.patch(`/customers/${customerId}/credit-limit`, { creditLimit });
+
+export const getCreditStatus = (customerId: number) =>
+  apiClient.get<CreditStatus>(`/customers/${customerId}/credit-status`);
 
 // ─── Quotations ───────────────────────────────────────────────────────────────
 
@@ -131,3 +137,20 @@ export const respondToInquiry = (id: number, data: {
 
 export const getCustomerBalance = (customerId: number) =>
   apiClient.get<CustomerBalance>(`/sales/customers/${customerId}/balance`);
+
+// ─── Sales Returns ────────────────────────────────────────────────────────────
+
+export const listReturns = (params?: Record<string, unknown>) =>
+  apiClient.get<any>('/sales/returns', { params });
+
+export const getReturn = (id: number) =>
+  apiClient.get<any>(`/sales/returns/${id}`);
+
+export const createReturn = (data: { salesOrderId: number; items: { productId: number; quantity: number; reason?: string; warehouseId?: number }[]; reason?: string }) =>
+  apiClient.post<any>('/sales/returns', data);
+
+export const approveReturn = (id: number) =>
+  apiClient.post<any>(`/sales/returns/${id}/approve`);
+
+export const rejectReturn = (id: number, reason: string) =>
+  apiClient.post<any>(`/sales/returns/${id}/reject`, { reason });

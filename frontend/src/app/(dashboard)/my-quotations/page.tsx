@@ -346,7 +346,7 @@ function QuotationItemsSection({ quotationId }: { quotationId: number }) {
       <div className="flex justify-between items-center pt-2 px-3 border-t">
         <span className="text-xs text-muted-foreground">Tổng cộng (đã VAT)</span>
         <span className="font-bold tabular-nums">
-          {vnd(data.items.reduce((s, i) => s + Number(i.totalAmount), 0) * 1.1)}
+          {vnd(Number(data.totalAmount))}
         </span>
       </div>
     </div>

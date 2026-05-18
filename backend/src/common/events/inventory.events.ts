@@ -31,3 +31,11 @@ export class GoodsReceivedEvent {
     public readonly items: Array<{ productId: string; qty: number; unitCost: number }>,
   ) {}
 }
+
+export class GoodsReceivedInventoryEvent {
+  constructor(
+    public readonly grnId: number,
+    public readonly warehouseId: number,
+    public readonly items: Array<{ productId: number; quantity: number }>,
+  ) {}
+}

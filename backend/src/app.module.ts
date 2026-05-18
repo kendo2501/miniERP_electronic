@@ -20,6 +20,8 @@ import { SettingsModule } from './settings/settings.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { StockInquiryModule } from './stock-inquiry/stock-inquiry.module';
 import { MinioModule } from './minio/minio.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { PurchaseModule } from './purchase/purchase.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -52,6 +54,8 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     SettingsModule,
     ReportingModule,
     StockInquiryModule,
+    SuppliersModule,
+    PurchaseModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

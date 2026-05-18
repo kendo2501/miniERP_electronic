@@ -65,6 +65,15 @@ export class ArLedgerQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() transactionType?: string;
 }
 
+// ─── AP Ledger ────────────────────────────────────────────────────────────────
+
+export class ApLedgerQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) page?: number = 1;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) limit?: number = 20;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) supplierId?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() transactionType?: string;
+}
+
 // ─── Outstanding / Aging ──────────────────────────────────────────────────────
 
 export class OutstandingQueryDto {

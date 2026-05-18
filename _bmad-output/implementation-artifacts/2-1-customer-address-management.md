@@ -1,6 +1,6 @@
 # Story 2.1: Customer Address Management — Quản lý địa chỉ khách hàng
 
-Status: review
+Status: done
 
 ## Story
 

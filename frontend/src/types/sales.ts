@@ -38,6 +38,12 @@ export interface CustomerBalanceInvoice {
   salesOrder?: { id: number; orderNumber: string };
 }
 
+export interface CreditStatus {
+  creditLimit: number;
+  outstandingDebt: number;
+  availableCredit: number | null;
+}
+
 export interface CustomerBalance {
   customer: Pick<Customer, 'id' | 'companyName' | 'customerCode' | 'creditLimit'>;
   invoices: CustomerBalanceInvoice[];
@@ -126,7 +132,7 @@ export interface QuotationListResponse {
 export interface QuotationItemPayload {
   productId: number;
   quantity: number;
-  unitPrice: number;
+  unitPrice?: number;
   discountPercent?: number;
 }
 

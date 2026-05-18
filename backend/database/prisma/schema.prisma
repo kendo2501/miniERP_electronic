@@ -229,27 +229,143 @@ model Supplier {
   deletedAt    DateTime? @map("deleted_at")
 
   purchaseOrders   PurchaseOrder[]
+  rfqQuotes        RFQSupplierQuote[]
+  purchaseInvoices PurchaseInvoice[]
   apLedger         AccountsPayableLedger[]
   supplierPayments SupplierPayment[]
 
   @@map("suppliers")
 }
 
-model PurchaseOrder {
-  id          Int       @id @default(autoincrement())
-  poNumber    String    @unique @map("po_number") @db.VarChar(100)
-  supplierId  Int       @map("supplier_id")
-  status      String?   @db.VarChar(50)
-  totalAmount Decimal?  @map("total_amount") @db.Decimal(18, 2)
-  notes       String?   @db.Text
-  expectedAt  DateTime? @map("expected_at") @db.Date
-  createdBy   Int?      @map("created_by")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+model PurchaseRequest {
+  id               Int       @id @default(autoincrement())
+  prNumber         String    @unique @map("pr_number") @db.VarChar(100)
+  status           String    @default("DRAFT") @db.VarChar(50)
+  notes            String?   @db.Text
+  requestedBy      Int?      @map("requested_by")
+  approvedBy       Int?      @map("approved_by")
+  approvedAt       DateTime? @map("approved_at")
+  rejectionReason  String?   @map("rejection_reason") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  supplier Supplier           @relation(fields: [supplierId], references: [id])
-  items    PurchaseOrderItem[]
-  receipts GoodsReceipt[]
+  items PurchaseRequestItem[]
+
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                Int     @id @default(autoincrement())
+  purchaseRequestId Int     @map("purchase_request_id")
+  productId         Int     @map("product_id")
+  quantity          Decimal @db.Decimal(18, 2)
+  estimatedUnitPrice Decimal? @map("estimated_unit_price") @db.Decimal(18, 2)
+  notes             String? @db.Text
+
+  purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id])
+  product         Product         @relation(fields: [productId], references: [id])
+
+  @@map("purchase_request_items")
+}
+
+model RFQ {
+  id               Int       @id @default(autoincrement())
+  rfqNumber        String    @unique @map("rfq_number") @db.VarChar(100)
+  status           String    @default("DRAFT") @db.VarChar(50)
+  winnerSupplierId Int?      @map("winner_supplier_id")
+  notes            String?   @db.Text
+  createdBy        Int?      @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  items          RFQItem[]
+  supplierQuotes RFQSupplierQuote[]
+
+  @@map("rfqs")
+}
+
+model RFQItem {
+  id        Int     @id @default(autoincrement())
+  rfqId     Int     @map("rfq_id")
+  productId Int     @map("product_id")
+  quantity  Decimal @db.Decimal(18, 2)
+
+  rfq     RFQ     @relation(fields: [rfqId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("rfq_items")
+}
+
+model RFQSupplierQuote {
+  id          Int      @id @default(autoincrement())
+  rfqId       Int      @map("rfq_id")
+  supplierId  Int      @map("supplier_id")
+  status      String   @default("PENDING") @db.VarChar(50)
+  totalAmount Decimal? @map("total_amount") @db.Decimal(18, 2)
+  deliveryDays Int?    @map("delivery_days")
+  notes       String?  @db.Text
+  quotedAt    DateTime? @map("quoted_at")
+
+  rfq      RFQ                   @relation(fields: [rfqId], references: [id])
+  supplier Supplier              @relation(fields: [supplierId], references: [id])
+  items    RFQSupplierQuoteItem[]
+
+  @@unique([rfqId, supplierId])
+  @@map("rfq_supplier_quotes")
+}
+
+model RFQSupplierQuoteItem {
+  id                 Int      @id @default(autoincrement())
+  rfqSupplierQuoteId Int      @map("rfq_supplier_quote_id")
+  productId          Int      @map("product_id")
+  unitPrice          Decimal? @map("unit_price") @db.Decimal(18, 2)
+  deliveryDays       Int?     @map("delivery_days")
+
+  rfqSupplierQuote RFQSupplierQuote @relation(fields: [rfqSupplierQuoteId], references: [id])
+  product          Product          @relation(fields: [productId], references: [id])
+
+  @@map("rfq_supplier_quote_items")
+}
+
+model PurchaseInvoice {
+  id                 Int       @id @default(autoincrement())
+  invoiceNumber      String    @unique @map("invoice_number") @db.VarChar(100)
+  purchaseOrderId    Int?      @map("purchase_order_id")
+  supplierId         Int?      @map("supplier_id")
+  totalAmount        Decimal   @map("total_amount") @db.Decimal(18, 2)
+  status             String    @default("DRAFT") @db.VarChar(50)
+  dueDate            DateTime? @map("due_date") @db.Date
+  notes              String?   @db.Text
+  matchingStatus     String?   @map("matching_status") @db.VarChar(50)
+  createdBy          Int?      @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+  @@map("purchase_invoices")
+}
+
+model PurchaseOrder {
+  id             Int       @id @default(autoincrement())
+  poNumber       String    @unique @map("po_number") @db.VarChar(100)
+  supplierId     Int       @map("supplier_id")
+  status         String?   @db.VarChar(50)
+  totalAmount    Decimal?  @map("total_amount") @db.Decimal(18, 2)
+  notes          String?   @db.Text
+  expectedAt     DateTime? @map("expected_at") @db.Date
+  sentAt         DateTime? @map("sent_at")
+  cancelReason   String?   @map("cancel_reason") @db.Text
+  createdBy      Int?      @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  supplier  Supplier           @relation(fields: [supplierId], references: [id])
+  items     PurchaseOrderItem[]
+  receipts  GoodsReceipt[]
+  invoices  PurchaseInvoice[]
 
   @@index([supplierId])
   @@map("purchase_orders")
@@ -359,6 +475,9 @@ model Product {
   uomConversions        UomConversion[]
   priceListItems        PriceListItem[]
   purchaseOrderItems    PurchaseOrderItem[]
+  purchaseRequestItems  PurchaseRequestItem[]
+  rfqItems              RFQItem[]
+  rfqQuoteItems         RFQSupplierQuoteItem[]
   goodsReceiptItems     GoodsReceiptItem[]
   stockCountItems          StockCountItem[]
   salesReturnItems         SalesReturnItem[]
@@ -683,13 +802,16 @@ model DeliveryItem {
 }
 
 model SalesReturn {
-  id           Int      @id @default(autoincrement())
-  returnNumber String   @unique @map("return_number") @db.VarChar(100)
-  salesOrderId Int      @map("sales_order_id")
-  reason       String?  @db.Text
-  status       String?  @db.VarChar(50)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id               Int       @id @default(autoincrement())
+  returnNumber     String    @unique @map("return_number") @db.VarChar(100)
+  salesOrderId     Int       @map("sales_order_id")
+  reason           String?   @db.Text
+  status           String?   @db.VarChar(50)
+  approvedBy       Int?      @map("approved_by")
+  approvedAt       DateTime? @map("approved_at")
+  rejectionReason  String?   @map("rejection_reason") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   salesOrder SalesOrder       @relation(fields: [salesOrderId], references: [id])
   items      SalesReturnItem[]
@@ -702,6 +824,8 @@ model SalesReturnItem {
   salesReturnId Int     @map("sales_return_id")
   productId     Int     @map("product_id")
   quantity      Decimal @db.Decimal(18, 2)
+  reason        String? @db.Text
+  warehouseId   Int?    @map("warehouse_id")
 
   salesReturn SalesReturn @relation(fields: [salesReturnId], references: [id])
   product     Product     @relation(fields: [productId], references: [id])

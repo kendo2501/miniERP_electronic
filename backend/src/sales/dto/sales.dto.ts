@@ -7,7 +7,8 @@ import { Type } from 'class-transformer';
 export class QuotationItemDto {
   @ApiProperty() @IsInt() @Type(() => Number) productId!: number;
   @ApiProperty() @IsNumber() @Min(0.01) @Type(() => Number) quantity!: number;
-  @ApiProperty() @IsNumber() @Min(0) @Type(() => Number) unitPrice!: number;
+  @ApiPropertyOptional({ description: 'Unit price. If omitted, auto-looked up from price lists.' })
+  @IsOptional() @IsNumber() @Min(0) @Type(() => Number) unitPrice?: number;
   @ApiPropertyOptional({ description: 'Chiết khấu % (0–100)' })
   @IsOptional() @IsNumber() @Min(0) @Max(100) @Type(() => Number) discountPercent?: number;
 }
@@ -66,9 +67,16 @@ export class RequestRevisionDto {
   @ApiProperty() @IsString() reason!: string;
 }
 
+export class QuotationItemWithPriceDto {
+  @ApiProperty() @IsInt() @Type(() => Number) productId!: number;
+  @ApiProperty() @IsNumber() @Min(0.01) @Type(() => Number) quantity!: number;
+  @ApiProperty() @IsNumber() @Min(0) @Type(() => Number) unitPrice!: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(100) @Type(() => Number) discountPercent?: number;
+}
+
 export class UpdateQuotationItemsDto {
-  @ApiProperty({ type: [QuotationItemDto] })
-  @IsArray() @ValidateNested({ each: true }) @Type(() => QuotationItemDto) items!: QuotationItemDto[];
+  @ApiProperty({ type: [QuotationItemWithPriceDto] })
+  @IsArray() @ValidateNested({ each: true }) @Type(() => QuotationItemWithPriceDto) items!: QuotationItemWithPriceDto[];
 }
 
 // ─── Counter Offer ────────────────────────────────────────────────────────
@@ -87,4 +95,31 @@ export class RequestPriceAdjustmentDto {
 export class AdjustOrderPricesDto {
   @ApiProperty({ type: [SalesOrderItemDto] })
   @IsArray() @ValidateNested({ each: true }) @Type(() => SalesOrderItemDto) items!: SalesOrderItemDto[];
+}
+
+// ─── Sales Returns ────────────────────────────────────────────────────────
+
+export class SalesReturnItemDto {
+  @ApiProperty() @IsInt() @Type(() => Number) productId!: number;
+  @ApiProperty({ minimum: 0.001 }) @IsNumber() @Min(0.001) @Type(() => Number) quantity!: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Type(() => Number) warehouseId?: number;
+}
+
+export class CreateSalesReturnDto {
+  @ApiProperty() @IsInt() @Type(() => Number) salesOrderId!: number;
+  @ApiProperty({ type: [SalesReturnItemDto] })
+  @IsArray() @ValidateNested({ each: true }) @Type(() => SalesReturnItemDto) items!: SalesReturnItemDto[];
+  @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+}
+
+export class RejectReturnDto {
+  @ApiProperty() @IsString() reason!: string;
+}
+
+export class SalesReturnQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) page?: number = 1;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) limit?: number = 20;
+  @ApiPropertyOptional() @IsOptional() status?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Type(() => Number) salesOrderId?: number;
 }

@@ -13,6 +13,11 @@ import {
   UpdateReplenishmentDto,
   ReplenishmentQueryDto,
 } from './dto/replenishment.dto';
+import {
+  CreateStockCountDto,
+  UpdateStockCountItemsDto,
+  StockCountQueryDto,
+} from './dto/stock-count.dto';
 
 @Injectable()
 export class InventoryService {
@@ -490,6 +495,177 @@ export class InventoryService {
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
+  // ─── Stock Counts ─────────────────────────────────────────────────────────
+
+  async listStockCounts(query: StockCountQueryDto) {
+    const { page = 1, limit = 20, warehouseId, status } = query;
+    const where: any = {};
+    if (warehouseId) where.warehouseId = warehouseId;
+    if (status) where.status = status;
+
+    const [items, total] = await Promise.all([
+      this.prisma.stockCount.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          warehouse: { select: { id: true, code: true, warehouseName: true } },
+          _count: { select: { items: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.stockCount.count({ where }),
+    ]);
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getStockCount(id: number) {
+    const sc = await this.prisma.stockCount.findUnique({
+      where: { id },
+      include: {
+        warehouse: { select: { id: true, code: true, warehouseName: true } },
+        items: {
+          include: { product: { select: { id: true, sku: true, productName: true, unit: true } } },
+          orderBy: { id: 'asc' },
+        },
+      },
+    });
+    if (!sc) throw new NotFoundException(`StockCount #${id} not found`);
+    return sc;
+  }
+
+  async createStockCount(dto: CreateStockCountDto, userId: number) {
+    await this.ensureWarehouseExists(dto.warehouseId);
+
+    const countNumber = await this.generateStockCountNumber();
+
+    return this.prisma.$transaction(async (tx) => {
+      const sc = await tx.stockCount.create({
+        data: {
+          countNumber,
+          warehouseId: dto.warehouseId,
+          status: 'DRAFT',
+          createdBy: userId,
+        },
+      });
+
+      for (const productId of dto.productIds) {
+        const stock = await tx.inventoryStock.findUnique({
+          where: { warehouseId_productId: { warehouseId: dto.warehouseId, productId } },
+          select: { availableQuantity: true },
+        });
+        const systemQty = stock ? Number(stock.availableQuantity) : 0;
+
+        await tx.stockCountItem.create({
+          data: {
+            stockCountId: sc.id,
+            productId,
+            systemQuantity: systemQty,
+            countedQuantity: systemQty,
+            difference: 0,
+          },
+        });
+      }
+
+      return tx.stockCount.findUniqueOrThrow({
+        where: { id: sc.id },
+        include: {
+          warehouse: { select: { id: true, code: true, warehouseName: true } },
+          items: {
+            include: { product: { select: { id: true, sku: true, productName: true, unit: true } } },
+          },
+        },
+      });
+    });
+  }
+
+  async updateStockCountItems(id: number, dto: UpdateStockCountItemsDto) {
+    const sc = await this.getStockCount(id);
+    if (sc.status !== 'DRAFT') throw new BadRequestException('Only DRAFT stock counts can be edited');
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const item of dto.items) {
+        const existing = await tx.stockCountItem.findFirst({
+          where: { stockCountId: id, productId: item.productId },
+        });
+        if (!existing) continue;
+
+        const difference = item.countedQuantity - Number(existing.systemQuantity);
+        await tx.stockCountItem.update({
+          where: { id: existing.id },
+          data: { countedQuantity: item.countedQuantity, difference },
+        });
+      }
+
+      return tx.stockCount.findUniqueOrThrow({
+        where: { id },
+        include: {
+          warehouse: { select: { id: true, code: true, warehouseName: true } },
+          items: {
+            include: { product: { select: { id: true, sku: true, productName: true, unit: true } } },
+          },
+        },
+      });
+    });
+  }
+
+  async submitStockCount(id: number) {
+    const sc = await this.getStockCount(id);
+    if (sc.status !== 'DRAFT') throw new BadRequestException('Only DRAFT stock counts can be submitted');
+
+    return this.prisma.stockCount.update({
+      where: { id },
+      data: { status: 'PENDING_APPROVAL' },
+      select: { id: true, countNumber: true, status: true },
+    });
+  }
+
+  async approveStockCount(id: number, userId: number) {
+    const sc = await this.getStockCount(id);
+    if (sc.status !== 'PENDING_APPROVAL') throw new BadRequestException('Only PENDING_APPROVAL stock counts can be approved');
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const item of sc.items) {
+        const diff = Number(item.difference);
+        if (diff === 0) continue;
+
+        const stock = await tx.inventoryStock.findUnique({
+          where: { warehouseId_productId: { warehouseId: sc.warehouseId, productId: item.productId } },
+        });
+        const currentQty = stock ? Number(stock.availableQuantity) : 0;
+        const newQty = currentQty + diff;
+        const safeQty = Math.max(0, newQty);
+
+        await tx.inventoryStock.upsert({
+          where: { warehouseId_productId: { warehouseId: sc.warehouseId, productId: item.productId } },
+          create: { warehouseId: sc.warehouseId, productId: item.productId, availableQuantity: safeQty, reservedQuantity: 0, damagedQuantity: 0 },
+          update: { availableQuantity: safeQty },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            warehouseId: sc.warehouseId,
+            productId: item.productId,
+            transactionType: diff > 0 ? 'STOCK_COUNT_IN' : 'STOCK_COUNT_OUT',
+            referenceType: 'STOCK_COUNT',
+            referenceId: id,
+            quantity: diff,
+            balanceAfter: safeQty,
+            notes: `Stock count ${sc.countNumber}`,
+            createdBy: userId,
+          },
+        });
+      }
+
+      return tx.stockCount.update({
+        where: { id },
+        data: { status: 'APPROVED', approvedBy: userId },
+        select: { id: true, countNumber: true, status: true, approvedBy: true },
+      });
+    });
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async ensureWarehouseExists(id: number) {
@@ -500,6 +676,18 @@ export class InventoryService {
   private async ensureProductExists(id: number) {
     const p = await this.prisma.product.findUnique({ where: { id }, select: { id: true, deletedAt: true } });
     if (!p || p.deletedAt) throw new NotFoundException(`Product #${id} not found`);
+  }
+
+  private async generateStockCountNumber() {
+    const prefix = 'CNT';
+    const last = await this.prisma.stockCount.findFirst({
+      orderBy: { id: 'desc' },
+      select: { countNumber: true },
+    });
+    if (!last?.countNumber) return `${prefix}-00001`;
+    const match = last.countNumber.match(/\d+$/);
+    const next = match ? parseInt(match[0], 10) + 1 : 1;
+    return `${prefix}-${String(next).padStart(5, '0')}`;
   }
 
   private async generateReplenishmentNumber(tx: any) {

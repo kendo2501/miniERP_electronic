@@ -5,6 +5,7 @@ import {
   CreateInvoiceDto, InvoiceQueryDto,
   CreatePaymentDto, PaymentQueryDto,
   AllocatePaymentDto, ArLedgerQueryDto, OutstandingQueryDto,
+  ApLedgerQueryDto,
 } from './dto/finance.dto';
 import { RequirePermissions, AnyPermission } from '../common/decorators/permissions.decorator';
 
@@ -51,6 +52,14 @@ export class FinanceController {
 
   @Get('ar-ledger') @RequirePermissions('finance.invoice.view') @ApiOperation({ summary: 'AR ledger entries (immutable)' })
   listArLedger(@Query() query: ArLedgerQueryDto) { return this.service.listArLedger(query); }
+
+  // ─── AP Ledger ────────────────────────────────────────────────────────────
+
+  @Get('ap-ledger') @RequirePermissions('finance.invoice.view') @ApiOperation({ summary: 'AP ledger entries (immutable)' })
+  listApLedger(@Query() query: ApLedgerQueryDto) { return this.service.listApLedger(query); }
+
+  @Get('suppliers/:id/balance') @RequirePermissions('finance.invoice.view') @ApiOperation({ summary: 'Supplier outstanding AP balance' })
+  getSupplierBalance(@Param('id', ParseIntPipe) id: number) { return this.service.getSupplierBalance(id); }
 
   // ─── Credit Limits ────────────────────────────────────────────────────────
 

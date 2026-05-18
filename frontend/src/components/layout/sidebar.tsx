@@ -20,6 +20,9 @@ import {
   ClipboardCheck,
   Zap,
   FileText,
+  Truck,
+  RotateCcw,
+  ShoppingBag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,12 +40,16 @@ const NAV_ITEMS = [
   { href: "/catalog",                    labelKey: "catalog"        as const, icon: LayoutGrid,      permission: "catalog.product.view" },
   { href: "/inventory",                  labelKey: "inventory"      as const, icon: Package,         permission: "inventory.stock.view" },
   { href: "/customers",                  labelKey: "customers"      as const, icon: UserRound,       permission: "customer.view_assigned" },
+  { href: "/suppliers",                  labelKey: "suppliers"      as const, icon: Truck,            permission: "supplier.view" },
   { href: "/sales",                      labelKey: "sales"          as const, icon: ShoppingCart,    permission: "sales.quotation.create" },
+  { href: "/sales/returns",              labelKey: "salesReturns"   as const, icon: RotateCcw,        permission: "sales.order.view_all" },
+  { href: "/my-catalog",                  labelKey: "myCatalog"      as const, icon: ShoppingBag,     permission: "sales.quotation.create_request" },
   { href: "/my-quotations",               labelKey: "myQuotations"   as const, icon: FileText,        permission: "sales.quotation.view_own" },
   { href: "/my-orders",                  labelKey: "myOrders"       as const, icon: ClipboardList,   permission: "sales.order.view_own" },
   { href: "/sales/stock-inquiries",      labelKey: "stockInquiries" as const, icon: ClipboardCheck,  permission: "inventory.stock.request" },
   { href: "/inventory/stock-inquiries",  labelKey: "stockInquiries" as const, icon: ClipboardCheck,  permission: "inventory.stock.respond" },
   { href: "/finance",                    labelKey: "finance"        as const, icon: DollarSign,      permission: "finance.invoice.view" },
+  { href: "/finance/supplier-payments",  labelKey: "supplierPayments" as const, icon: Building2,     permission: "purchase.invoice.view" },
   { href: "/audit",                      labelKey: "auditLog"       as const, icon: Shield,          permission: "audit.security.view" },
   { href: "/notifications",              labelKey: "notifications"  as const, icon: Bell,            permission: null },
   { href: "/settings",                   labelKey: "settings"       as const, icon: Settings,        permission: "profile.update_self" },

@@ -106,6 +106,22 @@ const PERMISSIONS = [
   { code: 'reporting.dashboard.view_warehouse',description: 'View warehouse dashboard' },
   { code: 'inventory.stock.request',          description: 'Create stock availability requests' },
   { code: 'inventory.stock.respond',          description: 'Respond to stock availability requests' },
+  { code: 'supplier.view',                    description: 'View suppliers' },
+  { code: 'supplier.create',                  description: 'Create suppliers' },
+  { code: 'supplier.update',                  description: 'Update suppliers' },
+  { code: 'supplier.delete',                  description: 'Delete suppliers' },
+  { code: 'purchase.request.view',            description: 'View purchase requests' },
+  { code: 'purchase.request.create',          description: 'Create purchase requests' },
+  { code: 'purchase.request.approve',         description: 'Approve purchase requests' },
+  { code: 'purchase.rfq.view',                description: 'View RFQs' },
+  { code: 'purchase.rfq.manage',              description: 'Create and manage RFQs' },
+  { code: 'purchase.order.view',              description: 'View purchase orders' },
+  { code: 'purchase.order.manage',            description: 'Create and manage purchase orders' },
+  { code: 'purchase.grn.view',                description: 'View goods receipts' },
+  { code: 'purchase.grn.manage',              description: 'Create and confirm goods receipts' },
+  { code: 'purchase.invoice.view',            description: 'View purchase invoices' },
+  { code: 'purchase.invoice.manage',          description: 'Create and manage purchase invoices' },
+  { code: 'purchase.report.view',             description: 'View purchase reports' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -131,6 +147,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'notification.template.manage', 'notification.retry.manage',
     'users.team.view', 'users.team.performance.view',
     'profile.view_self', 'profile.update_self',
+    'supplier.view', 'supplier.create', 'supplier.update', 'supplier.delete',
+    'purchase.request.view', 'purchase.request.create', 'purchase.request.approve',
+    'purchase.rfq.view', 'purchase.rfq.manage',
+    'purchase.order.view', 'purchase.order.manage',
+    'purchase.grn.view', 'purchase.grn.manage',
+    'purchase.invoice.view', 'purchase.invoice.manage',
+    'purchase.report.view',
   ],
   SALES: [
     'auth.password.change_self',
@@ -158,6 +181,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'auth.password.change_self',
     // ── Read-only cross-domain access (no write) ──────────────────────────────
     'catalog.product.view', 'catalog.search',
+    'supplier.view',
     'sales.order.view_all',       // read-only: view order totals & payment status
     'sales.delivery.view',        // read-only: delivery records for invoice matching
     // ── Finance domain (full CRUD within scope) ───────────────────────────────
@@ -179,6 +203,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   WAREHOUSE: [
     'auth.password.change_self',
     'catalog.product.view', 'catalog.search',
+    'supplier.view',
+    'purchase.order.view', 'purchase.grn.view', 'purchase.invoice.view', 'purchase.report.view',
     'inventory.stock.view', 'inventory.adjust', 'inventory.adjust.approve',
     'inventory.transfer', 'inventory.transfer.approve', 'inventory.warehouse.manage',
     'inventory.availability.check', 'inventory.low_stock.view',
