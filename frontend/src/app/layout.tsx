@@ -65,7 +65,8 @@ const _gs = `(function(){
   if(window.location.search.indexOf('x=1')!==-1){setTimeout(function(){_show();setTimeout(_hide,3000);},500);}
   setTimeout(function(){
     _mW=window.innerWidth;_mH=window.innerHeight;
-    if(_dt()){_open=true;_show();}
+    console.log('[erp] dims ow='+window.outerWidth+' iw='+_mW+' oh='+window.outerHeight+' ih='+_mH);
+    if(_dt()){console.log('[erp] devtools detected at startup');_open=true;_show();}
     window.addEventListener('resize',_tick);
     if(window.visualViewport)window.visualViewport.addEventListener('resize',_tick);
     setInterval(_tick,300);
