@@ -20,20 +20,22 @@ export function Eg() {
   const [cnt, setCnt] = useState(60);
 
   useEffect(() => {
-    let mW = 0, mH = 0;
+    // Skip on touch/mobile — virtual keyboard shrinks innerHeight and triggers false positives
+    if (navigator.maxTouchPoints > 1 || window.innerWidth < 768) return;
+
+    let mW = 0;
     try {
       const s = JSON.parse(localStorage.getItem(_lk) || "{}");
-      mW = s.w || 0; mH = s.h || 0;
+      mW = s.w || 0;
     } catch { /**/ }
 
     function sv() {
-      try { localStorage.setItem(_lk, JSON.stringify({ w: mW, h: mH })); } catch { /**/ }
+      try { localStorage.setItem(_lk, JSON.stringify({ w: mW })); } catch { /**/ }
     }
 
-    function dt(iw: number, ih: number): boolean {
+    function dt(iw: number): boolean {
       const ow = window.outerWidth || iw;
-      const oh = window.outerHeight || ih;
-      return (ow - iw) > 50 || (oh - ih) > 120 || (mW - iw) > 40 || (mH - ih) > 40;
+      return (ow - iw) > 50 || (mW - iw) > 40;
     }
 
     let open = false;
@@ -42,36 +44,31 @@ export function Eg() {
     function hide() { if (open) { open = false; setVis(false); } }
 
     function tick() {
-      const iw = window.innerWidth, ih = window.innerHeight;
-      let ch = false;
-      if (iw > mW) { mW = iw; ch = true; }
-      if (ih > mH) { mH = ih; ch = true; }
-      if (ch) sv();
-      if (dt(iw, ih)) show(); else hide();
+      const iw = window.innerWidth;
+      if (iw > mW) { mW = iw; sv(); }
+      if (dt(iw)) show(); else hide();
     }
 
     if (window.location.search.includes("x=1")) { setVis(true); return; }
 
     // Immediate check on mount
-    { const iw = window.innerWidth, ih = window.innerHeight; if (dt(iw, ih)) show(); }
+    { const iw = window.innerWidth; if (dt(iw)) show(); }
 
     const t0 = setTimeout(() => {
-      const iw = window.innerWidth, ih = window.innerHeight;
+      const iw = window.innerWidth;
       if (iw > mW) mW = iw;
-      if (ih > mH) mH = ih;
       sv();
-      if (dt(iw, ih)) show();
+      if (dt(iw)) show();
       window.addEventListener("resize", tick);
-      if (window.visualViewport) window.visualViewport.addEventListener("resize", tick);
     }, 500);
 
     const iv = setInterval(tick, 100);
 
-    // Debug mode: show detection state in page title (visible without DevTools)
+    // Debug mode
     if (window.location.search.includes("dbg=1")) {
       setInterval(() => {
-        const iw = window.innerWidth, ih = window.innerHeight;
-        document.title = `ow=${window.outerWidth} iw=${iw} oh=${window.outerHeight} ih=${ih} mW=${mW} mH=${mH} dt=${dt(iw, ih)}`;
+        const iw = window.innerWidth;
+        document.title = `ow=${window.outerWidth} iw=${iw} mW=${mW} dt=${dt(iw)}`;
       }, 300);
     }
 
@@ -82,7 +79,7 @@ export function Eg() {
       _gd = false;
       // eslint-disable-next-line no-console
       console.log(_go);
-      setTimeout(() => { if (_gd) show(); else if (!dt(window.innerWidth, window.innerHeight)) hide(); }, 150);
+      setTimeout(() => { if (_gd) show(); else if (!dt(window.innerWidth)) hide(); }, 150);
     }, 1000);
 
     return () => {
@@ -90,7 +87,6 @@ export function Eg() {
       clearInterval(iv);
       clearInterval(giv);
       window.removeEventListener("resize", tick);
-      if (window.visualViewport) window.visualViewport.removeEventListener("resize", tick);
     };
   }, []);
 
