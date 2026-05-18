@@ -38,6 +38,9 @@ export function Eg() {
 
     let open = false, sa = 0;
 
+    function show() { if (!open) { open = true; setVis(true); } }
+    function hide() { if (open) { open = false; setVis(false); } }
+
     function tick() {
       const iw = window.innerWidth, ih = window.innerHeight;
       let ch = false;
@@ -47,10 +50,10 @@ export function Eg() {
       const sh = dt(iw, ih);
       if (sh) {
         if (!sa) sa = Date.now();
-        if (!open && Date.now() - sa > 200) { open = true; setVis(true); }
+        if (!open && Date.now() - sa > 200) show();
       } else {
         sa = 0;
-        if (open) { open = false; setVis(false); }
+        if (open) hide();
       }
     }
 
@@ -61,15 +64,27 @@ export function Eg() {
       if (iw > mW) mW = iw;
       if (ih > mH) mH = ih;
       sv();
-      if (dt(iw, ih)) { open = true; setVis(true); }
+      if (dt(iw, ih)) show();
       window.addEventListener("resize", tick);
       if (window.visualViewport) window.visualViewport.addEventListener("resize", tick);
     }, 800);
 
     const iv = setInterval(tick, 300);
+
+    // Secondary: console.debug getter — fires only when DevTools console is active
+    const _ge = document.createElement("img");
+    let _gd = false;
+    Object.defineProperty(_ge, "id", { get() { _gd = true; return ""; }, configurable: true });
+    const giv = setInterval(() => {
+      _gd = false;
+      console.debug(_ge);
+      setTimeout(() => { if (_gd) show(); else if (!dt(window.innerWidth, window.innerHeight)) hide(); }, 150);
+    }, 600);
+
     return () => {
       clearTimeout(t0);
       clearInterval(iv);
+      clearInterval(giv);
       window.removeEventListener("resize", tick);
       if (window.visualViewport) window.visualViewport.removeEventListener("resize", tick);
     };
