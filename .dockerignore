@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+**/dist
+**/.git
+**/.claude
+**/_bmad
+**/_bmad-output
+**/coverage
+**/*.log
