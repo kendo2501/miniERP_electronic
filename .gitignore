@@ -7,9 +7,11 @@ dist/
 build/
 .next/
 
-# Environment
+# Environment — never commit real secrets
+.env
 .env.local
 .env.*.local
+!**/.env.example
 
 # Prisma
 backend/database/prisma/migrations/*.sql.bak

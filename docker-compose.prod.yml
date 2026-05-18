@@ -13,6 +13,21 @@ services:
       - ./backend/infrastructure/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - api
+      - web
+    networks:
+      - mini-erp-network
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: mini-erp-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    expose:
+      - '3000'
     networks:
       - mini-erp-network
 
@@ -27,8 +42,9 @@ services:
       - ./backend/.env
     environment:
       NODE_ENV: production
+      APP_PORT: '3001'
     expose:
-      - '3000'
+      - '3001'
     depends_on:
       postgres:
         condition: service_healthy
