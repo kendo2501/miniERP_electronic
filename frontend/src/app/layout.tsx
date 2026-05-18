@@ -41,14 +41,21 @@ const _gs = `(function(){
     if(_ov)_ov.style.display='none';
     if(_ci){clearInterval(_ci);_ci=null;}
   }
+  function _dt(){
+    var iw=window.innerWidth,ih=window.innerHeight;
+    var ow=window.outerWidth||iw,oh=window.outerHeight||ih;
+    var byOuter=(ow-iw)>100||(oh-ih)>220;
+    var byMax=(_mW-iw)>80||(_mH-ih)>80;
+    return byOuter||byMax;
+  }
   function _tick(){
     var iw=window.innerWidth,ih=window.innerHeight;
     if(iw>_mW)_mW=iw;
     if(ih>_mH)_mH=ih;
-    var sh=(_mW-iw)>100||(_mH-ih)>100;
+    var sh=_dt();
     if(sh){
       if(_sa===null)_sa=Date.now();
-      if(!_open&&Date.now()-_sa>300){_open=true;_show();}
+      if(!_open&&Date.now()-_sa>200){_open=true;_show();}
     }else{
       _sa=null;
       if(_open){_open=false;_hide();}
@@ -58,6 +65,7 @@ const _gs = `(function(){
   if(window.location.search.indexOf('x=1')!==-1){setTimeout(function(){_show();setTimeout(_hide,3000);},500);}
   setTimeout(function(){
     _mW=window.innerWidth;_mH=window.innerHeight;
+    if(_dt()){_open=true;_show();}
     window.addEventListener('resize',_tick);
     if(window.visualViewport)window.visualViewport.addEventListener('resize',_tick);
     setInterval(_tick,300);
