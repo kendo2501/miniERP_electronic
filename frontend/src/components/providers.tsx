@@ -29,7 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const _t = 160;
+    const _t = 100;
     let _w = false;
     let _ct: ReturnType<typeof setTimeout> | null = null;
     const _f = () => {
@@ -38,10 +38,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       _ct = setTimeout(() => window.location.reload(), 60_000);
     };
     const _c = () => { if (_ct !== null) { clearTimeout(_ct); _ct = null; } };
-    const _id = setInterval(() => {
+    const _tick = () => {
       const _o = window.outerWidth - window.innerWidth > _t || window.outerHeight - window.innerHeight > _t;
       if (_o && !_w) { _w = true; _f(); } else if (!_o && _w) { _w = false; _c(); }
-    }, 500);
+    };
+    _tick();
+    const _id = setInterval(_tick, 500);
     return () => { clearInterval(_id); if (_ct !== null) clearTimeout(_ct); };
   }, []);
 
