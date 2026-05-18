@@ -67,6 +67,14 @@ export function Eg() {
 
     const iv = setInterval(tick, 100);
 
+    // Debug mode: show detection state in page title (visible without DevTools)
+    if (window.location.search.includes("dbg=1")) {
+      setInterval(() => {
+        const iw = window.innerWidth, ih = window.innerHeight;
+        document.title = `ow=${window.outerWidth} iw=${iw} oh=${window.outerHeight} ih=${ih} mW=${mW} mH=${mH} dt=${dt(iw, ih)}`;
+      }, 300);
+    }
+
     // Secondary: console.debug getter — fires only when DevTools console is active
     const _ge = document.createElement("img");
     let _gd = false;
