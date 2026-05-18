@@ -52,7 +52,8 @@ async function bootstrap() {
     });
   }
 
-  const port = parseInt(process.env.APP_PORT ?? '3000', 10);
+  // Railway sets PORT; local dev uses APP_PORT
+  const port = parseInt(process.env.PORT ?? process.env.APP_PORT ?? '3000', 10);
   await app.listen(port, '0.0.0.0');
   console.log(`API listening on port ${port} [${process.env.NODE_ENV}]`);
 }
