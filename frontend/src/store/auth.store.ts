@@ -1,11 +1,25 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { AuthUser } from "@/types/auth";
+import { tokenMgr } from "@/lib/storage";
+
+const _ek = "_ms";
+const _enc = createJSONStorage(() => ({
+  getItem: (k: string) => {
+    if (typeof window === "undefined") return null;
+    const r = localStorage.getItem(k);
+    try { return r ? atob(r) : null; } catch { return null; }
+  },
+  setItem: (k: string, v: string) => {
+    if (typeof window !== "undefined") localStorage.setItem(k, btoa(v));
+  },
+  removeItem: (k: string) => {
+    if (typeof window !== "undefined") localStorage.removeItem(k);
+  },
+}));
 
 interface AuthState {
   user: AuthUser | null;
-  accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setUser: (user: AuthUser) => void;
@@ -18,26 +32,19 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
-      accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
 
       setTokens: (accessToken, refreshToken) => {
-        if (typeof window !== "undefined") {
-          localStorage.setItem("accessToken", accessToken);
-          localStorage.setItem("refreshToken", refreshToken);
-        }
-        set({ accessToken, refreshToken, isAuthenticated: true });
+        tokenMgr.setAccess(accessToken);
+        tokenMgr.setRefresh(refreshToken);
+        set({ isAuthenticated: true });
       },
 
       setUser: (user) => set({ user }),
 
       logout: () => {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-        }
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+        tokenMgr.clear();
+        set({ user: null, isAuthenticated: false });
       },
 
       hasPermission: (permission) => {
@@ -51,10 +58,9 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: "auth-storage",
+      name: _ek,
+      storage: _enc,
       partialize: (state) => ({
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
         user: state.user,
       }),

@@ -25,6 +25,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
+    ["accessToken", "refreshToken", "auth-storage"].forEach((k) => localStorage.removeItem(k));
+  }, []);
+
+  useEffect(() => {
     const _t = 160;
     let _w = false;
     let _ct: ReturnType<typeof setTimeout> | null = null;

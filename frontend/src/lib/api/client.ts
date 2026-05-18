@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
+import { tokenMgr } from "@/lib/storage";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -9,11 +10,9 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const token = tokenMgr.getAccess();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -38,19 +37,18 @@ apiClient.interceptors.response.use(
       }
       isRefreshing = true;
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
+        const refreshToken = tokenMgr.getRefresh();
         if (!refreshToken) throw new Error("No refresh token");
         const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh`, { refreshToken });
-        localStorage.setItem("accessToken", data.accessToken);
-        localStorage.setItem("refreshToken", data.refreshToken);
+        tokenMgr.setAccess(data.accessToken);
+        tokenMgr.setRefresh(data.refreshToken);
         const queue = refreshQueue;
         refreshQueue = [];
         queue.forEach((cb) => { try { cb(data.accessToken); } catch {} });
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return apiClient(original);
       } catch {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
+        tokenMgr.clear();
         if (typeof window !== "undefined") window.location.href = "/login";
         return Promise.reject(error);
       } finally {
