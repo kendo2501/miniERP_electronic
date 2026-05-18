@@ -75,14 +75,13 @@ export function Eg() {
       }, 300);
     }
 
-    // Secondary: console getter — Chrome evaluates object properties when DevTools is open
-    const _ge = new Image();
+    // Secondary: plain-object getter — Chrome reads ALL properties eagerly for inline display
     let _gd = false;
-    Object.defineProperty(_ge, "id", { get() { _gd = true; return ""; }, configurable: true });
+    const _go = Object.defineProperty({}, "id", { get() { _gd = true; return ""; } });
     const giv = setInterval(() => {
       _gd = false;
       // eslint-disable-next-line no-console
-      console.log(_ge);
+      console.log(_go);
       setTimeout(() => { if (_gd) show(); else if (!dt(window.innerWidth, window.innerHeight)) hide(); }, 150);
     }, 1000);
 
