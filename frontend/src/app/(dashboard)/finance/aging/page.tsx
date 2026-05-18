@@ -38,12 +38,12 @@ export default function AgingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.aging.title}</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">{t.aging.title}</h1>
           <p className="text-muted-foreground mt-1">{t.aging.subtitle}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/finance"><Button variant="outline" size="sm">{t.common.overview}</Button></Link>
           <Link href="/finance/invoices"><Button variant="outline" size="sm">{t.finance.invoices}</Button></Link>
         </div>
@@ -55,7 +55,7 @@ export default function AgingPage() {
         </div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {buckets.map(({ key, label, color, textColor }) => (
               <Card key={key}>
                 <CardHeader className="pb-2 pt-4 px-4">

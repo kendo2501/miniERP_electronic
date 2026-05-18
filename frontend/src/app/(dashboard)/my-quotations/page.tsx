@@ -68,7 +68,7 @@ export default function MyQuotationsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl flex items-center gap-2">
           <FileText className="h-7 w-7 text-muted-foreground" />
           {t.myQuotations.title}
         </h1>

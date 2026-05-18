@@ -248,12 +248,12 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.catalog.products}</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">{t.catalog.products}</h1>
           <p className="text-muted-foreground mt-1">{t.catalog.subtitle}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/catalog/categories"><Button variant="outline" size="sm">{t.catalog.categories}</Button></Link>
           <Link href="/catalog/brands"><Button variant="outline" size="sm">{t.catalog.brands}</Button></Link>
           <Button variant="outline" size="sm" onClick={handleExportProducts}>
@@ -271,21 +271,21 @@ export default function ProductsPage() {
 
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-48 max-w-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:flex-1 sm:min-w-48 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder={t.catalog.searchPlaceholder} className="pl-9" value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             </div>
             <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-40"><SelectValue placeholder={t.catalog.allCategories} /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder={t.catalog.allCategories} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.catalog.allCategories}</SelectItem>
                 {categories?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={brandFilter} onValueChange={(v) => { setBrandFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-36"><SelectValue placeholder={t.catalog.allBrands} /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder={t.catalog.allBrands} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.catalog.allBrands}</SelectItem>
                 {brands?.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}

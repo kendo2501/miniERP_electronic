@@ -109,12 +109,12 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.payments.title}</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">{t.payments.title}</h1>
           <p className="text-muted-foreground mt-1">{t.payments.subtitle}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/finance"><Button variant="outline" size="sm">{t.common.overview}</Button></Link>
           {!hideFinanceNav && (
             <Link href="/finance/invoices"><Button variant="outline" size="sm">{t.finance.invoices}</Button></Link>

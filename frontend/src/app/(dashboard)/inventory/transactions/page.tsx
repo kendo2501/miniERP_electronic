@@ -51,16 +51,16 @@ export default function TransactionsPage() {
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.inventory.transactionsTitle}</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">{t.inventory.transactionsTitle}</h1>
           <p className="text-muted-foreground mt-1">{t.inventory.transactionsSubtitle}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={warehouseId} onValueChange={(v) => { setWarehouseId(v); setPage(1); }}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder={`${t.common.all} ${t.inventory.warehouses}`} />
               </SelectTrigger>
               <SelectContent>
@@ -72,7 +72,7 @@ export default function TransactionsPage() {
             </Select>
 
             <Select value={txType} onValueChange={(v) => { setTxType(v); setPage(1); }}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder={`${t.common.all}`} />
               </SelectTrigger>
               <SelectContent>

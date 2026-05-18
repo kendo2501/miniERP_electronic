@@ -26,9 +26,9 @@ export default function CreditLimitsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Hạn mức tín dụng</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">Hạn mức tín dụng</h1>
           <p className="text-muted-foreground mt-1">Theo dõi dư nợ và hạn mức tín dụng khách hàng</p>
         </div>
         <Link href="/finance">

@@ -54,26 +54,26 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.inventory.title}</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">{t.inventory.title}</h1>
           <p className="text-muted-foreground mt-1">{t.inventory.subtitle}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/inventory/replenishment">
-            <Button variant="outline">
+            <Button variant="outline" size="sm">
               <ClipboardList className="h-4 w-4" />
               Yêu cầu bổ hàng
             </Button>
           </Link>
           {canTransfer && (
-            <Button variant="outline" onClick={() => setShowTransfer(true)}>
+            <Button variant="outline" size="sm" onClick={() => setShowTransfer(true)}>
               <ArrowLeftRight className="h-4 w-4" />
               {t.inventory.transferStock}
             </Button>
           )}
           {canAdjust && (
-            <Button onClick={() => setShowAdjust(true)}>
+            <Button size="sm" onClick={() => setShowAdjust(true)}>
               <SlidersHorizontal className="h-4 w-4" />
               {t.inventory.adjustStock}
             </Button>
@@ -112,8 +112,8 @@ export default function InventoryPage() {
 
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-48 max-w-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:flex-1 sm:min-w-48 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Tìm theo tên, SKU..."
@@ -123,7 +123,7 @@ export default function InventoryPage() {
               />
             </div>
             <Select value={warehouseId} onValueChange={(v) => { setWarehouseId(v); setPage(1); }}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Chọn kho" />
               </SelectTrigger>
               <SelectContent>
@@ -131,7 +131,7 @@ export default function InventoryPage() {
                 {warehouses?.map((w) => <SelectItem key={w.id} value={String(w.id)}>{w.warehouseName}</SelectItem>)}
               </SelectContent>
             </Select>
-            <div className="flex gap-2 ml-auto">
+            <div className="flex flex-wrap gap-2 sm:ml-auto">
               <Link href="/inventory/warehouses">
                 <Button variant="outline" size="sm">{t.inventory.warehouses}</Button>
               </Link>

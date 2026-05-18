@@ -54,13 +54,13 @@ export default function WarehousesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/inventory">
             <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{t.inventory.warehouses}</h1>
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">{t.inventory.warehouses}</h1>
             <p className="text-muted-foreground mt-1">{t.inventory.manageLocations}</p>
           </div>
         </div>

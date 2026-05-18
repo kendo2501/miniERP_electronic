@@ -143,12 +143,12 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.catalog.categories}</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">{t.catalog.categories}</h1>
           <p className="text-muted-foreground mt-1">{t.catalog.title}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/catalog/products"><Button variant="outline" size="sm">{t.catalog.products}</Button></Link>
           <Link href="/catalog/brands"><Button variant="outline" size="sm">{t.catalog.brands}</Button></Link>
           <Button variant="outline" size="sm" onClick={handleExportTemplate}>

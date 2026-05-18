@@ -274,15 +274,15 @@ export default function QuotationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <FileText className="h-7 w-7 text-muted-foreground" />
+          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2 sm:text-2xl lg:text-3xl">
+            <FileText className="h-6 w-6 text-muted-foreground sm:h-7 sm:w-7" />
             {t.quotations.title}
           </h1>
           <p className="text-muted-foreground mt-1">{t.quotations.subtitle}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/sales/orders"><Button variant="outline" size="sm">{t.orders.title}</Button></Link>
           {canCreate && (
             <Button onClick={() => setShowCreate(true)}>
@@ -295,14 +295,14 @@ export default function QuotationsPage() {
 
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-48 max-w-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:flex-1 sm:min-w-48 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder={t.quotations.searchPlaceholder} className="pl-9" value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             </div>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.quotations.allStatuses}</SelectItem>
                 <SelectItem value="PENDING_APPROVAL">{t.quotations.statusPendingApproval}</SelectItem>

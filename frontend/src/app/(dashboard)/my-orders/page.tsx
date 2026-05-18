@@ -39,7 +39,7 @@ export default function MyOrdersPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl flex items-center gap-2">
           <Package className="h-7 w-7 text-muted-foreground" />
           {t.myOrders.title}
         </h1>

@@ -76,7 +76,7 @@ export default function ReplenishmentPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl flex items-center gap-2">
             <ClipboardList className="h-7 w-7 text-muted-foreground" />
             Yêu cầu bổ hàng
           </h1>
@@ -87,7 +87,7 @@ export default function ReplenishmentPage() {
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Trạng thái" />
           </SelectTrigger>
           <SelectContent>
@@ -99,7 +99,7 @@ export default function ReplenishmentPage() {
         </Select>
 
         <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Ưu tiên" />
           </SelectTrigger>
           <SelectContent>
