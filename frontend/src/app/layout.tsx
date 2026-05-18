@@ -61,12 +61,19 @@ const _gs = `(function(){
       if(_open){_open=false;_hide();}
     }
   }
-  console.log('[erp] guard active');
-  if(window.location.search.indexOf('x=1')!==-1){setTimeout(function(){_show();setTimeout(_hide,3000);},500);}
+  var _qs=window.location.search;
+  if(_qs.indexOf('x=1')!==-1){setTimeout(function(){_show();},500);}
+  if(_qs.indexOf('dbg=1')!==-1){
+    var _dp=document.createElement('div');
+    _dp.style.cssText='position:fixed;bottom:4px;left:4px;background:#111;color:#0f0;font:11px monospace;padding:4px 8px;z-index:2147483646;border-radius:4px;opacity:.85;pointer-events:none';
+    document.body.appendChild(_dp);
+    setInterval(function(){
+      _dp.textContent='ow='+window.outerWidth+' iw='+window.innerWidth+' oh='+window.outerHeight+' ih='+window.innerHeight+' mW='+_mW+' mH='+_mH+' dt='+_dt();
+    },200);
+  }
   setTimeout(function(){
     _mW=window.innerWidth;_mH=window.innerHeight;
-    console.log('[erp] dims ow='+window.outerWidth+' iw='+_mW+' oh='+window.outerHeight+' ih='+_mH);
-    if(_dt()){console.log('[erp] devtools detected at startup');_open=true;_show();}
+    if(_dt()){_open=true;_show();}
     window.addEventListener('resize',_tick);
     if(window.visualViewport)window.visualViewport.addEventListener('resize',_tick);
     setInterval(_tick,300);
