@@ -38,6 +38,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let _w = false;
+    let _bw = 0;
+    let _bh = 0;
+    let _rid: ReturnType<typeof setInterval> | null = null;
 
     const _open = () => {
       _setVis(true);
@@ -57,20 +60,25 @@ export function Providers({ children }: { children: React.ReactNode }) {
     };
 
     const _tick = () => {
-      const _o =
-        window.outerWidth - window.innerWidth > 100 ||
-        window.outerHeight - window.innerHeight > 200;
+      const _dw = window.outerWidth - window.innerWidth;
+      const _dh = window.outerHeight - window.innerHeight;
+      const _o = (_dw - _bw) > 50 || (_dh - _bh) > 50;
       if (_o && !_w) { _w = true; _open(); }
       else if (!_o && _w) { _w = false; _close(); }
     };
 
-    _tick();
-    window.addEventListener("resize", _tick);
-    const _id = setInterval(_tick, 1000);
+    // Snapshot baseline after page fully settles (no DevTools open yet)
+    const _init = setTimeout(() => {
+      _bw = window.outerWidth - window.innerWidth;
+      _bh = window.outerHeight - window.innerHeight;
+      window.addEventListener("resize", _tick);
+      _rid = setInterval(_tick, 800);
+    }, 1200);
 
     return () => {
+      clearTimeout(_init);
       window.removeEventListener("resize", _tick);
-      clearInterval(_id);
+      if (_rid) clearInterval(_rid);
       if (_ci.current) clearInterval(_ci.current);
     };
   }, []);
