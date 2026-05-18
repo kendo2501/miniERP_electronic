@@ -43,8 +43,9 @@ apiClient.interceptors.response.use(
         const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh`, { refreshToken });
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
-        refreshQueue.forEach((cb) => cb(data.accessToken));
+        const queue = refreshQueue;
         refreshQueue = [];
+        queue.forEach((cb) => { try { cb(data.accessToken); } catch {} });
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return apiClient(original);
       } catch {
