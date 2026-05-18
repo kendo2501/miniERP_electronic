@@ -5,7 +5,12 @@ import { Toaster } from "sonner";
 import { LanguageProvider } from "@/context/language-context";
 
 const _d = (s: string) => {
-  try { return decodeURIComponent(escape(atob(s))); } catch { return ""; }
+  try {
+    const b = atob(s);
+    const u = new Uint8Array(b.length);
+    for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+    return new TextDecoder().decode(u);
+  } catch { return ""; }
 };
 const _m = [
   "8J+agCBtaW5pRVJQIEVsZWN0cm9uaWM=",
@@ -29,7 +34,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const _t = 100;
     let _w = false;
     let _ct: ReturnType<typeof setTimeout> | null = null;
     const _f = () => {
@@ -39,12 +43,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
     };
     const _c = () => { if (_ct !== null) { clearTimeout(_ct); _ct = null; } };
     const _tick = () => {
-      const _o = window.outerWidth - window.innerWidth > _t || window.outerHeight - window.innerHeight > _t;
+      const _o = window.outerWidth - window.innerWidth > 100 || window.outerHeight - window.innerHeight > 200;
       if (_o && !_w) { _w = true; _f(); } else if (!_o && _w) { _w = false; _c(); }
     };
-    _tick();
-    const _id = setInterval(_tick, 500);
-    return () => { clearInterval(_id); if (_ct !== null) clearTimeout(_ct); };
+    window.addEventListener("resize", _tick);
+    const _id = setInterval(_tick, 1000);
+    return () => {
+      window.removeEventListener("resize", _tick);
+      clearInterval(_id);
+      if (_ct !== null) clearTimeout(_ct);
+    };
   }, []);
 
   return (
