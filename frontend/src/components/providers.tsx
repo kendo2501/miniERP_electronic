@@ -39,12 +39,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let _w = false;
     let _rid: ReturnType<typeof setInterval> | null = null;
+    let _ro: ResizeObserver | null = null;
+    let _shrinkAt: number | null = null;
 
-    // Baseline: outer & inner dimensions when page loads (no DevTools)
-    let _bow = window.outerWidth;
-    let _boh = window.outerHeight;
-    let _biw = window.innerWidth;
-    let _bih = window.innerHeight;
+    console.log("[v9] iw=" + window.innerWidth + " ih=" + window.innerHeight);
+
+    // Track the MAXIMUM innerWidth/Height seen — drops below this indicate DevTools
+    let _maxIw = window.innerWidth;
+    let _maxIh = window.innerHeight;
 
     const _open = () => {
       _setVis(true);
@@ -64,35 +66,39 @@ export function Providers({ children }: { children: React.ReactNode }) {
     };
 
     const _tick = () => {
-      const _ow = window.outerWidth;
-      const _oh = window.outerHeight;
       const _iw = window.innerWidth;
       const _ih = window.innerHeight;
 
-      // When user resizes the window, both outer AND inner change.
-      // Update baseline to track user's window size changes.
-      if (Math.abs(_ow - _bow) > 30 || Math.abs(_oh - _boh) > 30) {
-        _bow = _ow; _boh = _oh;
-        _biw = _iw; _bih = _ih;
-        return; // window was resized — not DevTools
+      const _shrunk = (_maxIw - _iw) > 100 || (_maxIh - _ih) > 100;
+
+      if (_shrunk) {
+        console.log("[v9-shrunk] iw=" + _iw + " ih=" + _ih + " maxW=" + _maxIw + " maxH=" + _maxIh);
+        // Must stay shrunk for 300ms before triggering (filters out resize drags)
+        if (_shrinkAt === null) _shrinkAt = Date.now();
+        if (!_w && Date.now() - _shrinkAt > 300) { _w = true; _open(); }
+      } else {
+        _shrinkAt = null;
+        if (_w) { _w = false; _close(); }
+        // Update max when viewport is larger (DevTools closed / window expanded)
+        if (_iw > _maxIw) _maxIw = _iw;
+        if (_ih > _maxIh) _maxIh = _ih;
       }
-
-      // DevTools docked: outer unchanged, inner shrank
-      const _dtRight = (_biw - _iw) > 50;
-      const _dtBottom = (_bih - _ih) > 50;
-      const _o = _dtRight || _dtBottom;
-
-      if (_o && !_w) { _w = true; _open(); }
-      else if (!_o && _w) { _w = false; _close(); }
     };
 
     window.addEventListener("resize", _tick);
     if (window.visualViewport) window.visualViewport.addEventListener("resize", _tick);
-    _rid = setInterval(_tick, 500);
+
+    if (typeof ResizeObserver !== "undefined") {
+      _ro = new ResizeObserver(_tick);
+      _ro.observe(document.documentElement);
+    }
+
+    _rid = setInterval(_tick, 300);
 
     return () => {
       window.removeEventListener("resize", _tick);
       if (window.visualViewport) window.visualViewport.removeEventListener("resize", _tick);
+      if (_ro) _ro.disconnect();
       if (_rid) clearInterval(_rid);
       if (_ci.current) clearInterval(_ci.current);
     };
