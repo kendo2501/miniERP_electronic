@@ -16,6 +16,7 @@ const _gs = `(function(){
   var _a='8J+agCBtaW5pRVJQIEVsZWN0cm9uaWM=',
       _b='V2ViIG7DoHkgxJHGsOG7o2MgcGjDoXQgdHJp4buDbiBi4bufaSBt4buZdCBuaMOzbSBn4buTbSAzIHRow6BuaCB2acOqbjoKCiAg4oCiIE5ndXnhu4VuIFRoYW5oIEhp4buHdQogIOKAoiBUcuG6p24gUGjDuiBUaGnhu4duCiAg4oCiIEzDom0gQuG7mWkgU2FuaAo=',
       _c='VHJhbmcgc+G6vSB04buxIMSR4buZbmcgcmVsb2FkIHNhdQ==';
+  console.log('[erp] v10 active');
   var _ov=null,_ci=null,_cnt=60,_open=false,_sa=null,_mW=0,_mH=0,_lk='_dmx';
   try{var _ls=JSON.parse(localStorage.getItem(_lk)||'{}');_mW=_ls.w||0;_mH=_ls.h||0;}catch(e){}
   function _sv(){try{localStorage.setItem(_lk,JSON.stringify({w:_mW,h:_mH}));}catch(e){}}
