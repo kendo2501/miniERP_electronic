@@ -43,6 +43,17 @@ services:
     environment:
       NODE_ENV: production
       APP_PORT: '3001'
+      # Override localhost URLs from .env to use Docker service names
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
     expose:
       - '3001'
     depends_on:
