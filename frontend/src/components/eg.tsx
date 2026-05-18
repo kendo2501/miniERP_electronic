@@ -33,10 +33,10 @@ export function Eg() {
     function dt(iw: number, ih: number): boolean {
       const ow = window.outerWidth || iw;
       const oh = window.outerHeight || ih;
-      return (ow - iw) > 80 || (oh - ih) > 180 || (mW - iw) > 60 || (mH - ih) > 60;
+      return (ow - iw) > 50 || (oh - ih) > 120 || (mW - iw) > 40 || (mH - ih) > 40;
     }
 
-    let open = false, sa = 0;
+    let open = false;
 
     function show() { if (!open) { open = true; setVis(true); } }
     function hide() { if (open) { open = false; setVis(false); } }
@@ -47,17 +47,13 @@ export function Eg() {
       if (iw > mW) { mW = iw; ch = true; }
       if (ih > mH) { mH = ih; ch = true; }
       if (ch) sv();
-      const sh = dt(iw, ih);
-      if (sh) {
-        if (!sa) sa = Date.now();
-        if (!open && Date.now() - sa > 200) show();
-      } else {
-        sa = 0;
-        if (open) hide();
-      }
+      if (dt(iw, ih)) show(); else hide();
     }
 
     if (window.location.search.includes("x=1")) { setVis(true); return; }
+
+    // Immediate check on mount
+    { const iw = window.innerWidth, ih = window.innerHeight; if (dt(iw, ih)) show(); }
 
     const t0 = setTimeout(() => {
       const iw = window.innerWidth, ih = window.innerHeight;
@@ -67,9 +63,9 @@ export function Eg() {
       if (dt(iw, ih)) show();
       window.addEventListener("resize", tick);
       if (window.visualViewport) window.visualViewport.addEventListener("resize", tick);
-    }, 800);
+    }, 500);
 
-    const iv = setInterval(tick, 300);
+    const iv = setInterval(tick, 100);
 
     // Secondary: console.debug getter — fires only when DevTools console is active
     const _ge = document.createElement("img");
