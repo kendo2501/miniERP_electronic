@@ -46,8 +46,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
       target: production
     container_name: mini-erp-api
     restart: unless-stopped

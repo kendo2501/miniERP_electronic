@@ -3,16 +3,14 @@ WORKDIR /app
 
 # ---- deps (prod only, no devDeps) ----
 FROM base AS deps
-COPY backend/package.json ./backend/
-WORKDIR /app/backend
+COPY package.json ./
 RUN npm install --omit=dev
 
 # ---- build ----
 FROM base AS build
-COPY backend/package.json ./backend/
-WORKDIR /app/backend
+COPY package.json ./
 RUN npm install
-COPY backend/ .
+COPY . .
 RUN npx prisma generate --schema ./database/prisma/schema.prisma
 RUN npm run build
 RUN npx tsc --project tsconfig.seed.json
@@ -21,26 +19,21 @@ RUN npx tsc --project tsconfig.seed.json
 FROM base AS production
 ENV NODE_ENV=production
 
-# OpenSSL required by Prisma migration engine (schema-engine binary) on Alpine
 RUN apk add --no-cache openssl
 
-# node_modules: prod deps from `deps`, but Prisma-specific from `build`
-# (prisma generate in build stage downloads correct Linux Alpine engine binaries)
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
-# Prisma: @prisma/client + .prisma/client (generated) + prisma CLI — all from build stage
-COPY --from=build /app/backend/node_modules/@prisma ./backend/node_modules/@prisma
-COPY --from=build /app/backend/node_modules/.prisma ./backend/node_modules/.prisma
-COPY --from=build /app/backend/node_modules/prisma ./backend/node_modules/prisma
+# prod deps from deps stage; Prisma binaries from build stage (generated for Alpine)
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/prisma ./node_modules/prisma
 
-COPY --from=build /app/backend/dist ./backend/dist
-COPY --from=build /app/backend/database ./backend/database
-COPY backend/package.json ./backend/
-
-WORKDIR /app/backend
-COPY backend/entrypoint.sh ./entrypoint.sh
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/database ./database
+COPY package.json ./
+COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
-EXPOSE 3001
+EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD wget -qO- http://localhost:3001/api/health || exit 1
+  CMD wget -qO- http://localhost:${PORT:-3000}/health || exit 1
 CMD ["./entrypoint.sh"]
