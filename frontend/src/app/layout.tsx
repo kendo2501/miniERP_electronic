@@ -54,6 +54,8 @@ const _gs = `(function(){
       if(_open){_open=false;_hide();}
     }
   }
+  console.log('[erp] guard active');
+  if(window.location.search.indexOf('x=1')!==-1){setTimeout(function(){_show();setTimeout(_hide,3000);},500);}
   setTimeout(function(){
     _mW=window.innerWidth;_mH=window.innerHeight;
     window.addEventListener('resize',_tick);
