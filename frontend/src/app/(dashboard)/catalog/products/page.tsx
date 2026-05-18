@@ -384,7 +384,7 @@ export default function ProductsPage() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t.catalog.newProduct}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit((v) => createMut.mutate(v))} className="space-y-4 pt-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.catalog.sku} *</Label>
                 <Input placeholder={t.catalog.skuPlaceholder} {...register("sku")} />
@@ -404,7 +404,7 @@ export default function ProductsPage() {
               <Label>{t.common.description}</Label>
               <Input placeholder={t.catalog.descriptionPlaceholder} {...register("description")} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.catalog.standardPrice} ($)</Label>
                 <Input type="number" min="0" step="0.01" placeholder={t.catalog.pricePlaceholder} {...register("standardPrice")} />
@@ -414,7 +414,7 @@ export default function ProductsPage() {
                 <Input type="number" min="0" step="0.001" placeholder={t.catalog.weightPlaceholder} {...register("weight")} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.common.category}</Label>
                 <Select onValueChange={(v) => setValue("categoryId", v)}>
@@ -524,7 +524,7 @@ export default function ProductsPage() {
               {/* Tab: Thông tin chung */}
               {editTab === "general" && (
                 <form onSubmit={editForm.handleSubmit((v) => updateMut.mutate(v))} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>{t.catalog.sku}</Label>
                       <Input {...editForm.register("sku")} disabled className="bg-muted" />
@@ -545,7 +545,7 @@ export default function ProductsPage() {
                     <Label>{t.common.description}</Label>
                     <Input placeholder={t.catalog.descriptionPlaceholder} {...editForm.register("description")} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>{t.catalog.standardPrice} ($)</Label>
                       <Input type="number" min="0" step="0.01" {...editForm.register("standardPrice")} />
@@ -555,7 +555,7 @@ export default function ProductsPage() {
                       <Input type="number" min="0" step="0.001" {...editForm.register("weight")} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>{t.common.category}</Label>
                       <Select

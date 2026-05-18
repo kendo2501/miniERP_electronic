@@ -8,25 +8,27 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { listOrders } from "@/lib/api/sales";
 import { vnd } from "@/lib/format";
 import type { SalesOrderStatus, DeliveryStatus } from "@/types/sales";
-
-const ORDER_STATUS_CONFIG: Record<SalesOrderStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  DRAFT:                       { label: "Chờ xác nhận",    icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
-  CONFIRMED:                   { label: "Đã xác nhận giá", icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-blue-700 bg-blue-50 border-blue-200" },
-  PARTIALLY_DELIVERED:         { label: "Đang giao",       icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
-  DELIVERED:                   { label: "Đã giao hàng",    icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-green-700 bg-green-50 border-green-200" },
-  CANCELLED:                   { label: "Đã hủy",          icon: <XCircle className="h-3.5 w-3.5" />,      className: "text-red-700 bg-red-50 border-red-200" },
-  PRICE_ADJUSTMENT_REQUESTED:  { label: "Đang điều chỉnh giá", icon: <Clock className="h-3.5 w-3.5" />,   className: "text-orange-700 bg-orange-50 border-orange-200" },
-  PENDING_REAPPROVAL:          { label: "Chờ xác nhận lại", icon: <Clock className="h-3.5 w-3.5" />,       className: "text-purple-700 bg-purple-50 border-purple-200" },
-};
-
-const DELIVERY_CONFIG: Record<DeliveryStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  PENDING:    { label: "Chưa giao",  icon: <Package className="h-3.5 w-3.5" />,  className: "text-gray-600 bg-gray-50 border-gray-200" },
-  IN_TRANSIT: { label: "Đang giao", icon: <Truck className="h-3.5 w-3.5" />,     className: "text-orange-700 bg-orange-50 border-orange-200" },
-  DELIVERED:  { label: "Đã giao",   icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-green-700 bg-green-50 border-green-200" },
-};
+import { useLanguage } from "@/context/language-context";
 
 export default function MyOrdersPage() {
   const [page, setPage] = useState(1);
+  const { t } = useLanguage();
+
+  const ORDER_STATUS_CONFIG: Record<SalesOrderStatus, { label: string; icon: React.ReactNode; className: string }> = {
+    DRAFT:                       { label: t.myOrders.statusWaiting,         icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
+    CONFIRMED:                   { label: t.myOrders.statusConfirmed,        icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-blue-700 bg-blue-50 border-blue-200" },
+    PARTIALLY_DELIVERED:         { label: t.myOrders.statusPartialDelivery,  icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
+    DELIVERED:                   { label: t.myOrders.statusDelivered,        icon: <CheckCircle className="h-3.5 w-3.5" />,  className: "text-green-700 bg-green-50 border-green-200" },
+    CANCELLED:                   { label: t.myOrders.statusCancelled,        icon: <XCircle className="h-3.5 w-3.5" />,      className: "text-red-700 bg-red-50 border-red-200" },
+    PRICE_ADJUSTMENT_REQUESTED:  { label: t.myOrders.statusAdjusting,        icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
+    PENDING_REAPPROVAL:          { label: t.myOrders.statusReapproval,       icon: <Clock className="h-3.5 w-3.5" />,        className: "text-purple-700 bg-purple-50 border-purple-200" },
+  };
+
+  const DELIVERY_CONFIG: Record<DeliveryStatus, { label: string; icon: React.ReactNode; className: string }> = {
+    PENDING:    { label: t.myOrders.deliveryPending,    icon: <Package className="h-3.5 w-3.5" />,  className: "text-gray-600 bg-gray-50 border-gray-200" },
+    IN_TRANSIT: { label: t.myOrders.deliveryInTransit,  icon: <Truck className="h-3.5 w-3.5" />,    className: "text-orange-700 bg-orange-50 border-orange-200" },
+    DELIVERED:  { label: t.myOrders.deliveryDone,       icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-green-700 bg-green-50 border-green-200" },
+  };
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["my-orders", page],
@@ -39,9 +41,9 @@ export default function MyOrdersPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <Package className="h-7 w-7 text-muted-foreground" />
-          Đơn hàng của tôi
+          {t.myOrders.title}
         </h1>
-        <p className="text-muted-foreground mt-1">Xem trạng thái và lịch sử đơn hàng</p>
+        <p className="text-muted-foreground mt-1">{t.myOrders.subtitle}</p>
       </div>
 
       {isLoading ? (
@@ -52,13 +54,13 @@ export default function MyOrdersPage() {
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
             <AlertCircle className="h-8 w-8 mx-auto mb-2 text-red-400" />
-            <p className="font-medium text-red-600">Không thể tải danh sách đơn hàng</p>
-            <p className="text-sm mt-1">Nếu báo giá của bạn đã được duyệt nhưng đơn hàng chưa hiển thị, vui lòng tải lại trang hoặc liên hệ nhân viên kinh doanh.</p>
+            <p className="font-medium text-red-600">{t.myOrders.loadError}</p>
+            <p className="text-sm mt-1">{t.myOrders.loadErrorDesc}</p>
             <Button
               variant="outline" size="sm" className="mt-4"
               onClick={() => window.location.reload()}
             >
-              Tải lại trang
+              {t.myOrders.reload}
             </Button>
           </CardContent>
         </Card>
@@ -68,7 +70,7 @@ export default function MyOrdersPage() {
             <Card>
               <CardContent className="py-16 text-center text-muted-foreground">
                 <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p>Chưa có đơn hàng nào</p>
+                <p>{t.myOrders.noOrders}</p>
               </CardContent>
             </Card>
           )}
@@ -81,7 +83,6 @@ export default function MyOrdersPage() {
               <Card key={order.id} className="overflow-hidden">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-4">
-                    {/* Order info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm font-semibold">{order.orderNumber}</span>
@@ -94,18 +95,17 @@ export default function MyOrdersPage() {
                           {delivery.label}
                         </Badge>
                         {order.quotation && (
-                          <span className="text-xs text-muted-foreground">từ báo giá {order.quotation.quotationNumber}</span>
+                          <span className="text-xs text-muted-foreground">{t.myOrders.fromQuotation} {order.quotation.quotationNumber}</span>
                         )}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Đặt ngày: {order.orderedAt ? new Date(order.orderedAt).toLocaleDateString("vi-VN") : "—"}
+                        {t.myOrders.orderedDate} {order.orderedAt ? new Date(order.orderedAt).toLocaleDateString("vi-VN") : "—"}
                       </div>
                     </div>
 
-                    {/* Total */}
                     <div className="text-right shrink-0">
                       <div className="font-semibold tabular-nums">{vnd(Number(order.totalAmount))}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{order._count?.items ?? 0} sản phẩm</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{order._count?.items ?? 0} {t.myOrders.items}</div>
                     </div>
                   </div>
                 </CardHeader>
@@ -117,10 +117,10 @@ export default function MyOrdersPage() {
 
       {data && data.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Trang {data.page} / {data.totalPages}</span>
+          <span className="text-sm text-muted-foreground">{t.common.page} {data.page} {t.common.of} {data.totalPages}</span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>Trước</Button>
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>Sau</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>{t.common.previous}</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>{t.common.next}</Button>
           </div>
         </div>
       )}

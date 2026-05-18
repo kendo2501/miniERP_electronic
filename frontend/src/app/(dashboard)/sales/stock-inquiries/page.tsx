@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { listStockInquiries, createStockInquiry, getStockInquiry } from "@/lib/api/sales";
@@ -14,6 +14,7 @@ import { ProductSelect } from "@/components/product-select";
 import { vnd } from "@/lib/format";
 import type { Product } from "@/types/catalog";
 import Link from "next/link";
+import { useLanguage } from "@/context/language-context";
 
 export default function StockInquiriesPage() {
   const [page, setPage] = useState(1);
@@ -22,6 +23,7 @@ export default function StockInquiriesPage() {
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState([{ productId: "", product: null as Product | null, quantity: "1" }]);
   const qc = useQueryClient();
+  const { t } = useLanguage();
 
   const { data, isLoading } = useQuery({
     queryKey: ["stock-inquiries", page],
@@ -44,13 +46,13 @@ export default function StockInquiriesPage() {
       })),
     }).then((r) => r.data),
     onSuccess: () => {
-      toast.success("Đã gửi yêu cầu kiểm tra tồn kho");
+      toast.success(t.stockInquiries.submit);
       qc.invalidateQueries({ queryKey: ["stock-inquiries"] });
       setShowCreate(false);
       setNotes("");
       setItems([{ productId: "", product: null, quantity: "1" }]);
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi yêu cầu thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.stockInquiries.submit),
   });
 
   function handleProductChange(idx: number, productId: string, product?: Product) {
@@ -63,15 +65,15 @@ export default function StockInquiriesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ClipboardCheck className="h-7 w-7 text-muted-foreground" />
-            Kiểm tra tồn kho
+            {t.stockInquiries.titleSales}
           </h1>
-          <p className="text-muted-foreground mt-1">Hỏi nhân viên kho trước khi tạo báo giá hoặc đơn hàng</p>
+          <p className="text-muted-foreground mt-1">{t.stockInquiries.subtitleSales}</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/sales/quotations"><Button variant="outline" size="sm">Báo giá</Button></Link>
-          <Link href="/sales/orders"><Button variant="outline" size="sm">Đơn hàng</Button></Link>
+          <Link href="/sales/quotations"><Button variant="outline" size="sm">{t.stockInquiries.quotationsLink}</Button></Link>
+          <Link href="/sales/orders"><Button variant="outline" size="sm">{t.stockInquiries.ordersLink}</Button></Link>
           <Button onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" /> Yêu cầu mới
+            <Plus className="h-4 w-4" /> {t.stockInquiries.newRequest}
           </Button>
         </div>
       </div>
@@ -85,12 +87,12 @@ export default function StockInquiriesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Mã yêu cầu</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
-                    <th className="h-10 px-6 text-center font-medium text-muted-foreground">SP</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Người phản hồi</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Ngày tạo</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thao tác</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.stockInquiries.reqNumber}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.status}</th>
+                    <th className="h-10 px-6 text-center font-medium text-muted-foreground">{t.quotations.products}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.stockInquiries.respondedBy}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.stockInquiries.createdDate}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -100,11 +102,11 @@ export default function StockInquiriesPage() {
                       <td className="px-6 py-3">
                         {inq.status === "PENDING" ? (
                           <Badge variant="secondary" className="text-xs text-yellow-700 bg-yellow-50 border-yellow-200 gap-1">
-                            <Clock className="h-3 w-3" /> Chờ phản hồi
+                            <Clock className="h-3 w-3" /> {t.stockInquiries.statusPending}
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs text-green-700 bg-green-50 border-green-200 gap-1">
-                            <CheckCircle className="h-3 w-3" /> Đã phản hồi
+                            <CheckCircle className="h-3 w-3" /> {t.stockInquiries.statusResponded}
                           </Badge>
                         )}
                       </td>
@@ -118,13 +120,13 @@ export default function StockInquiriesPage() {
                       <td className="px-6 py-3">
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
                           onClick={() => setDetailId(inq.id)}>
-                          Xem chi tiết
+                          {t.stockInquiries.viewDetailBtn}
                         </Button>
                       </td>
                     </tr>
                   ))}
                   {data?.items.length === 0 && (
-                    <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">Chưa có yêu cầu nào</td></tr>
+                    <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">{t.stockInquiries.noRequestsYet}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -132,10 +134,10 @@ export default function StockInquiriesPage() {
           )}
           {data && data.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-6 py-3">
-              <span className="text-sm text-muted-foreground">Trang {data.page} / {data.totalPages}</span>
+              <span className="text-sm text-muted-foreground">{t.common.page} {data.page} {t.common.of} {data.totalPages}</span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>Trước</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>Sau</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>{t.common.previous}</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>{t.common.next}</Button>
               </div>
             </div>
           )}
@@ -145,24 +147,24 @@ export default function StockInquiriesPage() {
       {/* Create Dialog */}
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) { setNotes(""); setItems([{ productId: "", product: null, quantity: "1" }]); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Yêu cầu kiểm tra tồn kho</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.stockInquiries.titleSales}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label>Ghi chú (tùy chọn)</Label>
-              <Input placeholder="VD: Cần gấp cho đơn hàng khách ABC..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Label>{t.common.notes} ({t.common.optional})</Label>
+              <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>Sản phẩm cần kiểm tra *</Label>
+                <Label>{t.common.product} *</Label>
                 <Button type="button" variant="outline" size="sm"
                   onClick={() => setItems((p) => [...p, { productId: "", product: null, quantity: "1" }])}>
-                  <Plus className="h-3.5 w-3.5" /> Thêm SP
+                  <Plus className="h-3.5 w-3.5" /> {t.catalog.addItem}
                 </Button>
               </div>
               <div className="space-y-2">
                 <div className="grid grid-cols-[1fr_80px_32px] gap-2">
-                  <span className="text-xs text-muted-foreground font-medium">Sản phẩm</span>
-                  <span className="text-xs text-muted-foreground font-medium">SL cần</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t.common.product}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t.inventory.quantity}</span>
                   <span />
                 </div>
                 {items.map((item, idx) => (
@@ -182,11 +184,11 @@ export default function StockInquiriesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowCreate(false); setNotes(""); setItems([{ productId: "", product: null, quantity: "1" }]); }}>
-              Hủy
+              {t.common.cancel}
             </Button>
             <Button disabled={items.every((i) => !i.productId) || createMut.isPending} onClick={() => createMut.mutate()}>
               {createMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Gửi yêu cầu
+              {t.stockInquiries.submit}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -196,7 +198,7 @@ export default function StockInquiriesPage() {
       <Dialog open={!!detailId} onOpenChange={(v) => { if (!v) setDetailId(null); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Chi tiết yêu cầu {detail?.inquiryNumber}</DialogTitle>
+            <DialogTitle>{detail?.inquiryNumber}</DialogTitle>
           </DialogHeader>
           {!detail ? (
             <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>
@@ -204,15 +206,15 @@ export default function StockInquiriesPage() {
             <div className="space-y-4 pt-2">
               {detail.status === "PENDING" ? (
                 <div className="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-2 text-sm text-yellow-800">
-                  Đang chờ nhân viên kho phản hồi...
+                  {t.stockInquiries.statusPending}...
                 </div>
               ) : (
                 <div className="rounded-md bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-800">
-                  Đã phản hồi bởi <strong>{detail.respondedBy?.fullName}</strong> lúc {new Date(detail.respondedAt).toLocaleString("vi-VN")}
+                  {t.stockInquiries.statusResponded} — <strong>{detail.respondedBy?.fullName}</strong>
                   {detail.responseNotes && <div className="mt-1 text-muted-foreground">{detail.responseNotes}</div>}
                 </div>
               )}
-              {detail.notes && <p className="text-sm text-muted-foreground">Ghi chú: {detail.notes}</p>}
+              {detail.notes && <p className="text-sm text-muted-foreground">{t.common.notes}: {detail.notes}</p>}
               <div className="space-y-2">
                 {detail.items.map((item: any) => (
                   <div key={item.id} className="border rounded-md p-3 space-y-1">
@@ -224,21 +226,21 @@ export default function StockInquiriesPage() {
                       {detail.status === "RESPONDED" && (
                         item.isAvailable ? (
                           <Badge variant="outline" className="text-xs text-green-700 bg-green-50 border-green-200">
-                            ✓ Còn hàng: {item.availableQuantity} {item.product.unit}
+                            ✓ {t.stockInquiries.inStock}: {item.availableQuantity} {item.product.unit}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-xs text-red-700 bg-red-50 border-red-200">
-                            ✗ Hết hàng
+                            ✗ {t.stockInquiries.outOfStock}
                           </Badge>
                         )
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground flex gap-4">
-                      <span>Cần: {Number(item.requestedQuantity)} {item.product.unit}</span>
-                      {item.product.minPrice && <span className="text-orange-600">Giá tối thiểu: {vnd(item.product.minPrice)}</span>}
+                      <span>{Number(item.requestedQuantity)} {item.product.unit}</span>
+                      {item.product.minPrice && <span className="text-orange-600">{vnd(item.product.minPrice)}</span>}
                     </div>
                     {item.warehouseNote && (
-                      <div className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1">Kho: {item.warehouseNote}</div>
+                      <div className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1">{item.warehouseNote}</div>
                     )}
                   </div>
                 ))}
@@ -246,7 +248,7 @@ export default function StockInquiriesPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailId(null)}>Đóng</Button>
+            <Button variant="outline" onClick={() => setDetailId(null)}>{t.stockInquiries.closeBtn}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

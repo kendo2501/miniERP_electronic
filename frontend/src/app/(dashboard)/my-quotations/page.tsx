@@ -16,25 +16,7 @@ import { toast } from "sonner";
 import { listQuotations, submitCounterOffer } from "@/lib/api/sales";
 import { vnd } from "@/lib/format";
 import type { QuotationStatus } from "@/types/sales";
-
-// ─── Status config (ngôn ngữ khách hàng) ────────────────────────────────────
-
-const STATUS_CONFIG: Record<QuotationStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  PENDING_APPROVAL:   { label: "Đang xem xét",   icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
-  REVISION_REQUESTED: { label: "Đang xem xét",   icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
-  APPROVED:           { label: "Đã duyệt",        icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-blue-700 bg-blue-50 border-blue-200" },
-  SENT:               { label: "Chờ xác nhận",   icon: <FileText className="h-3.5 w-3.5" />,     className: "text-purple-700 bg-purple-50 border-purple-200" },
-  CONFIRMED:          { label: "Đã xác nhận",    icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-green-700 bg-green-50 border-green-200" },
-  CANCELLED:          { label: "Đã hủy",          icon: <XCircle className="h-3.5 w-3.5" />,     className: "text-red-700 bg-red-50 border-red-200" },
-};
-
-const NEGOTIATION_CONFIG = {
-  PROPOSED: { label: "Đã đề xuất giá",  className: "text-purple-700 bg-purple-50 border-purple-200" },
-  ACCEPTED: { label: "Giá được chấp nhận", className: "text-green-700 bg-green-50 border-green-200" },
-  REJECTED: { label: "Giá bị từ chối",  className: "text-red-700 bg-red-50 border-red-200" },
-} as const;
-
-// ─── Component ───────────────────────────────────────────────────────────────
+import { useLanguage } from "@/context/language-context";
 
 export default function MyQuotationsPage() {
   const [page, setPage] = useState(1);
@@ -44,6 +26,22 @@ export default function MyQuotationsPage() {
   const [offerNote, setOfferNote] = useState("");
 
   const qc = useQueryClient();
+  const { t } = useLanguage();
+
+  const STATUS_CONFIG: Record<QuotationStatus, { label: string; icon: React.ReactNode; className: string }> = {
+    PENDING_APPROVAL:   { label: t.myQuotations.statusReviewing,  icon: <Clock className="h-3.5 w-3.5" />,        className: "text-yellow-700 bg-yellow-50 border-yellow-200" },
+    REVISION_REQUESTED: { label: t.myQuotations.statusReviewing,  icon: <Clock className="h-3.5 w-3.5" />,        className: "text-orange-700 bg-orange-50 border-orange-200" },
+    APPROVED:           { label: t.myQuotations.statusApproved,   icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-blue-700 bg-blue-50 border-blue-200" },
+    SENT:               { label: t.myQuotations.statusWaiting,    icon: <FileText className="h-3.5 w-3.5" />,     className: "text-purple-700 bg-purple-50 border-purple-200" },
+    CONFIRMED:          { label: t.myQuotations.statusConfirmed,  icon: <CheckCircle className="h-3.5 w-3.5" />, className: "text-green-700 bg-green-50 border-green-200" },
+    CANCELLED:          { label: t.myQuotations.statusCancelled,  icon: <XCircle className="h-3.5 w-3.5" />,     className: "text-red-700 bg-red-50 border-red-200" },
+  };
+
+  const NEGOTIATION_CONFIG = {
+    PROPOSED: { label: t.myQuotations.negoProposed, className: "text-purple-700 bg-purple-50 border-purple-200" },
+    ACCEPTED: { label: t.myQuotations.negoAccepted, className: "text-green-700 bg-green-50 border-green-200" },
+    REJECTED: { label: t.myQuotations.negoRejected, className: "text-red-700 bg-red-50 border-red-200" },
+  } as const;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["my-quotations", page],
@@ -55,7 +53,7 @@ export default function MyQuotationsPage() {
     mutationFn: ({ id, amount, note }: { id: number; amount: number; note?: string }) =>
       submitCounterOffer(id, { proposedAmount: amount, note }),
     onSuccess: () => {
-      toast.success("Đã gửi đề xuất giá — chúng tôi sẽ phản hồi sớm nhất");
+      toast.success(t.myQuotations.sendProposalBtn);
       qc.invalidateQueries({ queryKey: ["my-quotations"] });
       setOfferTarget(null);
       setOfferAmount("");
@@ -63,24 +61,20 @@ export default function MyQuotationsPage() {
     },
     onError: (e: any) => {
       const msg = e.response?.data?.message;
-      toast.error(Array.isArray(msg) ? msg[0] : (msg ?? "Gửi đề xuất thất bại"));
+      toast.error(Array.isArray(msg) ? msg[0] : (msg ?? t.myQuotations.sendProposalBtn));
     },
   });
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <FileText className="h-7 w-7 text-muted-foreground" />
-          Báo giá của tôi
+          {t.myQuotations.title}
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Xem trạng thái báo giá và đề xuất giá nếu cần thương lượng
-        </p>
+        <p className="text-muted-foreground mt-1">{t.myQuotations.subtitle}</p>
       </div>
 
-      {/* List */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -88,7 +82,7 @@ export default function MyQuotationsPage() {
       ) : isError ? (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
-            <p>Không thể tải danh sách báo giá. Vui lòng thử lại.</p>
+            <p>{t.myQuotations.loadError}</p>
           </CardContent>
         </Card>
       ) : (
@@ -96,7 +90,7 @@ export default function MyQuotationsPage() {
           {data?.items.length === 0 && (
             <Card>
               <CardContent className="py-16 text-center text-muted-foreground">
-                Chưa có báo giá nào
+                {t.myQuotations.noQuotations}
               </CardContent>
             </Card>
           )}
@@ -112,7 +106,6 @@ export default function MyQuotationsPage() {
               <Card key={q.id} className="overflow-hidden">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-4">
-                    {/* Info left */}
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm font-semibold text-foreground">{q.quotationNumber}</span>
@@ -129,18 +122,17 @@ export default function MyQuotationsPage() {
                       </div>
 
                       <div className="text-xs text-muted-foreground">
-                        Ngày tạo: {new Date(q.createdAt).toLocaleDateString("vi-VN")}
+                        {t.myQuotations.createdDate} {new Date(q.createdAt).toLocaleDateString("vi-VN")}
                         {(q as any).validUntil && (
                           <span className="ml-3">
-                            Hiệu lực đến: {new Date((q as any).validUntil).toLocaleDateString("vi-VN")}
+                            {t.myQuotations.validUntil} {new Date((q as any).validUntil).toLocaleDateString("vi-VN")}
                           </span>
                         )}
                       </div>
 
-                      {/* Counter offer info */}
                       {nego === "PROPOSED" && (
                         <div className="mt-1 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
-                          <span className="font-medium">Đề xuất của bạn:</span>{" "}
+                          <span className="font-medium">{t.myQuotations.proposalYours}</span>{" "}
                           {vnd(Number((q as any).counterOfferAmount))}
                           {(q as any).counterOfferNote && (
                             <span className="text-xs text-purple-600 block mt-0.5">"{(q as any).counterOfferNote}"</span>
@@ -149,30 +141,27 @@ export default function MyQuotationsPage() {
                       )}
                       {nego === "ACCEPTED" && (
                         <p className="text-xs text-green-700">
-                          Giá đề xuất {vnd(Number((q as any).counterOfferAmount))} đã được chấp nhận → đơn hàng đã tạo.
+                          {vnd(Number((q as any).counterOfferAmount))} — {t.myQuotations.negoAccepted}
                         </p>
                       )}
                       {nego === "REJECTED" && (
                         <p className="text-xs text-red-600">
-                          Giá đề xuất {vnd(Number((q as any).counterOfferAmount))} bị từ chối. Bạn có thể đề xuất lại.
+                          {vnd(Number((q as any).counterOfferAmount))} — {t.myQuotations.negoRejected}
                         </p>
                       )}
                     </div>
 
-                    {/* Total right */}
                     <div className="text-right shrink-0 space-y-1">
                       {(q.status === "PENDING_APPROVAL" || q.status === "REVISION_REQUESTED") ? (
-                        <div className="text-xs text-muted-foreground italic">Đang xem xét</div>
+                        <div className="text-xs text-muted-foreground italic">{t.myQuotations.reviewing}</div>
                       ) : (
                         <div className="font-semibold tabular-nums text-sm">{vnd(Number(q.totalAmount))}</div>
                       )}
-                      <div className="text-xs text-muted-foreground">{(q as any)._count?.items ?? 0} sản phẩm</div>
+                      <div className="text-xs text-muted-foreground">{(q as any)._count?.items ?? 0} {t.common.product}</div>
                     </div>
                   </div>
 
-                  {/* Actions row */}
                   <div className="flex items-center gap-2 pt-1 flex-wrap">
-                    {/* Toggle items — chỉ hiển thị khi giá đã được duyệt */}
                     {((q as any)._count?.items ?? 0) > 0 && q.status !== "PENDING_APPROVAL" && q.status !== "REVISION_REQUESTED" && (
                       <Button
                         variant="ghost" size="sm"
@@ -180,21 +169,19 @@ export default function MyQuotationsPage() {
                         onClick={() => setExpandedId(isExpanded ? null : q.id)}
                       >
                         {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-1" /> : <ChevronDown className="h-3.5 w-3.5 mr-1" />}
-                        {isExpanded ? "Ẩn sản phẩm" : "Xem sản phẩm"}
+                        {isExpanded ? t.myQuotations.hideItems : t.myQuotations.showItems}
                       </Button>
                     )}
 
-                    {/* Hướng dẫn xem đơn hàng khi báo giá đã được duyệt */}
                     {(q.status === "APPROVED" || q.status === "CONFIRMED") && (
                       <Link href="/my-orders">
                         <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50">
                           <ShoppingBag className="h-3.5 w-3.5" />
-                          Xem đơn hàng
+                          {t.myQuotations.viewOrders}
                         </Button>
                       </Link>
                     )}
 
-                    {/* Counter offer button */}
                     {canOffer && (
                       <Button
                         variant="outline" size="sm"
@@ -206,16 +193,15 @@ export default function MyQuotationsPage() {
                         }}
                       >
                         <MessageSquare className="h-3.5 w-3.5" />
-                        Đề xuất giá
+                        {t.myQuotations.proposePriceBtn}
                       </Button>
                     )}
                   </div>
                 </CardHeader>
 
-                {/* Expanded: item list */}
                 {isExpanded && (
                   <CardContent className="pt-0 border-t bg-muted/20">
-                    <QuotationItemsSection quotationId={q.id} />
+                    <QuotationItemsSection quotationId={q.id} totalLabel={t.myQuotations.totalWithVAT} productLabel={t.common.product} />
                   </CardContent>
                 )}
               </Card>
@@ -224,65 +210,63 @@ export default function MyQuotationsPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {data && data.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Trang {data.page} / {data.totalPages}</span>
+          <span className="text-sm text-muted-foreground">{t.common.page} {data.page} {t.common.of} {data.totalPages}</span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>Trước</Button>
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>Sau</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>{t.common.previous}</Button>
+            <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>{t.common.next}</Button>
           </div>
         </div>
       )}
 
-      {/* ─── Counter Offer Dialog ────────────────────────────────────────────── */}
       <Dialog open={!!offerTarget} onOpenChange={(v) => { if (!v) { setOfferTarget(null); setOfferAmount(""); setOfferNote(""); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-purple-600" />
-              Đề xuất giá — {offerTarget?.quoNum}
+              {t.myQuotations.counterOfferTitle} — {offerTarget?.quoNum}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             {offerTarget && (
               <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Giá gốc:</span>{" "}
+                <span className="text-muted-foreground">{t.myQuotations.originalPrice}</span>{" "}
                 <span className="font-semibold">{vnd(offerTarget.originalAmount)}</span>
               </div>
             )}
 
             <div className="space-y-1.5">
-              <Label>Giá đề xuất của bạn (₫) *</Label>
+              <Label>{t.myQuotations.proposedPriceLabel}</Label>
               <Input
                 type="number" min="0" step="1000"
                 value={offerAmount}
                 onChange={(e) => setOfferAmount(e.target.value)}
-                placeholder="Nhập mức giá bạn mong muốn..."
+                placeholder={t.myQuotations.proposedPricePlaceholder}
               />
               {offerTarget && Number(offerAmount) > 0 && Number(offerAmount) !== offerTarget.originalAmount && (
                 <p className={`text-xs ${Number(offerAmount) < offerTarget.originalAmount ? "text-orange-600" : "text-blue-600"}`}>
                   {Number(offerAmount) < offerTarget.originalAmount
-                    ? `Thấp hơn ${vnd(offerTarget.originalAmount - Number(offerAmount))} so với giá gốc`
-                    : `Cao hơn ${vnd(Number(offerAmount) - offerTarget.originalAmount)} so với giá gốc`}
+                    ? `−${vnd(offerTarget.originalAmount - Number(offerAmount))}`
+                    : `+${vnd(Number(offerAmount) - offerTarget.originalAmount)}`}
                 </p>
               )}
             </div>
 
             <div className="space-y-1.5">
-              <Label>Ghi chú (không bắt buộc)</Label>
+              <Label>{t.myQuotations.notesLabel}</Label>
               <Input
                 value={offerNote}
                 onChange={(e) => setOfferNote(e.target.value)}
-                placeholder="Lý do, điều kiện, số lượng mua thêm..."
+                placeholder={t.myQuotations.notesPlaceholder}
               />
             </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => { setOfferTarget(null); setOfferAmount(""); setOfferNote(""); }}>
-              Hủy
+              {t.myQuotations.cancelBtn}
             </Button>
             <Button
               className="bg-purple-600 hover:bg-purple-700 text-white"
@@ -293,7 +277,7 @@ export default function MyQuotationsPage() {
               }}
             >
               {counterMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Gửi đề xuất
+              {t.myQuotations.sendProposalBtn}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -302,9 +286,7 @@ export default function MyQuotationsPage() {
   );
 }
 
-// ─── Sub-component: quotation items (lazy fetch) ─────────────────────────────
-
-function QuotationItemsSection({ quotationId }: { quotationId: number }) {
+function QuotationItemsSection({ quotationId, totalLabel, productLabel }: { quotationId: number; totalLabel: string; productLabel: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ["quotation-detail-customer", quotationId],
     queryFn: () => import("@/lib/api/sales").then((m) => m.getQuotation(quotationId)).then((r) => r.data),
@@ -318,7 +300,7 @@ function QuotationItemsSection({ quotationId }: { quotationId: number }) {
   );
 
   if (!data?.items?.length) return (
-    <p className="py-4 text-sm text-muted-foreground text-center">Không có sản phẩm</p>
+    <p className="py-4 text-sm text-muted-foreground text-center">{productLabel}</p>
   );
 
   return (
@@ -342,9 +324,8 @@ function QuotationItemsSection({ quotationId }: { quotationId: number }) {
         );
       })}
 
-      {/* Total row */}
       <div className="flex justify-between items-center pt-2 px-3 border-t">
-        <span className="text-xs text-muted-foreground">Tổng cộng (đã VAT)</span>
+        <span className="text-xs text-muted-foreground">{totalLabel}</span>
         <span className="font-bold tabular-nums">
           {vnd(Number(data.totalAmount))}
         </span>

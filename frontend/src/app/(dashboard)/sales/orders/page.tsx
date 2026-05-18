@@ -49,38 +49,38 @@ const STATUS_COLORS: Record<SalesOrderStatus, string> = {
 
 // ─── Payment badge ─────────────────────────────────────────────────────────────
 
-function PaymentBadge({ status }: { status?: PaymentStatus }) {
+function PaymentBadge({ status, unpaidLabel, paidLabel }: { status?: PaymentStatus; unpaidLabel: string; paidLabel: string }) {
   if (!status || status === "UNPAID")
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-        Chưa thanh toán
+        {unpaidLabel}
       </span>
     );
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
-      <CheckCircle2 className="h-3 w-3" /> Đã thanh toán
+      <CheckCircle2 className="h-3 w-3" /> {paidLabel}
     </span>
   );
 }
 
 // ─── Delivery badge ────────────────────────────────────────────────────────────
 
-function DeliveryBadge({ status }: { status?: DeliveryStatus }) {
+function DeliveryBadge({ status, pendingLabel, inTransitLabel, doneLabel }: { status?: DeliveryStatus; pendingLabel: string; inTransitLabel: string; doneLabel: string }) {
   if (!status || status === "PENDING")
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-        Chưa giao
+        {pendingLabel}
       </span>
     );
   if (status === "IN_TRANSIT")
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
-        <Truck className="h-3 w-3" /> Đang giao
+        <Truck className="h-3 w-3" /> {inTransitLabel}
       </span>
     );
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-      <CheckCircle2 className="h-3 w-3" /> Đã giao
+      <CheckCircle2 className="h-3 w-3" /> {doneLabel}
     </span>
   );
 }
@@ -164,15 +164,15 @@ export default function SalesOrdersPage() {
   const confirmPriceMut = useMutation({
     mutationFn: ({ id, orderStatus }: { id: number; orderStatus: SalesOrderStatus }) =>
       orderStatus === "PENDING_REAPPROVAL" ? confirmReapproval(id) : confirmOrder(id),
-    onSuccess: () => { toast.success("Đã xác nhận giá — đơn hàng chuyển sang Xác nhận"); invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận giá thất bại"),
+    onSuccess: () => { toast.success(t.orders.confirmed); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.orders.confirmPrice),
   });
 
   // Admin: hủy đơn (chỉ khi CONFIRMED)
   const cancelMut = useMutation({
     mutationFn: (id: number) => cancelOrder(id),
     onSuccess: () => { toast.success(t.orders.cancelledMsg); invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Hủy đơn thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.orders.cancelledMsg),
   });
 
   // Admin: gửi yêu cầu điều chỉnh giá
@@ -180,12 +180,12 @@ export default function SalesOrdersPage() {
     mutationFn: ({ id, reason }: { id: number; reason: string }) =>
       requestPriceAdjustment(id, reason || undefined),
     onSuccess: () => {
-      toast.success("Đã gửi yêu cầu — Sale và khách hàng đã được thông báo");
+      toast.success(t.orders.requestAdjust);
       invalidate();
       setRequestAdjustTarget(null);
       setRequestAdjustReason("");
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Yêu cầu thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.orders.requestAdjust),
   });
 
   // Sale: điều chỉnh lại giá
@@ -198,42 +198,42 @@ export default function SalesOrdersPage() {
         discountPercent: i.discountPercent,
       }))),
     onSuccess: () => {
-      toast.success("Đã điều chỉnh giá — đơn hàng đang chờ Admin xác nhận lại");
+      toast.success(t.orders.adjustPriceBtn);
       invalidate();
       setAdjustPriceOrderId(null);
       setAdjustPriceItems([]);
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Điều chỉnh giá thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.orders.adjustPriceBtn),
   });
 
   const paymentMut = useMutation({
     mutationFn: (id: number) => confirmPayment(id),
-    onSuccess: () => { toast.success("Xác nhận thanh toán thành công"); invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Xác nhận thanh toán thất bại"),
+    onSuccess: () => { toast.success(t.orders.confirmPaymentBtn); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.orders.confirmPaymentBtn),
   });
 
   const startDeliveryMut = useMutation({
     mutationFn: (id: number) => startDelivery(id),
-    onSuccess: () => { toast.success("Đã bắt đầu giao hàng"); invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Thất bại"),
+    onSuccess: () => { toast.success(t.orders.startDeliveryBtn); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.orders.startDeliveryBtn),
   });
 
   const completeDeliveryMut = useMutation({
     mutationFn: (id: number) => completeDelivery(id),
-    onSuccess: () => { toast.success("Đã hoàn tất giao hàng"); invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Thất bại"),
+    onSuccess: () => { toast.success(t.orders.completeDeliveryBtn); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.orders.completeDeliveryBtn),
   });
 
   // ─── Status labels ─────────────────────────────────────────────────────────
 
   const STATUS_LABELS: Record<SalesOrderStatus, string> = {
     DRAFT: t.common.draft,
-    CONFIRMED: "Đã xác nhận",
-    PARTIALLY_DELIVERED: "Giao 1 phần",
-    DELIVERED: "Đã giao",
+    CONFIRMED: t.orders.statusConfirmed,
+    PARTIALLY_DELIVERED: t.orders.statusPartialDelivery,
+    DELIVERED: t.orders.statusDelivered,
     CANCELLED: t.common.cancelled,
-    PRICE_ADJUSTMENT_REQUESTED: "Chờ điều chỉnh",
-    PENDING_REAPPROVAL: "Chờ duyệt lại",
+    PRICE_ADJUSTMENT_REQUESTED: t.orders.statusPriceAdj,
+    PENDING_REAPPROVAL: t.orders.statusPendingReapproval,
   };
 
   function calcAdjustTotal() {
@@ -279,11 +279,11 @@ export default function SalesOrdersPage() {
               <SelectContent>
                 <SelectItem value="all">{t.orders.allStatuses}</SelectItem>
                 <SelectItem value="DRAFT">{t.common.draft}</SelectItem>
-                <SelectItem value="CONFIRMED">Đã xác nhận</SelectItem>
-                <SelectItem value="PRICE_ADJUSTMENT_REQUESTED">Chờ điều chỉnh</SelectItem>
-                <SelectItem value="PENDING_REAPPROVAL">Chờ duyệt lại</SelectItem>
-                <SelectItem value="PARTIALLY_DELIVERED">Giao 1 phần</SelectItem>
-                <SelectItem value="DELIVERED">Đã giao</SelectItem>
+                <SelectItem value="CONFIRMED">{t.orders.statusConfirmed}</SelectItem>
+                <SelectItem value="PRICE_ADJUSTMENT_REQUESTED">{t.orders.statusPriceAdj}</SelectItem>
+                <SelectItem value="PENDING_REAPPROVAL">{t.orders.statusPendingReapproval}</SelectItem>
+                <SelectItem value="PARTIALLY_DELIVERED">{t.orders.statusPartialDelivery}</SelectItem>
+                <SelectItem value="DELIVERED">{t.orders.statusDelivered}</SelectItem>
                 <SelectItem value="CANCELLED">{t.common.cancelled}</SelectItem>
               </SelectContent>
             </Select>
@@ -305,17 +305,16 @@ export default function SalesOrdersPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Số đơn</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Khách hàng</th>
-                    {/* Cột trạng thái chỉ hiển thị cho Admin */}
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.orders.orderNumber}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.customer}</th>
                     {canApprove && (
-                      <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
+                      <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.status}</th>
                     )}
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Giao hàng</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thanh toán</th>
-                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">Tổng tiền</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Ngày đặt</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thao tác</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.orders.deliveryHeader}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.orders.paymentStatus}</th>
+                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">{t.orders.total}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.orders.orderDateHeader}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -335,15 +334,14 @@ export default function SalesOrdersPage() {
 
                     return (
                       <tr key={o.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                        {/* Số đơn — Sale thấy inline badge khi cần action */}
                         <td className="px-6 py-3">
                           <div className="font-mono text-xs font-medium">{o.orderNumber}</div>
                           {o.quotation && (
-                            <div className="text-xs text-muted-foreground">từ {o.quotation.quotationNumber}</div>
+                            <div className="text-xs text-muted-foreground">{t.orders.fromQuotation} {o.quotation.quotationNumber}</div>
                           )}
                           {!canApprove && orderStatus === "PRICE_ADJUSTMENT_REQUESTED" && (
                             <div className="inline-flex items-center gap-1 text-xs mt-1 px-1.5 py-0.5 rounded text-orange-700 bg-orange-50 border border-orange-200">
-                              <AlertCircle className="h-3 w-3" /> Cần điều chỉnh giá
+                              <AlertCircle className="h-3 w-3" /> {t.orders.needsAdjustment}
                             </div>
                           )}
                         </td>
@@ -366,14 +364,21 @@ export default function SalesOrdersPage() {
                           </td>
                         )}
 
-                        {/* Giao hàng */}
                         <td className="px-6 py-3">
-                          <DeliveryBadge status={delivStatus} />
+                          <DeliveryBadge
+                            status={delivStatus}
+                            pendingLabel={t.orders.deliveryPending}
+                            inTransitLabel={t.orders.deliveryInTransit}
+                            doneLabel={t.orders.deliveryDone}
+                          />
                         </td>
 
-                        {/* Thanh toán */}
                         <td className="px-6 py-3">
-                          <PaymentBadge status={payStatus} />
+                          <PaymentBadge
+                            status={payStatus}
+                            unpaidLabel={t.orders.paymentUnpaid}
+                            paidLabel={t.orders.paymentPaid}
+                          />
                           {payStatus === "PAID" && (o as any).paidAt && (
                             <div className="text-xs text-muted-foreground mt-0.5">
                               {new Date((o as any).paidAt).toLocaleDateString("vi-VN")}
@@ -381,26 +386,22 @@ export default function SalesOrdersPage() {
                           )}
                         </td>
 
-                        {/* Tổng tiền */}
                         <td className="px-6 py-3 text-right">
                           <div className="font-semibold tabular-nums">{vnd(Number(o.totalAmount))}</div>
                           {Number(o.subtotal) !== Number(o.totalAmount) && (
                             <div className="text-xs text-muted-foreground">
-                              Trước thuế: {vnd(Number(o.subtotal))}
+                              {t.orders.preTaxLabel}: {vnd(Number(o.subtotal))}
                             </div>
                           )}
                         </td>
 
-                        {/* Ngày đặt */}
                         <td className="px-6 py-3 text-muted-foreground text-xs">
                           {new Date(o.orderedAt).toLocaleDateString("vi-VN")}
                         </td>
 
-                        {/* ── Thao tác ── */}
                         <td className="px-6 py-3">
                           <div className="flex items-center gap-1 flex-wrap">
 
-                            {/* Admin: xác nhận giá (DRAFT hoặc PENDING_REAPPROVAL) */}
                             {canApprove && ["DRAFT", "PENDING_REAPPROVAL"].includes(orderStatus) && (
                               <Button
                                 size="sm" variant="ghost"
@@ -408,22 +409,20 @@ export default function SalesOrdersPage() {
                                 onClick={() => confirmPriceMut.mutate({ id: o.id, orderStatus })}
                                 disabled={confirmPriceMut.isPending}
                               >
-                                <CheckCircle className="h-3 w-3" /> Xác nhận giá
+                                <CheckCircle className="h-3 w-3" /> {t.orders.confirmPrice}
                               </Button>
                             )}
 
-                            {/* Admin: yêu cầu điều chỉnh giá — ẩn với Admin & Saler */}
                             {canApprove && canShowRestrictedActions && ["DRAFT", "CONFIRMED", "PENDING_REAPPROVAL"].includes(orderStatus) && (
                               <Button
                                 size="sm" variant="ghost"
                                 className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
                                 onClick={() => { setRequestAdjustTarget({ id: o.id, status: orderStatus }); setRequestAdjustReason(""); }}
                               >
-                                <Edit2 className="h-3 w-3" /> Yêu cầu điều chỉnh
+                                <Edit2 className="h-3 w-3" /> {t.orders.requestAdjust}
                               </Button>
                             )}
 
-                            {/* Admin: hủy đơn — ẩn với Admin & Saler */}
                             {canApprove && canShowRestrictedActions && orderStatus === "CONFIRMED" && (
                               <Button
                                 size="sm" variant="ghost"
@@ -431,22 +430,20 @@ export default function SalesOrdersPage() {
                                 onClick={() => cancelMut.mutate(o.id)}
                                 disabled={cancelMut.isPending}
                               >
-                                <XCircle className="h-3 w-3" /> Hủy
+                                <XCircle className="h-3 w-3" /> {t.common.cancel}
                               </Button>
                             )}
 
-                            {/* Sale: điều chỉnh lại giá (chỉ khi PRICE_ADJUSTMENT_REQUESTED) */}
                             {canCreate && !canApprove && orderStatus === "PRICE_ADJUSTMENT_REQUESTED" && (
                               <Button
                                 size="sm" variant="ghost"
                                 className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 border border-orange-200 bg-orange-50"
                                 onClick={() => { setAdjustPriceItems([]); setAdjustPriceOrderId(o.id); }}
                               >
-                                <Edit2 className="h-3 w-3" /> Điều chỉnh lại giá
+                                <Edit2 className="h-3 w-3" /> {t.orders.adjustPriceBtn}
                               </Button>
                             )}
 
-                            {/* Giao hàng (Admin + Sale, khi CONFIRMED và chưa giao) */}
                             {canStartDelivery && (
                               <Button
                                 size="sm" variant="ghost"
@@ -454,11 +451,10 @@ export default function SalesOrdersPage() {
                                 onClick={() => startDeliveryMut.mutate(o.id)}
                                 disabled={startDeliveryMut.isPending}
                               >
-                                <Truck className="h-3 w-3" /> Giao hàng
+                                <Truck className="h-3 w-3" /> {t.orders.startDeliveryBtn}
                               </Button>
                             )}
 
-                            {/* Hoàn tất giao hàng (Admin + Sale, khi đang giao) */}
                             {canCompleteDelivery && (
                               <Button
                                 size="sm" variant="ghost"
@@ -466,11 +462,10 @@ export default function SalesOrdersPage() {
                                 onClick={() => completeDeliveryMut.mutate(o.id)}
                                 disabled={completeDeliveryMut.isPending}
                               >
-                                <CheckCircle className="h-3 w-3" /> Hoàn tất giao
+                                <CheckCircle className="h-3 w-3" /> {t.orders.completeDeliveryBtn}
                               </Button>
                             )}
 
-                            {/* Xác nhận thanh toán (Admin + Sale, khi đủ điều kiện) */}
                             {canPay && (
                               <Button
                                 size="sm"
@@ -482,7 +477,7 @@ export default function SalesOrdersPage() {
                                   ? <Loader2 className="h-3 w-3 animate-spin" />
                                   : <CheckCircle2 className="h-3 w-3" />
                                 }
-                                Xác nhận thanh toán
+                                {t.orders.confirmPaymentBtn}
                               </Button>
                             )}
                           </div>

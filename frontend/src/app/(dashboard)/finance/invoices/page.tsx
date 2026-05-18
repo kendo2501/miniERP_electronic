@@ -270,7 +270,7 @@ export default function InvoicesPage() {
               <Input type="number" placeholder={t.invoices.linkOrderPlaceholder} {...register("salesOrderId")} />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.invoices.issueDate}</Label>
                 <Input type="date" {...register("issueDate")} />
@@ -281,7 +281,7 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.invoices.subtotal} *</Label>
                 <Input type="number" min="0" step="0.01" {...register("subtotal")} />

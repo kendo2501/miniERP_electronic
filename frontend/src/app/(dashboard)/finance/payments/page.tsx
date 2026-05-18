@@ -223,7 +223,7 @@ export default function PaymentsPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.payments.amount} ($) *</Label>
                 <Input type="number" min="0.01" step="0.01" placeholder={t.payments.amountPlaceholder} {...createForm.register("totalAmount")} />
@@ -239,7 +239,7 @@ export default function PaymentsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.payments.paymentDate}</Label>
                 <Input type="date" {...createForm.register("paymentDate")} />

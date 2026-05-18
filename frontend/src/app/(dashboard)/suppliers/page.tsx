@@ -292,7 +292,7 @@ export default function SuppliersPage() {
               <Input {...register("companyName")} />
               {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>{s.contactName} <span className="text-muted-foreground text-xs">({s.optional})</span></Label>
                 <Input {...register("contactName")} />
@@ -302,7 +302,7 @@ export default function SuppliersPage() {
                 <Input {...register("phone")} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>{s.email} <span className="text-muted-foreground text-xs">({s.optional})</span></Label>
                 <Input {...register("email")} type="email" />

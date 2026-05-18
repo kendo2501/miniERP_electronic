@@ -407,7 +407,7 @@ export default function CustomersPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4 pt-2">
             {/* Customer code + company name */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.customers.customerCode}</Label>
                 <Input placeholder={t.customers.codePlaceholder} {...register("customerCode")} />
@@ -429,7 +429,7 @@ export default function CustomersPage() {
               <Input placeholder={t.customers.companyPlaceholder} {...register("companyName")} />
               {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.customers.contactName}</Label>
                 <Input placeholder={t.customers.contactPlaceholder} {...register("contactName")} />
@@ -441,7 +441,7 @@ export default function CustomersPage() {
               </div>
             </div>
             {/* Email + Password (portal account) */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.common.email} *</Label>
                 <Input type="email" placeholder={t.customers.emailPlaceholder} {...register("email")} />
@@ -456,7 +456,7 @@ export default function CustomersPage() {
             <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
               {t.customers.portalAccountNote}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>{t.customers.taxCode}</Label>
                 <Input placeholder="0123456789" {...register("taxCode")} />
@@ -685,7 +685,7 @@ export default function CustomersPage() {
           ) : balanceData ? (
             <div className="space-y-4">
               {/* Summary */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="rounded-lg border p-3 bg-muted/30">
                   <p className="text-xs text-muted-foreground mb-1">{t.customers.totalDebt}</p>
                   <p className={`text-lg font-bold ${balanceData.totalDebt > 0 ? "text-orange-600" : "text-green-600"}`}>

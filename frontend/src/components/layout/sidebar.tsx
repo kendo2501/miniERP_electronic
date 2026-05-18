@@ -23,10 +23,9 @@ import {
   Truck,
   RotateCcw,
   ShoppingBag,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuthStore } from "@/store/auth.store";
 import { authApi } from "@/lib/api/auth";
@@ -34,29 +33,32 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/language-context";
 
-// permission: null = visible to all authenticated users
 const NAV_ITEMS = [
-  { href: "/dashboard",                  labelKey: "dashboard"      as const, icon: LayoutDashboard, permission: null },
-  { href: "/catalog",                    labelKey: "catalog"        as const, icon: LayoutGrid,      permission: "catalog.product.view" },
-  { href: "/inventory",                  labelKey: "inventory"      as const, icon: Package,         permission: "inventory.stock.view" },
-  { href: "/customers",                  labelKey: "customers"      as const, icon: UserRound,       permission: "customer.view_assigned" },
-  { href: "/suppliers",                  labelKey: "suppliers"      as const, icon: Truck,            permission: "supplier.view" },
-  { href: "/sales",                      labelKey: "sales"          as const, icon: ShoppingCart,    permission: "sales.quotation.create" },
-  { href: "/sales/returns",              labelKey: "salesReturns"   as const, icon: RotateCcw,        permission: "sales.order.view_all" },
-  { href: "/my-catalog",                  labelKey: "myCatalog"      as const, icon: ShoppingBag,     permission: "sales.quotation.create_request" },
-  { href: "/my-quotations",               labelKey: "myQuotations"   as const, icon: FileText,        permission: "sales.quotation.view_own" },
-  { href: "/my-orders",                  labelKey: "myOrders"       as const, icon: ClipboardList,   permission: "sales.order.view_own" },
-  { href: "/sales/stock-inquiries",      labelKey: "stockInquiries" as const, icon: ClipboardCheck,  permission: "inventory.stock.request" },
-  { href: "/inventory/stock-inquiries",  labelKey: "stockInquiries" as const, icon: ClipboardCheck,  permission: "inventory.stock.respond" },
-  { href: "/finance",                    labelKey: "finance"        as const, icon: DollarSign,      permission: "finance.invoice.view" },
-  { href: "/finance/supplier-payments",  labelKey: "supplierPayments" as const, icon: Building2,     permission: "purchase.invoice.view" },
-  { href: "/audit",                      labelKey: "auditLog"       as const, icon: Shield,          permission: "audit.security.view" },
-  { href: "/notifications",              labelKey: "notifications"  as const, icon: Bell,            permission: null },
-  { href: "/settings",                   labelKey: "settings"       as const, icon: Settings,        permission: "profile.update_self" },
-  { href: "/users",                      labelKey: "users"          as const, icon: Users,           permission: "auth.user.read" },
+  { href: "/dashboard",                  labelKey: "dashboard"        as const, icon: LayoutDashboard, permission: null },
+  { href: "/catalog",                    labelKey: "catalog"          as const, icon: LayoutGrid,      permission: "catalog.product.view" },
+  { href: "/inventory",                  labelKey: "inventory"        as const, icon: Package,         permission: "inventory.stock.view" },
+  { href: "/customers",                  labelKey: "customers"        as const, icon: UserRound,       permission: "customer.view_assigned" },
+  { href: "/suppliers",                  labelKey: "suppliers"        as const, icon: Truck,           permission: "supplier.view" },
+  { href: "/sales",                      labelKey: "sales"            as const, icon: ShoppingCart,    permission: "sales.quotation.create" },
+  { href: "/sales/returns",              labelKey: "salesReturns"     as const, icon: RotateCcw,       permission: "sales.order.view_all" },
+  { href: "/my-catalog",                 labelKey: "myCatalog"        as const, icon: ShoppingBag,     permission: "sales.quotation.create_request" },
+  { href: "/my-quotations",              labelKey: "myQuotations"     as const, icon: FileText,        permission: "sales.quotation.view_own" },
+  { href: "/my-orders",                  labelKey: "myOrders"         as const, icon: ClipboardList,   permission: "sales.order.view_own" },
+  { href: "/sales/stock-inquiries",      labelKey: "stockInquiries"   as const, icon: ClipboardCheck,  permission: "inventory.stock.request" },
+  { href: "/inventory/stock-inquiries",  labelKey: "stockInquiries"   as const, icon: ClipboardCheck,  permission: "inventory.stock.respond" },
+  { href: "/finance",                    labelKey: "finance"          as const, icon: DollarSign,      permission: "finance.invoice.view" },
+  { href: "/finance/supplier-payments",  labelKey: "supplierPayments" as const, icon: Building2,       permission: "purchase.invoice.view" },
+  { href: "/audit",                      labelKey: "auditLog"         as const, icon: Shield,          permission: "audit.security.view" },
+  { href: "/notifications",              labelKey: "notifications"    as const, icon: Bell,            permission: null },
+  { href: "/settings",                   labelKey: "settings"         as const, icon: Settings,        permission: "profile.update_self" },
+  { href: "/users",                      labelKey: "users"            as const, icon: Users,           permission: "auth.user.read" },
 ] as const;
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, hasPermission, logout } = useAuthStore();
   const router = useRouter();
@@ -91,10 +93,18 @@ export function Sidebar() {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEA837] shrink-0">
           <Zap className="h-4 w-4 text-[#432D51]" fill="currentColor" />
         </div>
-        <div className="flex flex-col">
+        <div className="flex flex-col flex-1">
           <span className="font-bold text-sm text-white leading-tight">miniERP</span>
           <span className="text-[10px] text-sidebar-foreground/50 leading-none">Electronic</span>
         </div>
+        {/* Close button — mobile only */}
+        <button
+          onClick={onClose}
+          className="lg:hidden ml-auto p-1.5 rounded-lg text-sidebar-foreground/60 hover:text-white hover:bg-white/10 transition-colors"
+          aria-label="Close menu"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Nav */}
@@ -105,6 +115,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={cn(
                 "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
                 isActive
@@ -112,7 +123,6 @@ export function Sidebar() {
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
               )}
             >
-              {/* Active accent bar */}
               <span className={cn(
                 "absolute left-3 h-5 w-0.5 rounded-full transition-all duration-150",
                 isActive ? "bg-[#FEA837]" : "bg-transparent"

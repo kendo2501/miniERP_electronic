@@ -72,7 +72,7 @@ export function TransferStockDialog({ open, onOpenChange, onSuccess }: Props) {
           <DialogTitle>{t.inventory.transferTitle}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4 pt-2">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>{t.inventory.fromWarehouse}</Label>
               <Select onValueChange={(v) => setValue("fromWarehouseId", v)}>

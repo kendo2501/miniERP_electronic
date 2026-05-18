@@ -318,7 +318,7 @@ export default function PriceListsPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>{t.catalog.validFrom}</Label>
                 <Input type="date" {...regCreate("validFrom")} className="mt-1" />
@@ -404,7 +404,7 @@ export default function PriceListsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>{t.catalog.validFrom}</Label>
                   <Input type="date" {...regEdit("validFrom")} className="mt-1" />

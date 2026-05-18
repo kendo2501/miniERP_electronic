@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { listStockInquiries, getStockInquiry, respondToInquiry } from "@/lib/api/sales";
 import { vnd } from "@/lib/format";
 import Link from "next/link";
+import { useLanguage } from "@/context/language-context";
 
 export default function WarehouseStockInquiriesPage() {
   const [page, setPage] = useState(1);
@@ -21,6 +22,7 @@ export default function WarehouseStockInquiriesPage() {
   const [responseNotes, setResponseNotes] = useState("");
   const [itemResponses, setItemResponses] = useState<Record<number, { isAvailable: boolean; qty: string; note: string }>>({});
   const qc = useQueryClient();
+  const { t } = useLanguage();
 
   const { data, isLoading } = useQuery({
     queryKey: ["wh-stock-inquiries", page, statusFilter],
@@ -54,13 +56,13 @@ export default function WarehouseStockInquiriesPage() {
       })),
     }).then((r) => r.data),
     onSuccess: () => {
-      toast.success("Đã gửi phản hồi cho sale");
+      toast.success(t.stockInquiries.sendResponse);
       qc.invalidateQueries({ queryKey: ["wh-stock-inquiries"] });
       setRespondingId(null);
       setResponseNotes("");
       setItemResponses({});
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Phản hồi thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.stockInquiries.sendResponse),
   });
 
   function updateItemResp(itemId: number, field: string, value: any) {
@@ -73,18 +75,18 @@ export default function WarehouseStockInquiriesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ClipboardCheck className="h-7 w-7 text-muted-foreground" />
-            Yêu cầu kiểm tra tồn kho
+            {t.stockInquiries.titleWarehouse}
           </h1>
-          <p className="text-muted-foreground mt-1">Phản hồi yêu cầu từ bộ phận bán hàng</p>
+          <p className="text-muted-foreground mt-1">{t.stockInquiries.subtitleWarehouse}</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/inventory"><Button variant="outline" size="sm">Kho hàng</Button></Link>
+          <Link href="/inventory"><Button variant="outline" size="sm">{t.stockInquiries.warehouseLink}</Button></Link>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả</SelectItem>
-              <SelectItem value="PENDING">Chờ phản hồi</SelectItem>
-              <SelectItem value="RESPONDED">Đã phản hồi</SelectItem>
+              <SelectItem value="all">{t.stockInquiries.filterAll}</SelectItem>
+              <SelectItem value="PENDING">{t.stockInquiries.filterPending}</SelectItem>
+              <SelectItem value="RESPONDED">{t.stockInquiries.filterResponded}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -99,12 +101,12 @@ export default function WarehouseStockInquiriesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Mã yêu cầu</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Sale</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
-                    <th className="h-10 px-6 text-center font-medium text-muted-foreground">SP</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Ngày tạo</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thao tác</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.stockInquiries.reqNumber}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.stockInquiries.salesPerson}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.status}</th>
+                    <th className="h-10 px-6 text-center font-medium text-muted-foreground">{t.quotations.products}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.stockInquiries.createdDate}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -115,11 +117,11 @@ export default function WarehouseStockInquiriesPage() {
                       <td className="px-6 py-3">
                         {inq.status === "PENDING" ? (
                           <Badge variant="secondary" className="text-xs text-yellow-700 bg-yellow-50 border-yellow-200 gap-1">
-                            <Clock className="h-3 w-3" /> Chờ phản hồi
+                            <Clock className="h-3 w-3" /> {t.stockInquiries.statusPending}
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs text-green-700 bg-green-50 border-green-200 gap-1">
-                            <CheckCircle className="h-3 w-3" /> Đã phản hồi
+                            <CheckCircle className="h-3 w-3" /> {t.stockInquiries.statusResponded}
                           </Badge>
                         )}
                       </td>
@@ -131,19 +133,19 @@ export default function WarehouseStockInquiriesPage() {
                         {inq.status === "PENDING" ? (
                           <Button size="sm" variant="default" className="h-7 px-2 text-xs gap-1"
                             onClick={() => setRespondingId(inq.id)}>
-                            <CheckCircle className="h-3 w-3" /> Phản hồi
+                            <CheckCircle className="h-3 w-3" /> {t.stockInquiries.respondBtn}
                           </Button>
                         ) : (
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
                             onClick={() => setRespondingId(inq.id)}>
-                            Xem lại
+                            {t.stockInquiries.viewBtn}
                           </Button>
                         )}
                       </td>
                     </tr>
                   ))}
                   {data?.items.length === 0 && (
-                    <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">Không có yêu cầu nào</td></tr>
+                    <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">{t.stockInquiries.noRequests}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -151,10 +153,10 @@ export default function WarehouseStockInquiriesPage() {
           )}
           {data && data.totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-6 py-3">
-              <span className="text-sm text-muted-foreground">Trang {data.page} / {data.totalPages}</span>
+              <span className="text-sm text-muted-foreground">{t.common.page} {data.page} {t.common.of} {data.totalPages}</span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>Trước</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>Sau</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>{t.common.previous}</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= data.totalPages}>{t.common.next}</Button>
               </div>
             </div>
           )}
@@ -165,7 +167,7 @@ export default function WarehouseStockInquiriesPage() {
       <Dialog open={!!respondingId} onOpenChange={(v) => { if (!v) { setRespondingId(null); setResponseNotes(""); setItemResponses({}); } }}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Phản hồi yêu cầu {detail?.inquiryNumber}</DialogTitle>
+            <DialogTitle>{detail?.inquiryNumber}</DialogTitle>
           </DialogHeader>
           {!detail ? (
             <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>
@@ -173,7 +175,7 @@ export default function WarehouseStockInquiriesPage() {
             <div className="space-y-4 pt-2">
               {detail.notes && (
                 <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                  Sale ghi chú: {detail.notes}
+                  {detail.notes}
                 </div>
               )}
               <div className="space-y-3">
@@ -186,8 +188,8 @@ export default function WarehouseStockInquiriesPage() {
                           <span className="font-mono text-xs text-blue-600 bg-blue-50 px-1 rounded mr-1">{item.product.sku}</span>
                           <span className="text-sm font-medium">{item.product.productName}</span>
                           <div className="text-xs text-muted-foreground mt-0.5">
-                            Cần: {Number(item.requestedQuantity)} {item.product.unit}
-                            {item.product.minPrice && <span className="ml-2 text-orange-600">• Giá tối thiểu: {vnd(item.product.minPrice)}</span>}
+                            {Number(item.requestedQuantity)} {item.product.unit}
+                            {item.product.minPrice && <span className="ml-2 text-orange-600">• {vnd(item.product.minPrice)}</span>}
                           </div>
                         </div>
                         <Select
@@ -199,23 +201,23 @@ export default function WarehouseStockInquiriesPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="yes">✓ Còn hàng</SelectItem>
-                            <SelectItem value="no">✗ Hết hàng</SelectItem>
+                            <SelectItem value="yes">✓ {t.stockInquiries.inStock}</SelectItem>
+                            <SelectItem value="no">✗ {t.stockInquiries.outOfStock}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {resp.isAvailable && (
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div className="space-y-1">
-                            <Label className="text-xs">Số lượng có thể cung cấp</Label>
+                            <Label className="text-xs">{t.inventory.quantity}</Label>
                             <Input type="number" min="0" step="1" value={resp.qty}
                               onChange={(e) => updateItemResp(item.id, "qty", e.target.value)}
                               disabled={detail.status === "RESPONDED"}
                               className="h-8 text-xs" />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs">Ghi chú thêm</Label>
-                            <Input value={resp.note} placeholder="VD: hàng về ngày 10/5..."
+                            <Label className="text-xs">{t.common.notes}</Label>
+                            <Input value={resp.note}
                               onChange={(e) => updateItemResp(item.id, "note", e.target.value)}
                               disabled={detail.status === "RESPONDED"}
                               className="h-8 text-xs" />
@@ -224,8 +226,8 @@ export default function WarehouseStockInquiriesPage() {
                       )}
                       {!resp.isAvailable && (
                         <div className="space-y-1">
-                          <Label className="text-xs">Ghi chú</Label>
-                          <Input value={resp.note} placeholder="VD: đã hết, dự kiến nhập thêm ngày..."
+                          <Label className="text-xs">{t.common.notes}</Label>
+                          <Input value={resp.note}
                             onChange={(e) => updateItemResp(item.id, "note", e.target.value)}
                             disabled={detail.status === "RESPONDED"}
                             className="h-8 text-xs" />
@@ -237,19 +239,18 @@ export default function WarehouseStockInquiriesPage() {
               </div>
               {detail.status !== "RESPONDED" && (
                 <div className="space-y-1.5">
-                  <Label>Ghi chú chung</Label>
-                  <Input placeholder="Ghi chú tổng hợp cho sale..."
-                    value={responseNotes} onChange={(e) => setResponseNotes(e.target.value)} />
+                  <Label>{t.common.notes}</Label>
+                  <Input value={responseNotes} onChange={(e) => setResponseNotes(e.target.value)} />
                 </div>
               )}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRespondingId(null); setResponseNotes(""); setItemResponses({}); }}>Đóng</Button>
+            <Button variant="outline" onClick={() => { setRespondingId(null); setResponseNotes(""); setItemResponses({}); }}>{t.stockInquiries.closeBtn}</Button>
             {detail?.status === "PENDING" && (
               <Button disabled={respondMut.isPending} onClick={() => respondMut.mutate()}>
                 {respondMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Gửi phản hồi
+                {t.stockInquiries.sendResponse}
               </Button>
             )}
           </DialogFooter>

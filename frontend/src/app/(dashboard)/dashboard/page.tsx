@@ -361,7 +361,7 @@ function SalesDashboard({ user }: { user: any }) {
 
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted-foreground">{t.dashboard.quickActions}</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
                   { href: "/customers",         icon: UserRound,    label: t.dashboard.myCustomers, color: "text-[#593E67]", bg: "bg-[#593E67]/10" },
                   { href: "/sales/quotations",  icon: ClipboardList,label: t.quotations.title,      color: "text-[#84495F]", bg: "bg-[#84495F]/10" },
@@ -769,7 +769,7 @@ function WarehouseDashboard({ user }: { user: any }) {
 
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted-foreground">{t.dashboard.quickActions}</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
                   { href: "/inventory",                icon: Package,    label: t.inventory.title,         color: "text-[#593E67]", bg: "bg-[#593E67]/10" },
                   { href: "/inventory/stock-inquiries", icon: ClipboardList, label: t.sidebar.stockInquiries, color: "text-[#84495F]", bg: "bg-[#84495F]/10" },

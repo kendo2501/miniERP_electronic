@@ -30,14 +30,7 @@ import Link from "next/link";
 
 // ─── Status display ──────────────────────────────────────────────────────────
 
-const STATUS_LABELS: Record<QuotationStatus, string> = {
-  PENDING_APPROVAL: "Chờ duyệt",
-  APPROVED: "Đã duyệt",
-  REVISION_REQUESTED: "Yêu cầu chỉnh sửa",
-  SENT: "Đã gửi KH",
-  CONFIRMED: "Đã xác nhận",
-  CANCELLED: "Đã hủy",
-};
+// STATUS_LABELS is built inside the component using t keys
 
 const STATUS_CLASSES: Record<QuotationStatus, string> = {
   PENDING_APPROVAL: "bg-yellow-100 text-yellow-800 border border-yellow-300",
@@ -99,6 +92,15 @@ export default function QuotationsPage() {
   const canCreate = hasPermission("sales.quotation.create");
   const canApprove = hasPermission("sales.quotation.approve");
   const canUpdateOwn = hasPermission("sales.quotation.update_own");
+
+  const STATUS_LABELS: Record<QuotationStatus, string> = {
+    PENDING_APPROVAL:   t.quotations.statusPendingApproval,
+    APPROVED:           t.quotations.statusApproved,
+    REVISION_REQUESTED: t.quotations.statusRevisionRequested,
+    SENT:               t.quotations.statusSent,
+    CONFIRMED:          t.quotations.statusConfirmed,
+    CANCELLED:          t.quotations.statusCancelled,
+  };
 
   // ─── Queries ──────────────────────────────────────────────────────────────
 
@@ -303,12 +305,12 @@ export default function QuotationsPage() {
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.quotations.allStatuses}</SelectItem>
-                <SelectItem value="PENDING_APPROVAL">Chờ duyệt</SelectItem>
-                <SelectItem value="APPROVED">Đã duyệt</SelectItem>
-                <SelectItem value="REVISION_REQUESTED">Yêu cầu chỉnh sửa</SelectItem>
-                <SelectItem value="SENT">Đã gửi KH</SelectItem>
-                <SelectItem value="CONFIRMED">Đã xác nhận</SelectItem>
-                <SelectItem value="CANCELLED">Đã hủy</SelectItem>
+                <SelectItem value="PENDING_APPROVAL">{t.quotations.statusPendingApproval}</SelectItem>
+                <SelectItem value="APPROVED">{t.quotations.statusApproved}</SelectItem>
+                <SelectItem value="REVISION_REQUESTED">{t.quotations.statusRevisionRequested}</SelectItem>
+                <SelectItem value="SENT">{t.quotations.statusSent}</SelectItem>
+                <SelectItem value="CONFIRMED">{t.quotations.statusConfirmed}</SelectItem>
+                <SelectItem value="CANCELLED">{t.quotations.statusCancelled}</SelectItem>
               </SelectContent>
             </Select>
             {data && <span className="text-sm text-muted-foreground ml-auto">{data.total} {t.quotations.totalQuotations}</span>}
@@ -325,14 +327,14 @@ export default function QuotationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Số báo giá</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Khách hàng</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Trạng thái</th>
-                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">Tổng tiền</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Hiệu lực đến</th>
-                    <th className="h-10 px-6 text-center font-medium text-muted-foreground">SP</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Ngày tạo</th>
-                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">Thao tác</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.quotations.quotationNumber}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.customer}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.status}</th>
+                    <th className="h-10 px-6 text-right font-medium text-muted-foreground">{t.common.total}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.quotations.validUntil}</th>
+                    <th className="h-10 px-6 text-center font-medium text-muted-foreground">{t.quotations.products}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.quotations.createdAtHeader}</th>
+                    <th className="h-10 px-6 text-left font-medium text-muted-foreground">{t.common.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -357,7 +359,7 @@ export default function QuotationsPage() {
                               </span>
                             )}
                             {q.cancelReason && q.status === "CANCELLED" && (
-                              <span className="text-xs text-red-600">Lý do: {q.cancelReason}</span>
+                              <span className="text-xs text-red-600">{t.quotations.cancelReasonNote} {q.cancelReason}</span>
                             )}
                             {q.negotiationStatus === "PROPOSED" && (
                               <Badge variant="secondary" className="text-xs text-purple-700 bg-purple-50 border border-purple-200 w-fit">
@@ -372,7 +374,7 @@ export default function QuotationsPage() {
                         <td className="px-6 py-3">
                           {q.validUntil ? (
                             <span className={isExpired ? "text-red-500 text-xs font-medium" : "text-xs text-muted-foreground"}>
-                              {isExpired ? "⚠ Hết hạn " : ""}
+                              {isExpired ? `⚠ ${t.quotations.expiredWarning} ` : ""}
                               {new Date(q.validUntil).toLocaleDateString("vi-VN")}
                             </span>
                           ) : "—"}
@@ -383,67 +385,61 @@ export default function QuotationsPage() {
                         </td>
                         <td className="px-6 py-3">
                           <div className="flex items-center gap-1 flex-wrap">
-                            {/* Manager: Duyệt / Yêu cầu chỉnh sửa / Hủy khi PENDING_APPROVAL */}
                             {canApprove && q.status === "PENDING_APPROVAL" && (
                               <>
                                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-700 hover:text-green-800"
                                   onClick={() => approveMut.mutate(q.id)} disabled={approveMut.isPending}>
-                                  <CheckCircle className="h-3 w-3" /> Duyệt
+                                  <CheckCircle className="h-3 w-3" /> {t.quotations.approveBtn}
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
                                   onClick={() => { setRevisionTarget(q.id); setRevisionReason(""); }}>
-                                  <Edit2 className="h-3 w-3" /> Yêu cầu chỉnh sửa
+                                  <Edit2 className="h-3 w-3" /> {t.quotations.requestRevisionBtn}
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
                                   onClick={() => { setCancelTarget(q.id); setCancelReason(""); }}>
-                                  <XCircle className="h-3 w-3" /> Hủy
+                                  <XCircle className="h-3 w-3" /> {t.quotations.cancelBtn}
                                 </Button>
                               </>
                             )}
 
-                            {/* Manager: Gửi KH khi APPROVED (mở cơ hội thương lượng giá) */}
                             {canApprove && q.status === "APPROVED" && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700"
                                 onClick={() => sendMut.mutate(q.id)} disabled={sendMut.isPending}>
-                                <Send className="h-3 w-3" /> Gửi KH
+                                <Send className="h-3 w-3" /> {t.quotations.sendToCustomerBtn}
                               </Button>
                             )}
 
-                            {/* Manager: xử lý đề xuất giá */}
                             {canApprove && q.negotiationStatus === "PROPOSED" && (
                               <>
                                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-green-600 hover:text-green-700"
                                   onClick={() => acceptOfferMut.mutate(q.id)} disabled={acceptOfferMut.isPending}>
-                                  <CheckCircle className="h-3 w-3" /> Chấp nhận giá
+                                  <CheckCircle className="h-3 w-3" /> {t.quotations.acceptPriceBtn}
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
                                   onClick={() => rejectOfferMut.mutate(q.id)} disabled={rejectOfferMut.isPending}>
-                                  <XCircle className="h-3 w-3" /> Từ chối
+                                  <XCircle className="h-3 w-3" /> {t.quotations.rejectBtn}
                                 </Button>
                               </>
                             )}
 
-                            {/* Sale: Chỉnh sửa lại giá khi REVISION_REQUESTED */}
                             {canUpdateOwn && !canApprove && q.status === "REVISION_REQUESTED" && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700"
                                 onClick={() => { setResubmitItems([]); setResubmitTarget(null); setResubmitTargetId(q.id); }}>
-                                <Edit2 className="h-3 w-3" /> Điều chỉnh lại giá
+                                <Edit2 className="h-3 w-3" /> {t.quotations.adjustPriceBtn}
                               </Button>
                             )}
 
-                            {/* Sale: Đề xuất giá khi SENT */}
                             {canUpdateOwn && q.status === "SENT" && (!q.negotiationStatus || q.negotiationStatus === "NONE" || q.negotiationStatus === "REJECTED") && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-purple-600 hover:text-purple-700"
                                 onClick={() => { setCounterOfferTarget({ id: q.id, original: Number(q.totalAmount) }); setCounterAmount(String(q.totalAmount)); setCounterNote(""); }}>
-                                <MessageSquare className="h-3 w-3" /> Đề xuất giá
+                                <MessageSquare className="h-3 w-3" /> {t.quotations.proposePriceBtn}
                               </Button>
                             )}
 
-                            {/* Hủy có lý do — sale có thể hủy nếu chưa xác nhận */}
                             {!canApprove && canUpdateOwn && (q.status === "REVISION_REQUESTED") && (
                               <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700"
                                 onClick={() => { setCancelTarget(q.id); setCancelReason(""); }}>
-                                <XCircle className="h-3 w-3" /> Hủy
+                                <XCircle className="h-3 w-3" /> {t.quotations.cancelBtn}
                               </Button>
                             )}
                           </div>
@@ -495,7 +491,7 @@ export default function QuotationsPage() {
                 requestRevisionMut.mutate({ id: revisionTarget, reason: revisionReason.trim() });
               }}>
               {requestRevisionMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Gửi yêu cầu
+              {t.quotations.sendRequestBtn}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -504,13 +500,12 @@ export default function QuotationsPage() {
       {/* ─── Cancel With Reason Dialog ──────────────────────────────────────── */}
       <Dialog open={cancelTarget !== null} onOpenChange={(v) => { if (!v) { setCancelTarget(null); setCancelReason(""); } }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Hủy báo giá</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.quotations.cancelBtn} {t.quotations.title}</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
-            <Label>Lý do hủy *</Label>
+            <Label>{t.quotations.cancelReasonNote} *</Label>
             <Textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Nhập lý do hủy báo giá..."
               rows={3}
             />
           </div>
@@ -526,7 +521,7 @@ export default function QuotationsPage() {
                 cancelWithReasonMut.mutate({ id: cancelTarget, reason: cancelReason.trim() });
               }}>
               {cancelWithReasonMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Xác nhận hủy
+              {t.common.confirm}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -593,7 +588,7 @@ export default function QuotationsPage() {
                 resubmitMut.mutate({ id: resubmitTarget.id, items: resubmitItems });
               }}>
               {resubmitMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Gửi lại chờ duyệt
+              {t.quotations.resubmitBtn}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -632,7 +627,7 @@ export default function QuotationsPage() {
                 counterOfferMut.mutate({ id: counterOfferTarget.id, proposedAmount: Number(counterAmount), note: counterNote || undefined });
               }}>
               {counterOfferMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Gửi đề xuất
+              {t.quotations.sendProposalBtn}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -647,7 +642,7 @@ export default function QuotationsPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{t.quotations.createTitle}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit((v) => createMut.mutate(v))} className="space-y-4 pt-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Khách hàng *</Label>
                 <Select onValueChange={(v) => setValue("customerId", v)}>
@@ -716,7 +711,7 @@ export default function QuotationsPage() {
               </Button>
               <Button type="submit" disabled={createMut.isPending}>
                 {createMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Tạo & gửi duyệt
+                {t.quotations.createAndSend}
               </Button>
             </DialogFooter>
           </form>
