@@ -38,9 +38,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let _w = false;
-    let _bw = 0;
-    let _bh = 0;
     let _rid: ReturnType<typeof setInterval> | null = null;
+
+    // Baseline: outer & inner dimensions when page loads (no DevTools)
+    let _bow = window.outerWidth;
+    let _boh = window.outerHeight;
+    let _biw = window.innerWidth;
+    let _bih = window.innerHeight;
 
     const _open = () => {
       _setVis(true);
@@ -60,26 +64,35 @@ export function Providers({ children }: { children: React.ReactNode }) {
     };
 
     const _tick = () => {
-      const _dw = window.outerWidth - window.innerWidth;
-      const _dh = window.outerHeight - window.innerHeight;
-      console.log("[diag] ow-iw=" + _dw + " oh-ih=" + _dh + " bw=" + _bw + " bh=" + _bh + " dw=" + (_dw - _bw) + " dh=" + (_dh - _bh));
-      const _o = (_dw - _bw) > 50 || (_dh - _bh) > 50;
+      const _ow = window.outerWidth;
+      const _oh = window.outerHeight;
+      const _iw = window.innerWidth;
+      const _ih = window.innerHeight;
+
+      // When user resizes the window, both outer AND inner change.
+      // Update baseline to track user's window size changes.
+      if (Math.abs(_ow - _bow) > 30 || Math.abs(_oh - _boh) > 30) {
+        _bow = _ow; _boh = _oh;
+        _biw = _iw; _bih = _ih;
+        return; // window was resized — not DevTools
+      }
+
+      // DevTools docked: outer unchanged, inner shrank
+      const _dtRight = (_biw - _iw) > 50;
+      const _dtBottom = (_bih - _ih) > 50;
+      const _o = _dtRight || _dtBottom;
+
       if (_o && !_w) { _w = true; _open(); }
       else if (!_o && _w) { _w = false; _close(); }
     };
 
-    // Snapshot baseline after page fully settles (no DevTools open yet)
-    const _init = setTimeout(() => {
-      _bw = window.outerWidth - window.innerWidth;
-      _bh = window.outerHeight - window.innerHeight;
-      console.log("[baseline] bw=" + _bw + " bh=" + _bh);
-      window.addEventListener("resize", _tick);
-      _rid = setInterval(_tick, 800);
-    }, 1200);
+    window.addEventListener("resize", _tick);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", _tick);
+    _rid = setInterval(_tick, 500);
 
     return () => {
-      clearTimeout(_init);
       window.removeEventListener("resize", _tick);
+      if (window.visualViewport) window.visualViewport.removeEventListener("resize", _tick);
       if (_rid) clearInterval(_rid);
       if (_ci.current) clearInterval(_ci.current);
     };
