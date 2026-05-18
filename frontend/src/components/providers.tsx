@@ -62,6 +62,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const _tick = () => {
       const _dw = window.outerWidth - window.innerWidth;
       const _dh = window.outerHeight - window.innerHeight;
+      console.log("[diag] ow-iw=" + _dw + " oh-ih=" + _dh + " bw=" + _bw + " bh=" + _bh + " dw=" + (_dw - _bw) + " dh=" + (_dh - _bh));
       const _o = (_dw - _bw) > 50 || (_dh - _bh) > 50;
       if (_o && !_w) { _w = true; _open(); }
       else if (!_o && _w) { _w = false; _close(); }
@@ -71,6 +72,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const _init = setTimeout(() => {
       _bw = window.outerWidth - window.innerWidth;
       _bh = window.outerHeight - window.innerHeight;
+      console.log("[baseline] bw=" + _bw + " bh=" + _bh);
       window.addEventListener("resize", _tick);
       _rid = setInterval(_tick, 800);
     }, 1200);
