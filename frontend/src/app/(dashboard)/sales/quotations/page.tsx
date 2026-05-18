@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Search, Plus, Loader2, Trash2, CheckCircle, XCircle, FileText, MessageSquare, Edit2, AlertCircle } from "lucide-react";
+import { Search, Plus, Loader2, Trash2, CheckCircle, XCircle, FileText, MessageSquare, Edit2, AlertCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import {
   listQuotations, getQuotation, createQuotation, cancelQuotation, listCustomers,
   submitCounterOffer, acceptCounterOffer, rejectCounterOffer,
   approveQuotation, requestRevision, cancelQuotationWithReason, resubmitQuotation,
+  sendQuotation,
 } from "@/lib/api/sales";
 import { ProductSelect } from "@/components/product-select";
 import type { Product } from "@/types/catalog";
@@ -228,6 +229,15 @@ export default function QuotationsPage() {
     onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi lại thất bại"),
   });
 
+  const sendMut = useMutation({
+    mutationFn: (id: number) => sendQuotation(id),
+    onSuccess: () => {
+      toast.success("Đã gửi báo giá cho khách hàng — khách có thể đề xuất giá");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi thất bại"),
+  });
+
   // Counter offer (customer via sales rep)
   const counterOfferMut = useMutation({
     mutationFn: ({ id, proposedAmount, note }: { id: number; proposedAmount: number; note?: string }) =>
@@ -389,6 +399,14 @@ export default function QuotationsPage() {
                                   <XCircle className="h-3 w-3" /> Hủy
                                 </Button>
                               </>
+                            )}
+
+                            {/* Manager: Gửi KH khi APPROVED (mở cơ hội thương lượng giá) */}
+                            {canApprove && q.status === "APPROVED" && (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-blue-600 hover:text-blue-700"
+                                onClick={() => sendMut.mutate(q.id)} disabled={sendMut.isPending}>
+                                <Send className="h-3 w-3" /> Gửi KH
+                              </Button>
                             )}
 
                             {/* Manager: xử lý đề xuất giá */}

@@ -169,10 +169,16 @@ export class SalesService {
   async confirmQuotation(id: number) {
     const q = await this.getQuotation(id);
 
-    // Idempotency: return existing order if quotation already has an order (CONFIRMED or APPROVED)
-    if (['CONFIRMED', 'APPROVED'].includes(q.status ?? '')) {
+    // Idempotency: approveQuotation already creates an order; SENT means it was approved then sent to customer
+    if (['CONFIRMED', 'APPROVED', 'SENT'].includes(q.status ?? '')) {
       const existing = await this.prisma.salesOrder.findFirst({ where: { quotationId: id }, select: ORDER_SELECT });
-      if (existing) return existing;
+      if (existing) {
+        // Mark quotation as CONFIRMED if not already
+        if (q.status !== 'CONFIRMED') {
+          await this.prisma.quotation.update({ where: { id }, data: { status: 'CONFIRMED' } });
+        }
+        return existing;
+      }
     }
 
     if (!['SENT', 'APPROVED'].includes(q.status ?? '')) throw new BadRequestException('Quotation cannot be confirmed');
@@ -575,14 +581,31 @@ export class SalesService {
 
     if ((q as any).negotiationStatus !== 'PROPOSED') throw new BadRequestException('No pending counter offer to accept');
 
-    const orderNumber = await this.generateOrderNumber();
-    const acceptedTotal = (q as any).counterOfferAmount;
+    const acceptedTotal = Number((q as any).counterOfferAmount);
+
+    // approveQuotation may have already created an order — update it rather than create a duplicate
+    const existingOrder = await this.prisma.salesOrder.findFirst({ where: { quotationId: id } });
 
     return this.prisma.$transaction(async (tx) => {
       await tx.quotation.update({
         where: { id },
         data: { status: 'CONFIRMED', negotiationStatus: 'ACCEPTED' },
       });
+
+      if (existingOrder) {
+        return tx.salesOrder.update({
+          where: { id: existingOrder.id },
+          data: {
+            totalAmount: acceptedTotal,
+            subtotal: acceptedTotal,
+            taxAmount: 0,
+            notes: `Giá được xác nhận theo đề xuất: ${acceptedTotal}`,
+          },
+          select: ORDER_SELECT,
+        });
+      }
+
+      const orderNumber = await this.generateOrderNumber();
       return tx.salesOrder.create({
         data: {
           orderNumber,
