@@ -77,8 +77,10 @@ export class JwtAuthGuard {
     organizationId: number | null;
   } | null> {
     const key = `session:${sid}`;
-    const cached = await this.redis.get(key);
-    if (cached) return JSON.parse(cached);
+    try {
+      const cached = await this.redis.get(key);
+      if (cached) return JSON.parse(cached);
+    } catch {}
 
     const session = await this.prisma.session.findUnique({
       where: { sessionIdentifier: sid },
@@ -97,7 +99,7 @@ export class JwtAuthGuard {
       sessionDbId: session.id,
       organizationId: session.user.organizationId,
     };
-    await this.redis.setex(key, 300, JSON.stringify(data));
+    try { await this.redis.setex(key, 300, JSON.stringify(data)); } catch {}
     return data;
   }
 
@@ -105,8 +107,10 @@ export class JwtAuthGuard {
     userId: number,
   ): Promise<{ roles: string[]; permissions: string[] }> {
     const key = `user:perms:${userId}`;
-    const cached = await this.redis.get(key);
-    if (cached) return JSON.parse(cached);
+    try {
+      const cached = await this.redis.get(key);
+      if (cached) return JSON.parse(cached);
+    } catch {}
 
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId },
@@ -128,7 +132,7 @@ export class JwtAuthGuard {
     }
 
     const data = { roles, permissions: Array.from(permSet) };
-    await this.redis.setex(key, 300, JSON.stringify(data));
+    try { await this.redis.setex(key, 300, JSON.stringify(data)); } catch {}
     return data;
   }
 

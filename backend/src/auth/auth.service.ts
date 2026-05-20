@@ -70,7 +70,7 @@ export class AuthService {
       sessionDbId: session.id,
       organizationId: user.organizationId,
     };
-    await this.redis.setex(`session:${sessionIdentifier}`, 300, JSON.stringify(sessionData));
+    try { await this.redis.setex(`session:${sessionIdentifier}`, 300, JSON.stringify(sessionData)); } catch {}
 
     const payload: JwtPayload = { sub: user.id, sid: sessionIdentifier, email: user.email };
     const accessToken = await this.jwtService.signAsync(payload);
@@ -124,7 +124,7 @@ export class AuthService {
       where: { sessionId: user.sessionDbId, status: 'ACTIVE' },
       data: { status: 'REVOKED' },
     });
-    await this.redis.del(`session:${user.sessionIdentifier}`);
+    try { await this.redis.del(`session:${user.sessionIdentifier}`); } catch {}
   }
 
   async changePassword(user: AuthUser, dto: ChangePasswordDto): Promise<void> {
