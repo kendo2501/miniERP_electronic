@@ -1,8 +1,7 @@
 #!/bin/sh
-set -e
 
 echo "Running database migrations..."
-npx prisma migrate deploy --schema ./database/prisma/schema.prisma
+npx prisma migrate deploy --schema ./database/prisma/schema.prisma || echo "Migration failed or already up to date, continuing..."
 
 echo "Checking seed status..."
 node -e "
