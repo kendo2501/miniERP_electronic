@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,12 +12,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { inventoryApi } from "@/lib/api/inventory";
+import { ProductSearch } from "@/components/product-search";
+import type { ProductSearchResult } from "@/types/inventory";
 import { useLanguage } from "@/context/language-context";
 
 const schema = z.object({
   fromWarehouseId: z.string().min(1),
   toWarehouseId: z.string().min(1),
-  productId: z.string().min(1),
+  productId: z.number().int().positive("Chọn sản phẩm"),
   quantity: z.string().refine((v) => parseFloat(v) > 0, "Quantity must be positive"),
   notes: z.string().optional(),
 }).refine((d) => d.fromWarehouseId !== d.toWarehouseId, {
@@ -35,22 +38,37 @@ interface Props {
 export function TransferStockDialog({ open, onOpenChange, onSuccess }: Props) {
   const qc = useQueryClient();
   const { t } = useLanguage();
+  const [selectedProduct, setSelectedProduct] = useState<ProductSearchResult | null>(null);
+
   const { data: warehouses } = useQuery({
     queryKey: ["warehouses"],
     queryFn: inventoryApi.listWarehouses,
     enabled: open,
   });
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
+
+  const fromWarehouseId = watch("fromWarehouseId");
+
+  const handleProductSelect = (product: ProductSearchResult) => {
+    setSelectedProduct(product);
+    setValue("productId", product.id, { shouldValidate: true });
+  };
+
+  const handleClose = () => {
+    reset();
+    setSelectedProduct(null);
+    onOpenChange(false);
+  };
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) =>
       inventoryApi.transferStock({
         fromWarehouseId: parseInt(values.fromWarehouseId),
         toWarehouseId: parseInt(values.toWarehouseId),
-        productId: parseInt(values.productId),
+        productId: values.productId,
         quantity: parseFloat(values.quantity),
         notes: values.notes,
       }),
@@ -59,6 +77,7 @@ export function TransferStockDialog({ open, onOpenChange, onSuccess }: Props) {
       qc.invalidateQueries({ queryKey: ["stocks"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       reset();
+      setSelectedProduct(null);
       onOpenChange(false);
       onSuccess();
     },
@@ -66,7 +85,7 @@ export function TransferStockDialog({ open, onOpenChange, onSuccess }: Props) {
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t.inventory.transferTitle}</DialogTitle>
@@ -99,8 +118,23 @@ export function TransferStockDialog({ open, onOpenChange, onSuccess }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t.inventory.productId}</Label>
-            <Input type="number" placeholder={t.inventory.productIdPlaceholder} {...register("productId")} />
+            <Label>{t.common.product}</Label>
+            <ProductSearch
+              onSelect={handleProductSelect}
+              warehouseId={fromWarehouseId ? parseInt(fromWarehouseId) : undefined}
+              placeholder="Tìm sản phẩm..."
+            />
+            {selectedProduct && (
+              <div className="rounded-md bg-muted px-3 py-2 text-sm flex items-center justify-between">
+                <div>
+                  <span className="font-medium">{selectedProduct.productName}</span>
+                  <span className="text-muted-foreground ml-2 text-xs">{selectedProduct.sku}</span>
+                </div>
+                <span className={selectedProduct.inStock ? "text-xs text-green-600" : "text-xs text-red-500"}>
+                  {selectedProduct.inStock ? `Tồn: ${selectedProduct.totalAvailable}` : "Hết hàng"}
+                </span>
+              </div>
+            )}
             {errors.productId && <p className="text-xs text-destructive">{errors.productId.message}</p>}
           </div>
 
@@ -116,10 +150,10 @@ export function TransferStockDialog({ open, onOpenChange, onSuccess }: Props) {
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => { reset(); onOpenChange(false); }}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               {t.common.cancel}
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || !selectedProduct}>
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {t.common.transfer}
             </Button>
