@@ -131,3 +131,17 @@ body {
   background-color: var(--background);
   color: var(--foreground);
 }
+
+/* Mobile responsive helpers */
+@media (max-width: 640px) {
+  /* Tables scroll horizontally on small screens */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Dialogs take most of the screen width */
+  [role="dialog"] {
+    max-width: calc(100vw - 2rem) !important;
+    margin: 1rem;
+  }
+}

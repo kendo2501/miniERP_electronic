@@ -15,19 +15,20 @@ function _dec64(s: string): string {
 let _a: string | null = null;
 const _k = "_sid";
 
+// Refresh token lives in sessionStorage so it survives F5 but is cleared on tab close
 export const tokenMgr = {
   getAccess: () => _a,
   setAccess: (t: string | null) => { _a = t; },
   getRefresh: (): string | null => {
     if (typeof window === "undefined") return null;
-    const r = localStorage.getItem(_k);
+    const r = sessionStorage.getItem(_k);
     try { return r ? _dec64(r) : null; } catch { return null; }
   },
   setRefresh: (t: string) => {
-    if (typeof window !== "undefined") localStorage.setItem(_k, _enc64(t));
+    if (typeof window !== "undefined") sessionStorage.setItem(_k, _enc64(t));
   },
   clear: () => {
     _a = null;
-    if (typeof window !== "undefined") localStorage.removeItem(_k);
+    if (typeof window !== "undefined") sessionStorage.removeItem(_k);
   },
 };

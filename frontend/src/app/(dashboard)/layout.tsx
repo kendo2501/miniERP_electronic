@@ -6,9 +6,11 @@ import { AuthGuard } from "@/components/layout/auth-guard";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { PageTransition } from "@/components/layout/page-transition";
 import { Button } from "@/components/ui/button";
+import { useInactivityLogout } from "@/hooks/use-inactivity-logout";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useInactivityLogout();
 
   return (
     <AuthGuard>
@@ -35,7 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden min-w-0">
           {/* Topbar */}
-          <header className="flex h-14 shrink-0 items-center bg-white border-b border-border px-4 lg:px-6 gap-3 shadow-sm relative">
+          <header className="flex h-14 shrink-0 items-center bg-card border-b border-border px-4 lg:px-6 gap-3 shadow-sm relative">
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#593E67] via-[#B85B56] to-[#FEA837]" />
 
             {/* Hamburger — mobile only */}
@@ -49,7 +51,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="h-5 w-5" />
             </Button>
 
-            {/* Spacer */}
             <div className="flex-1" />
 
             <NotificationBell />

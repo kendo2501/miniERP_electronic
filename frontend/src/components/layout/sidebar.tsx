@@ -15,7 +15,6 @@ import {
   Shield,
   Bell,
   Settings,
-  Languages,
   ClipboardList,
   ClipboardCheck,
   Zap,
@@ -62,7 +61,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, hasPermission, logout } = useAuthStore();
   const router = useRouter();
-  const { t, toggleLang, lang } = useLanguage();
+  const { t } = useLanguage();
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => item.permission === null || hasPermission(item.permission)
@@ -142,18 +141,6 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Divider */}
       <div className="h-px bg-sidebar-border mx-3" />
-
-      {/* Language toggle */}
-      <div className="px-3 pt-2">
-        <button
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-white transition-colors"
-          onClick={toggleLang}
-          title={t.sidebar.switchLang}
-        >
-          <Languages className="h-3.5 w-3.5 shrink-0" />
-          {lang === "vi" ? "🇻🇳 Tiếng Việt" : "🇺🇸 English"}
-        </button>
-      </div>
 
       {/* User card */}
       <div className="p-3 pt-2">

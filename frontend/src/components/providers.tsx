@@ -1,6 +1,6 @@
 "use client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import { LanguageProvider } from "@/context/language-context";
@@ -14,10 +14,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       })
   );
-
-  useEffect(() => {
-    ["accessToken", "refreshToken", "auth-storage"].forEach((k) => localStorage.removeItem(k));
-  }, []);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
