@@ -3,15 +3,30 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { AuthUser } from "@/types/auth";
 import { tokenMgr } from "@/lib/storage";
 
+// UTF-8-safe base64 encoding — btoa() crashes on non-ASCII (e.g. Vietnamese fullName)
+function _enc64(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let b = "";
+  for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+  return btoa(b);
+}
+
+function _dec64(s: string): string {
+  const b = atob(s);
+  const bytes = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) bytes[i] = b.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
 const _ek = "_ms";
 const _enc = createJSONStorage(() => ({
   getItem: (k: string) => {
     if (typeof window === "undefined") return null;
     const r = localStorage.getItem(k);
-    try { return r ? atob(r) : null; } catch { return null; }
+    try { return r ? _dec64(r) : null; } catch { return null; }
   },
   setItem: (k: string, v: string) => {
-    if (typeof window !== "undefined") localStorage.setItem(k, btoa(v));
+    if (typeof window !== "undefined") localStorage.setItem(k, _enc64(v));
   },
   removeItem: (k: string) => {
     if (typeof window !== "undefined") localStorage.removeItem(k);
