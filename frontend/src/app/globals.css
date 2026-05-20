@@ -90,37 +90,37 @@
 }
 
 .dark {
-  /* ── Dark mode — keeps brand purple identity ── */
-  --background: #100C16;
-  --foreground: #EDE8F5;
-  --card: #1A1228;
-  --card-foreground: #EDE8F5;
-  --popover: #1A1228;
-  --popover-foreground: #EDE8F5;
+  /* ── Dark mode palette ── */
+  /* #6C7EE1 indigo  #92B9E3 sky  #FFC4A4 peach  #FBA2D0 pink  #C688EB violet */
+  --background: #0C0F1E;
+  --foreground: #E8EDF8;
+  --card: #131728;
+  --card-foreground: #E8EDF8;
+  --popover: #131728;
+  --popover-foreground: #E8EDF8;
 
-  /* Brand purple lightened for dark backgrounds */
-  --primary: #A07CC0;
+  --primary: #6C7EE1;             /* indigo — buttons, active states */
   --primary-foreground: #FFFFFF;
-  --secondary: #241638;
-  --secondary-foreground: #C8B4E0;
-  --muted: #1E1430;
-  --muted-foreground: #9080A8;
-  --accent: #2C1C44;
-  --accent-foreground: #C8B4E0;
+  --secondary: #1C2140;
+  --secondary-foreground: #92B9E3; /* sky blue — secondary text */
+  --muted: #171C38;
+  --muted-foreground: #7A8AB5;
+  --accent: #1E2445;
+  --accent-foreground: #C688EB;    /* violet — hover/accent labels */
   --destructive: #E05555;
   --destructive-foreground: #FFFFFF;
-  --border: rgba(160, 124, 192, 0.18);
-  --input: rgba(160, 124, 192, 0.14);
-  --ring: #9B6FBA;
+  --border: rgba(108, 126, 225, 0.2);
+  --input: rgba(108, 126, 225, 0.15);
+  --ring: #6C7EE1;
 
-  /* Sidebar — deep purple, closer to brand */
-  --sidebar-background: #130D1E;
-  --sidebar-foreground: #EDE6F2;
-  --sidebar-primary: #FEA837;
-  --sidebar-primary-foreground: #2D1A3D;
-  --sidebar-accent: rgba(255, 255, 255, 0.08);
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgba(255, 255, 255, 0.07);
+  /* Sidebar */
+  --sidebar-background: #090C18;
+  --sidebar-foreground: #E8EDF8;
+  --sidebar-primary: #FFC4A4;      /* peach — active nav item */
+  --sidebar-primary-foreground: #1A0A06;
+  --sidebar-accent: rgba(251, 162, 208, 0.08); /* pink tint hover */
+  --sidebar-accent-foreground: #FBA2D0;         /* pink — nav hover text */
+  --sidebar-border: rgba(108, 126, 225, 0.12);
 }
 
 * {
