@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
+import { Globe } from "lucide-react";
 
 const schema = z.object({
   email: z.email("Invalid email"),
@@ -23,7 +24,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { setTokens, setUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const { t } = useLanguage();
+  const { t, lang, toggleLang } = useLanguage();
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -148,6 +149,17 @@ export default function LoginPage() {
             {["#593E67", "#84495F", "#B85B56", "#DE741C", "#FEA837"].map((c) => (
               <div key={c} className="h-1 flex-1 rounded-full" style={{ backgroundColor: c }} />
             ))}
+          </div>
+
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={toggleLang}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <Globe className="h-3.5 w-3.5" />
+              {lang === "vi" ? "English" : "Tiếng Việt"}
+            </button>
           </div>
         </div>
       </div>
