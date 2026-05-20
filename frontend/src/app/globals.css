@@ -90,32 +90,37 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.145 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --sidebar-background: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  /* ── Dark mode — keeps brand purple identity ── */
+  --background: #100C16;
+  --foreground: #EDE8F5;
+  --card: #1A1228;
+  --card-foreground: #EDE8F5;
+  --popover: #1A1228;
+  --popover-foreground: #EDE8F5;
+
+  /* Brand purple lightened for dark backgrounds */
+  --primary: #A07CC0;
+  --primary-foreground: #FFFFFF;
+  --secondary: #241638;
+  --secondary-foreground: #C8B4E0;
+  --muted: #1E1430;
+  --muted-foreground: #9080A8;
+  --accent: #2C1C44;
+  --accent-foreground: #C8B4E0;
+  --destructive: #E05555;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(160, 124, 192, 0.18);
+  --input: rgba(160, 124, 192, 0.14);
+  --ring: #9B6FBA;
+
+  /* Sidebar — deep purple, closer to brand */
+  --sidebar-background: #130D1E;
+  --sidebar-foreground: #EDE6F2;
+  --sidebar-primary: #FEA837;
+  --sidebar-primary-foreground: #2D1A3D;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
 }
 
 * {
