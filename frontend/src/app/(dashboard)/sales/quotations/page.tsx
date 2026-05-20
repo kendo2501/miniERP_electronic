@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,21 +43,12 @@ const STATUS_CLASSES: Record<QuotationStatus, string> = {
 
 // ─── Form schema ─────────────────────────────────────────────────────────────
 
-const itemSchema = z.object({
-  productId: z.string().min(1, "Chọn sản phẩm"),
-  quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, "Số lượng phải là số nguyên dương"),
-  unitPrice: z.string().refine((v) => Number(v) > 0, "Đơn giá phải lớn hơn 0"),
-  discountPercent: z.string().optional().refine((v) => !v || (Number(v) >= 0 && Number(v) <= 100), "CK 0–100"),
-});
-
-const schema = z.object({
-  customerId: z.string().min(1, "Chọn khách hàng"),
-  validUntil: z.string().optional(),
-  notes: z.string().optional(),
-  items: z.array(itemSchema).min(1),
-});
-
-type FormValues = z.infer<typeof schema>;
+type FormValues = {
+  customerId: string;
+  validUntil?: string;
+  notes?: string;
+  items: { productId: string; quantity: string; unitPrice: string; discountPercent?: string }[];
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -88,6 +79,21 @@ export default function QuotationsPage() {
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
+
+  const schema = useMemo(() => {
+    const itemSchema = z.object({
+      productId: z.string().min(1, t.quotations.selectProduct),
+      quantity: z.string().refine((v) => Number.isInteger(Number(v)) && Number(v) > 0, t.quotations.qtyMustBePositive),
+      unitPrice: z.string().refine((v) => Number(v) > 0, t.quotations.unitPriceMustBePositive),
+      discountPercent: z.string().optional().refine((v) => !v || (Number(v) >= 0 && Number(v) <= 100), t.quotations.discountRange),
+    });
+    return z.object({
+      customerId: z.string().min(1, t.quotations.selectCustomerRequired),
+      validUntil: z.string().optional(),
+      notes: z.string().optional(),
+      items: z.array(itemSchema).min(1),
+    });
+  }, [t]);
 
   const canCreate = hasPermission("sales.quotation.create");
   const canApprove = hasPermission("sales.quotation.approve");
@@ -142,7 +148,7 @@ export default function QuotationsPage() {
   // ─── Form ─────────────────────────────────────────────────────────────────
 
   const { handleSubmit, setValue, reset, watch, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema as any),
     defaultValues: { items: [{ productId: "", quantity: "1", unitPrice: "0" }] },
   });
 
@@ -173,14 +179,14 @@ export default function QuotationsPage() {
         })),
       }).then((r) => r.data),
     onSuccess: () => {
-      toast.success("Báo giá đã gửi chờ duyệt");
+      toast.success(t.quotations.quotationSubmitted);
       invalidate();
       setShowCreate(false);
       reset({ items: [{ productId: "", quantity: "1", unitPrice: "0" }] });
     },
     onError: (e: any) => {
       const msg = e.response?.data?.message;
-      toast.error(Array.isArray(msg) ? msg[0] : (msg ?? "Tạo báo giá thất bại"));
+      toast.error(Array.isArray(msg) ? msg[0] : (msg ?? t.quotations.quotationCreateFailed));
     },
   });
 
@@ -188,33 +194,33 @@ export default function QuotationsPage() {
   const approveMut = useMutation({
     mutationFn: (id: number) => approveQuotation(id),
     onSuccess: () => {
-      toast.success("Đã duyệt — đơn hàng được tạo tự động và đồng bộ cho khách hàng");
+      toast.success(t.quotations.approvedWithOrder);
       invalidate();
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Duyệt thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.approveFailed),
   });
 
   const requestRevisionMut = useMutation({
     mutationFn: ({ id, reason }: { id: number; reason: string }) => requestRevision(id, reason),
     onSuccess: () => {
-      toast.success("Đã yêu cầu chỉnh sửa");
+      toast.success(t.quotations.revisionRequested);
       invalidate();
       setRevisionTarget(null);
       setRevisionReason("");
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Yêu cầu chỉnh sửa thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.revisionFailed),
   });
 
   const cancelWithReasonMut = useMutation({
     mutationFn: ({ id, reason }: { id: number; reason: string }) => cancelQuotationWithReason(id, reason),
     onSuccess: () => {
-      toast.success("Đã hủy báo giá");
+      toast.success(t.quotations.quotationCancelled);
       invalidate();
       setCancelTarget(null);
       setCancelReason("");
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Hủy thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.cancelFailed),
   });
 
   // Sale actions
@@ -222,22 +228,22 @@ export default function QuotationsPage() {
     mutationFn: ({ id, items }: { id: number; items: typeof resubmitItems }) =>
       resubmitQuotation(id, items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, discountPercent: i.discountPercent }))),
     onSuccess: () => {
-      toast.success("Đã gửi lại báo giá chờ duyệt");
+      toast.success(t.quotations.resubmitted);
       invalidate();
       setResubmitTargetId(null);
       setResubmitTarget(null);
       setResubmitItems([]);
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi lại thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.resubmitFailed),
   });
 
   const sendMut = useMutation({
     mutationFn: (id: number) => sendQuotation(id),
     onSuccess: () => {
-      toast.success("Đã gửi báo giá cho khách hàng — khách có thể đề xuất giá");
+      toast.success(t.quotations.quotationSent);
       invalidate();
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.sendFailed),
   });
 
   // Counter offer (customer via sales rep)
@@ -245,29 +251,29 @@ export default function QuotationsPage() {
     mutationFn: ({ id, proposedAmount, note }: { id: number; proposedAmount: number; note?: string }) =>
       submitCounterOffer(id, { proposedAmount, note }),
     onSuccess: () => {
-      toast.success("Đã ghi nhận đề xuất giá — chờ Admin xác nhận");
+      toast.success(t.quotations.proposalRecorded);
       invalidate();
       setCounterOfferTarget(null);
       setCounterAmount("");
       setCounterNote("");
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Gửi đề xuất giá thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.proposalFailed),
   });
 
   const acceptOfferMut = useMutation({
     mutationFn: (id: number) => acceptCounterOffer(id),
     onSuccess: () => {
-      toast.success("Đã chấp nhận giá đề xuất → Tạo đơn hàng thành công");
+      toast.success(t.quotations.offerAccepted);
       invalidate();
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Chấp nhận giá thất bại"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.offerAcceptFailed),
   });
 
   const rejectOfferMut = useMutation({
     mutationFn: (id: number) => rejectCounterOffer(id),
-    onSuccess: () => { toast.success("Đã từ chối giá đề xuất"); invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Từ chối giá thất bại"),
+    onSuccess: () => { toast.success(t.quotations.offerRejected); invalidate(); },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? t.quotations.offerRejectFailed),
   });
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -363,7 +369,7 @@ export default function QuotationsPage() {
                             )}
                             {q.negotiationStatus === "PROPOSED" && (
                               <Badge variant="secondary" className="text-xs text-purple-700 bg-purple-50 border border-purple-200 w-fit">
-                                💬 Đề xuất: {vnd(Number(q.counterOfferAmount))}
+                                💬 {t.quotations.negotiationProposal} {vnd(Number(q.counterOfferAmount))}
                               </Badge>
                             )}
                           </div>
@@ -470,13 +476,13 @@ export default function QuotationsPage() {
       {/* ─── Revision Request Dialog (Manager) ─────────────────────────────── */}
       <Dialog open={revisionTarget !== null} onOpenChange={(v) => { if (!v) { setRevisionTarget(null); setRevisionReason(""); } }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Yêu cầu chỉnh sửa báo giá</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.quotations.revisionTitle}</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
-            <Label>Lý do yêu cầu chỉnh sửa *</Label>
+            <Label>{t.quotations.revisionReasonLabel}</Label>
             <Textarea
               value={revisionReason}
               onChange={(e) => setRevisionReason(e.target.value)}
-              placeholder="Nhập lý do yêu cầu chỉnh sửa..."
+              placeholder={t.quotations.revisionReasonPlaceholder}
               rows={3}
             />
           </div>
@@ -531,11 +537,11 @@ export default function QuotationsPage() {
       <Dialog open={resubmitTargetId !== null} onOpenChange={(v) => { if (!v) { setResubmitTargetId(null); setResubmitTarget(null); setResubmitItems([]); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Điều chỉnh lại giá báo giá</DialogTitle>
+            <DialogTitle>{t.quotations.adjustPriceTitle}</DialogTitle>
             {resubmitTarget?.approvalNotes && (
               <p className="text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded p-2 mt-1">
                 <AlertCircle className="h-4 w-4 inline mr-1" />
-                Lý do yêu cầu chỉnh sửa: <strong>{resubmitTarget.approvalNotes}</strong>
+                {t.quotations.revisionReasonDetail} <strong>{resubmitTarget.approvalNotes}</strong>
               </p>
             )}
           </DialogHeader>
@@ -543,15 +549,15 @@ export default function QuotationsPage() {
           {loadingResubmit || resubmitItems.length === 0 ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">Đang tải dữ liệu...</span>
+              <span className="ml-2 text-sm text-muted-foreground">{t.quotations.loadingData}</span>
             </div>
           ) : (
             <div className="space-y-3 pt-2">
               <div className="grid grid-cols-[2fr_80px_120px_100px] gap-2 text-xs font-medium text-muted-foreground">
-                <span>Sản phẩm</span>
-                <span>SL</span>
-                <span>Đơn giá (₫)</span>
-                <span>CK (%)</span>
+                <span>{t.common.product}</span>
+                <span>{t.quotations.qty}</span>
+                <span>{t.quotations.unitPrice}</span>
+                <span>{t.quotations.discountPct}</span>
               </div>
               {resubmitItems.map((item, idx) => (
                 <div key={idx} className="grid grid-cols-[2fr_80px_120px_100px] gap-2 items-center">
@@ -597,23 +603,23 @@ export default function QuotationsPage() {
       {/* ─── Counter Offer Dialog ────────────────────────────────────────────── */}
       <Dialog open={!!counterOfferTarget} onOpenChange={(v) => { if (!v) { setCounterOfferTarget(null); setCounterAmount(""); setCounterNote(""); } }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Nhập giá đề xuất của khách hàng</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.quotations.counterOfferTitle}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             {counterOfferTarget && (
               <p className="text-sm text-muted-foreground">
-                Giá gốc: <span className="font-semibold text-foreground">{vnd(counterOfferTarget.original)}</span>
+                {t.quotations.originalPrice} <span className="font-semibold text-foreground">{vnd(counterOfferTarget.original)}</span>
               </p>
             )}
             <div className="space-y-1.5">
-              <Label>Giá đề xuất (₫) *</Label>
+              <Label>{t.quotations.proposedPriceLabel}</Label>
               <Input type="number" min="0" step="1000" value={counterAmount}
                 onChange={(e) => setCounterAmount(e.target.value)}
-                placeholder="Nhập số tiền khách đề xuất..." />
+                placeholder={t.quotations.proposedPricePlaceholder} />
             </div>
             <div className="space-y-1.5">
-              <Label>Ghi chú</Label>
+              <Label>{t.quotations.notesLabel}</Label>
               <Input value={counterNote} onChange={(e) => setCounterNote(e.target.value)}
-                placeholder="Lý do / điều kiện khách hàng..." />
+                placeholder={t.quotations.notesInputPlaceholder} />
             </div>
           </div>
           <DialogFooter>
@@ -644,9 +650,9 @@ export default function QuotationsPage() {
           <form onSubmit={handleSubmit((v) => createMut.mutate(v))} className="space-y-4 pt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Khách hàng *</Label>
+                <Label>{t.quotations.customer} *</Label>
                 <Select onValueChange={(v) => setValue("customerId", v)}>
-                  <SelectTrigger><SelectValue placeholder="Chọn khách hàng" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t.quotations.selectCustomer} /></SelectTrigger>
                   <SelectContent>
                     {customers?.items.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
@@ -659,30 +665,30 @@ export default function QuotationsPage() {
                 {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label>Hiệu lực đến</Label>
+                <Label>{t.quotations.validUntil}</Label>
                 <Input type="date" onChange={(e) => setValue("validUntil", e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Ghi chú</Label>
-              <Input placeholder="Ghi chú thêm..." onChange={(e) => setValue("notes", e.target.value)} />
+              <Label>{t.quotations.notesLabel}</Label>
+              <Input placeholder={t.quotations.notesPlaceholder} onChange={(e) => setValue("notes", e.target.value)} />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>Sản phẩm *</Label>
+                <Label>{t.common.product} *</Label>
                 <Button type="button" variant="outline" size="sm"
                   onClick={() => setValue("items", [...(items ?? []), { productId: "", quantity: "1", unitPrice: "0" }])}>
-                  <Plus className="h-3.5 w-3.5" /> Thêm SP
+                  <Plus className="h-3.5 w-3.5" /> {t.quotations.addItem}
                 </Button>
               </div>
               <div className="space-y-2">
                 <div className="grid grid-cols-[2fr_64px_100px_80px_32px] gap-2">
-                  <span className="text-xs text-muted-foreground font-medium">Sản phẩm (SKU)</span>
-                  <span className="text-xs text-muted-foreground font-medium">SL</span>
-                  <span className="text-xs text-muted-foreground font-medium">Đơn giá (₫)</span>
-                  <span className="text-xs text-muted-foreground font-medium">CK (%)</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t.quotations.productSku}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t.quotations.qty}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t.quotations.unitPrice}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t.quotations.discountPct}</span>
                   <span />
                 </div>
                 {(items ?? []).map((item, idx) => (
@@ -701,7 +707,7 @@ export default function QuotationsPage() {
                     </Button>
                   </div>
                 ))}
-                {errors.items && <p className="text-xs text-destructive">Kiểm tra lại thông tin sản phẩm</p>}
+                {errors.items && <p className="text-xs text-destructive">{t.quotations.itemsError}</p>}
               </div>
             </div>
 
