@@ -187,6 +187,21 @@ export class UsersService {
     return this.findOne(id);
   }
 
+  async resetPassword(id: number, newPassword: string): Promise<void> {
+    await this.ensureExists(id);
+    const hash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash: hash, failedLoginAttempts: 0, lockedUntil: null },
+    });
+    // Revoke all active sessions so the user must re-login with the new password
+    await this.prisma.session.updateMany({
+      where: { userId: id, status: 'ACTIVE' },
+      data: { status: 'REVOKED' },
+    });
+    try { await this.redis.del(`user:perms:${id}`); } catch {}
+  }
+
   private async ensureExists(id: number): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
     if (!user) throw new NotFoundException(`User #${id} not found`);

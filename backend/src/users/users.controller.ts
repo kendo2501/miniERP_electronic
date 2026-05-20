@@ -21,6 +21,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserQueryDto } from './dto/user-query.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { AuthUser } from '../common/types/auth-user.type';
@@ -89,6 +90,17 @@ export class UsersController {
   @ApiOperation({ summary: 'Unlock a user account' })
   unlock(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.unlock(id);
+  }
+
+  @Post(':id/reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions('auth.password.reset_other')
+  @ApiOperation({ summary: 'Reset user password — IT/Admin only, no current password required' })
+  resetPassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ResetPasswordDto,
+  ) {
+    return this.usersService.resetPassword(id, dto.newPassword);
   }
 
   @Put(':id/roles')

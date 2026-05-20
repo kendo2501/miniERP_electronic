@@ -190,6 +190,13 @@ const en = {
     created: "User created",
     errorCreate: "Failed to create user",
     errorPasswordMatch: "Passwords do not match",
+    resetPassword: "Reset Password",
+    resetPasswordTitle: "Reset Password",
+    resetPasswordDesc: "Set a new password for this account. All active sessions will be revoked.",
+    newPassword: "New Password",
+    resetPasswordSuccess: "Password reset successfully",
+    resetPasswordError: "Failed to reset password",
+    resetting: "Resetting...",
   },
 
   catalog: {
@@ -1107,6 +1114,13 @@ const vi: typeof en = {
     created: "Đã tạo người dùng",
     errorCreate: "Không thể tạo người dùng",
     errorPasswordMatch: "Mật khẩu không khớp",
+    resetPassword: "Đặt lại mật khẩu",
+    resetPasswordTitle: "Đặt lại mật khẩu",
+    resetPasswordDesc: "Đặt mật khẩu mới cho tài khoản này. Tất cả phiên đang hoạt động sẽ bị thu hồi.",
+    newPassword: "Mật khẩu mới",
+    resetPasswordSuccess: "Đã đặt lại mật khẩu thành công",
+    resetPasswordError: "Không thể đặt lại mật khẩu",
+    resetting: "Đang đặt lại...",
   },
 
   catalog: {

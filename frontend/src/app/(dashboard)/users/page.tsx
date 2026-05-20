@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Search, Lock, Unlock, MoreHorizontal, Loader2 } from "lucide-react";
+import { Plus, Search, Lock, Unlock, MoreHorizontal, Loader2, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { usersApi } from "@/lib/api/users";
 import { useAuthStore } from "@/store/auth.store";
 import { CreateUserDialog } from "./create-user-dialog";
+import { ResetPasswordDialog } from "./reset-password-dialog";
 import type { User } from "@/types/user";
 import { useLanguage } from "@/context/language-context";
 
@@ -27,6 +28,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
   const { hasPermission } = useAuthStore();
   const qc = useQueryClient();
   const { t } = useLanguage();
@@ -51,6 +53,7 @@ export default function UsersPage() {
 
   const canCreate = hasPermission("auth.user.create");
   const canLock = hasPermission("auth.user.lock");
+  const canResetPassword = hasPermission("auth.password.reset_other");
 
   return (
     <div className="space-y-6">
@@ -126,7 +129,7 @@ export default function UsersPage() {
                         {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : "—"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {canLock && (
+                        {(canLock || canResetPassword) && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -136,7 +139,14 @@ export default function UsersPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>{t.common.actions}</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              {user.status === "LOCKED" ? (
+                              {canResetPassword && (
+                                <DropdownMenuItem onClick={() => setResetTarget(user)}>
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  {t.users.resetPassword}
+                                </DropdownMenuItem>
+                              )}
+                              {canLock && canResetPassword && <DropdownMenuSeparator />}
+                              {canLock && (user.status === "LOCKED" ? (
                                 <DropdownMenuItem onClick={() => unlockMutation.mutate(user.id)} disabled={unlockMutation.isPending}>
                                   <Unlock className="h-4 w-4 mr-2" />
                                   Unlock
@@ -146,7 +156,7 @@ export default function UsersPage() {
                                   <Lock className="h-4 w-4 mr-2" />
                                   Lock
                                 </DropdownMenuItem>
-                              )}
+                              ))}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
@@ -181,6 +191,12 @@ export default function UsersPage() {
         open={showCreate}
         onOpenChange={setShowCreate}
         onSuccess={() => qc.invalidateQueries({ queryKey: ["users"] })}
+      />
+
+      <ResetPasswordDialog
+        user={resetTarget}
+        open={!!resetTarget}
+        onOpenChange={(v) => !v && setResetTarget(null)}
       />
     </div>
   );

@@ -29,4 +29,7 @@ export const usersApi = {
 
   assignRoles: (id: number, roleIds: number[]) =>
     apiClient.put<UserDetail>(`/users/${id}/roles`, { roleIds }).then((r) => r.data),
+
+  resetPassword: (id: number, newPassword: string) =>
+    apiClient.post(`/users/${id}/reset-password`, { newPassword }),
 };

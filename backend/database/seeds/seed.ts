@@ -9,6 +9,7 @@ const prisma = new PrismaClient();
 
 const ROLES = [
   { code: 'ADMIN',      name: 'Administrator', description: 'Full system access' },
+  { code: 'IT',         name: 'IT Support',    description: 'User management and account recovery — no access to business data' },
   { code: 'SALES',      name: 'Sales',         description: 'Sales operations' },
   { code: 'CUSTOMER',   name: 'Customer',      description: 'Customer self-service portal' },
   { code: 'ACCOUNTANT', name: 'Accountant',    description: 'Finance and accounting operations' },
@@ -25,6 +26,7 @@ const PERMISSIONS = [
   { code: 'auth.role.assign',                  description: 'Assign roles' },
   { code: 'auth.permission.manage',            description: 'Manage permissions' },
   { code: 'auth.password.change_self',         description: 'Change own password' },
+  { code: 'auth.password.reset_other',        description: 'Reset another user password (IT/Admin)' },
   { code: 'session.revoke',                    description: 'Revoke a session' },
   { code: 'session.revoke_all',                description: 'Revoke all user sessions' },
   { code: 'audit.security.view',               description: 'View security audit logs' },
@@ -127,7 +129,7 @@ const PERMISSIONS = [
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   ADMIN: [
     'auth.user.read', 'auth.user.create', 'auth.user.update', 'auth.user.lock', 'auth.user.unlock', 'auth.user.assign_roles',
-    'auth.role.assign', 'auth.permission.manage', 'auth.password.change_self',
+    'auth.role.assign', 'auth.permission.manage', 'auth.password.change_self', 'auth.password.reset_other',
     'session.revoke', 'session.revoke_all',
     'audit.security.view',
     'catalog.product.view', 'catalog.product.create', 'catalog.product.update',
@@ -154,6 +156,19 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'purchase.grn.view', 'purchase.grn.manage',
     'purchase.invoice.view', 'purchase.invoice.manage',
     'purchase.report.view',
+  ],
+  IT: [
+    // User management — core purpose of this account
+    'auth.user.read', 'auth.user.update', 'auth.user.lock', 'auth.user.unlock',
+    // Password reset — the main reason this account exists
+    'auth.password.reset_other', 'auth.password.change_self',
+    // Session management
+    'session.revoke', 'session.revoke_all',
+    // Audit log — to track security events
+    'audit.security.view',
+    // Self-service
+    'profile.view_self', 'profile.update_self',
+    'notification.preferences.manage_self',
   ],
   SALES: [
     'auth.password.change_self',
@@ -268,11 +283,12 @@ async function main() {
 
   // ── Users ─────────────────────────────────────────────
   const usersToSeed = [
-    { email: 'admin@mini-erp.local',      password: 'Admin@123456',      fullName: 'Quản Trị Hệ Thống',   roleCode: 'ADMIN'      },
-    { email: 'sales@mini-erp.local',      password: 'Sales@123456',      fullName: 'Trần Văn Bình',        roleCode: 'SALES'      },
-    { email: 'customer@mini-erp.local',   password: 'Customer@123456',   fullName: 'Lê Văn Thắng',         roleCode: 'CUSTOMER'   },
-    { email: 'accountant@mini-erp.local', password: 'Accountant@123456', fullName: 'Phạm Thị Lan',         roleCode: 'ACCOUNTANT' },
-    { email: 'warehouse@mini-erp.local',  password: 'Warehouse@123456',  fullName: 'Hoàng Văn Đức',        roleCode: 'WAREHOUSE'  },
+    { email: 'admin@mini-erp.local',      password: 'Admin@123456',          fullName: 'Quản Trị Hệ Thống',   roleCode: 'ADMIN'      },
+    { email: 'it@mini-erp.local',         password: 'IT@Supp0rt#2026!',      fullName: 'Bộ Phận IT',           roleCode: 'IT'         },
+    { email: 'sales@mini-erp.local',      password: 'Sales@123456',          fullName: 'Trần Văn Bình',        roleCode: 'SALES'      },
+    { email: 'customer@mini-erp.local',   password: 'Customer@123456',       fullName: 'Lê Văn Thắng',         roleCode: 'CUSTOMER'   },
+    { email: 'accountant@mini-erp.local', password: 'Accountant@123456',     fullName: 'Phạm Thị Lan',         roleCode: 'ACCOUNTANT' },
+    { email: 'warehouse@mini-erp.local',  password: 'Warehouse@123456',      fullName: 'Hoàng Văn Đức',        roleCode: 'WAREHOUSE'  },
   ];
 
   const userMap: Record<string, { id: number }> = {};
@@ -890,17 +906,16 @@ async function main() {
   console.log(`  Permissions  : ${PERMISSIONS.length}`);
   console.log(`  Roles        : ${ROLES.length}`);
   console.log('');
-  console.log('  ┌─────────────────────────────────────────────────────────────┐');
-  console.log('  │                  TÀI KHOẢN ĐĂNG NHẬP                       │');
-  console.log('  ├─────────────┬────────────────────────────┬──────────────────┤');
-  console.log('  │ Role        │ Email                      │ Password         │');
-  console.log('  ├─────────────┼────────────────────────────┼──────────────────┤');
-  console.log('  │ Admin       │ admin@mini-erp.local       │ Admin@123456     │');
-  console.log('  │ Sales       │ sales@mini-erp.local       │ Sales@123456     │');
-  console.log('  │ Customer    │ customer@mini-erp.local    │ Customer@123456  │');
-  console.log('  │ Accountant  │ accountant@mini-erp.local  │ Accountant@123456│');
-  console.log('  │ Warehouse   │ warehouse@mini-erp.local   │ Warehouse@123456 │');
-  console.log('  └─────────────┴────────────────────────────┴──────────────────┘');
+  console.log('  ┌─────────────┬────────────────────────────┬──────────────────────┐');
+  console.log('  │ Role        │ Email                      │ Password             │');
+  console.log('  ├─────────────┼────────────────────────────┼──────────────────────┤');
+  console.log('  │ Admin       │ admin@mini-erp.local       │ Admin@123456         │');
+  console.log('  │ IT          │ it@mini-erp.local          │ IT@Supp0rt#2026!     │');
+  console.log('  │ Sales       │ sales@mini-erp.local       │ Sales@123456         │');
+  console.log('  │ Customer    │ customer@mini-erp.local    │ Customer@123456      │');
+  console.log('  │ Accountant  │ accountant@mini-erp.local  │ Accountant@123456    │');
+  console.log('  │ Warehouse   │ warehouse@mini-erp.local   │ Warehouse@123456     │');
+  console.log('  └─────────────┴────────────────────────────┴──────────────────────┘');
   console.log('');
   console.log('  Dữ liệu mẫu:');
   console.log('  - Thương hiệu: Schneider Electric, ABB, Siemens, CADIVI, Rạng Đông');
