@@ -60,20 +60,20 @@ export default function LoginPage() {
 
         <div className="space-y-6">
           <div className="space-y-3">
-            <h1 className="text-4xl font-bold text-white leading-tight">
-              Quản lý kinh doanh<br />thông minh hơn
+            <h1 className="text-4xl font-bold text-white leading-tight whitespace-pre-line">
+              {t.login.headline}
             </h1>
             <p className="text-white/60 text-base leading-relaxed">
-              Hệ thống ERP cho doanh nghiệp điện tử — quản lý khách hàng, đơn hàng, kho hàng và tài chính trong một nền tảng.
+              {t.login.headlineDesc}
             </p>
           </div>
 
           {/* Feature dots */}
           <div className="space-y-3">
             {[
-              { label: "Quản lý catalog sản phẩm", color: "bg-[#FEA837]" },
-              { label: "Theo dõi đơn hàng & giao vận", color: "bg-[#DE741C]" },
-              { label: "Báo cáo tài chính tự động", color: "bg-[#B85B56]" },
+              { label: t.login.feature1, color: "bg-[#FEA837]" },
+              { label: t.login.feature2, color: "bg-[#DE741C]" },
+              { label: t.login.feature3, color: "bg-[#B85B56]" },
             ].map(({ label, color }) => (
               <div key={label} className="flex items-center gap-3">
                 <div className={`h-2 w-2 rounded-full ${color} shrink-0`} />
@@ -98,7 +98,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold text-gray-900">Đăng nhập</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t.login.formTitle}</h2>
             <p className="text-sm text-gray-500">{t.login.subtitle}</p>
           </div>
 

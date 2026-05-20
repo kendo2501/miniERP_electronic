@@ -110,6 +110,12 @@ const en = {
     emailPlaceholder: "you@company.com",
     passwordPlaceholder: "••••••••",
     error: "Invalid credentials",
+    headline: "Smarter business\nmanagement",
+    headlineDesc: "ERP system for electronics businesses — manage customers, orders, inventory and finance in one platform.",
+    feature1: "Product catalog management",
+    feature2: "Order & delivery tracking",
+    feature3: "Automated financial reports",
+    formTitle: "Sign in",
   },
 
   dashboard: {
@@ -1021,6 +1027,12 @@ const vi: typeof en = {
     emailPlaceholder: "ban@congty.com",
     passwordPlaceholder: "••••••••",
     error: "Email hoặc mật khẩu không đúng",
+    headline: "Quản lý kinh doanh\nthông minh hơn",
+    headlineDesc: "Hệ thống ERP cho doanh nghiệp điện tử — quản lý khách hàng, đơn hàng, kho hàng và tài chính trong một nền tảng.",
+    feature1: "Quản lý catalog sản phẩm",
+    feature2: "Theo dõi đơn hàng & giao vận",
+    feature3: "Báo cáo tài chính tự động",
+    formTitle: "Đăng nhập",
   },
 
   dashboard: {
