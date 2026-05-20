@@ -1,206 +1,187 @@
 "use client";
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Settings, Save, Eye, EyeOff } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useForm } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Sun, Moon, Monitor, Languages, Lock, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api/client";
-import { toast } from "sonner";
-import { useAuthStore } from "@/store/auth.store";
 import { useLanguage } from "@/context/language-context";
 
-interface Setting {
-  id: number;
-  category?: string;
-  key: string;
-  value: any;
-  valueType?: string;
-  scope?: string;
-  isSensitive: boolean;
-  isReadonly: boolean;
-  version: number;
-  updatedAt: string;
-  updater?: { id: number; fullName: string };
-}
-
-function SettingRow({ setting, onSave }: { setting: Setting; onSave: (key: string, value: any) => void }) {
-  const { t } = useLanguage();
-  const [editVal, setEditVal] = useState(
-    typeof setting.value === "object" ? JSON.stringify(setting.value, null, 2) : String(setting.value ?? "")
-  );
-  const [showSecret, setShowSecret] = useState(false);
-  const [dirty, setDirty] = useState(false);
-
-  const displayVal = setting.isSensitive && !showSecret ? "***" : editVal;
-
-  return (
-    <tr className="border-b last:border-0">
-      <td className="px-6 py-3">
-        <div className="font-mono text-xs font-medium">{setting.key}</div>
-        {setting.scope && <div className="text-xs text-muted-foreground">{setting.scope}</div>}
-      </td>
-      <td className="px-6 py-3">
-        {setting.isReadonly ? (
-          <span className="font-mono text-xs text-muted-foreground">{String(setting.value ?? "—")}</span>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Input
-              className="h-8 text-xs font-mono max-w-xs"
-              value={displayVal}
-              onChange={(e) => { setEditVal(e.target.value); setDirty(true); }}
-              disabled={setting.isSensitive && !showSecret}
-            />
-            {setting.isSensitive && (
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"
-                onClick={() => setShowSecret((v) => !v)}>
-                {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              </Button>
-            )}
-          </div>
-        )}
-      </td>
-      <td className="px-6 py-3 text-xs text-muted-foreground">{setting.valueType ?? "—"}</td>
-      <td className="px-6 py-3">
-        <div className="flex gap-1">
-          {setting.isSensitive && <Badge variant="secondary" className="text-xs">Sensitive</Badge>}
-          {setting.isReadonly && <Badge variant="outline" className="text-xs">Read-only</Badge>}
-        </div>
-      </td>
-      <td className="px-6 py-3 text-xs text-muted-foreground">
-        <div>{setting.updater?.fullName ?? "System"}</div>
-        <div>{new Date(setting.updatedAt).toLocaleDateString()}</div>
-      </td>
-      <td className="px-6 py-3">
-        {!setting.isReadonly && dirty && (
-          <Button size="sm" className="h-7 text-xs gap-1"
-            onClick={() => { onSave(setting.key, editVal); setDirty(false); }}>
-            <Save className="h-3 w-3" /> {t.common.save}
-          </Button>
-        )}
-      </td>
-    </tr>
-  );
+interface PasswordForm {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 export default function SettingsPage() {
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const { hasPermission } = useAuthStore();
-  const qc = useQueryClient();
-  const { t } = useLanguage();
+  const { t, lang, toggleLang } = useLanguage();
+  const { theme, setTheme } = useTheme();
 
-  const { data: settings, isLoading } = useQuery({
-    queryKey: ["settings", categoryFilter],
-    queryFn: () =>
-      apiClient.get<Setting[]>("/settings", {
-        params: { category: categoryFilter !== "all" ? categoryFilter : undefined },
-      }).then((r) => r.data),
-  });
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<PasswordForm>();
 
-  const { data: categories } = useQuery({
-    queryKey: ["settings-categories"],
-    queryFn: () =>
-      apiClient.get<{ category: string; _count: { id: number } }[]>("/settings/categories").then((r) => r.data),
-  });
-
-  const updateMut = useMutation({
-    mutationFn: ({ key, value }: { key: string; value: any }) =>
-      apiClient.patch(`/settings/${key}`, { value }),
+  const changePasswordMut = useMutation({
+    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
+      apiClient.post("/auth/change-password", data),
     onSuccess: () => {
-      toast.success(t.settings.profileUpdated);
-      qc.invalidateQueries({ queryKey: ["settings"] });
+      toast.success(t.settings.passwordChanged);
+      reset();
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? "Failed to update setting"),
+    onError: (e: any) => toast.error(e.response?.data?.message ?? "Failed"),
   });
 
-  const canManage = hasPermission("settings.manage");
-
-  if (!canManage) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-        <Settings className="h-10 w-10 opacity-20" />
-        <p>You don't have permission to view system settings.</p>
-      </div>
-    );
-  }
-
-  const grouped = settings?.reduce<Record<string, Setting[]>>((acc, s) => {
-    const cat = s.category ?? "General";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(s);
-    return acc;
-  }, {}) ?? {};
+  const onSubmit = (values: PasswordForm) => {
+    if (!values.currentPassword) {
+      setError("currentPassword", { message: t.settings.currentPasswordRequired });
+      return;
+    }
+    if (values.newPassword.length < 8) {
+      setError("newPassword", { message: t.settings.passwordTooShort });
+      return;
+    }
+    if (values.newPassword !== values.confirmPassword) {
+      setError("confirmPassword", { message: t.settings.passwordMismatch });
+      return;
+    }
+    changePasswordMut.mutate({
+      currentPassword: values.currentPassword,
+      newPassword: values.newPassword,
+    });
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t.settings.title}</h1>
-          <p className="text-muted-foreground mt-1">{t.settings.subtitle}</p>
-        </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-44"><SelectValue placeholder={`${t.common.all}`} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.common.all}</SelectItem>
-            {categories?.map((c) => (
-              <SelectItem key={c.category} value={c.category}>
-                {c.category} ({c._count.id})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">{t.settings.title}</h1>
+        <p className="text-muted-foreground mt-1">{t.settings.subtitle}</p>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : Object.keys(grouped).length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            {t.common.noData}
-          </CardContent>
-        </Card>
-      ) : (
-        Object.entries(grouped).map(([category, items]) => (
-          <Card key={category}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                {category}
-                <Badge variant="outline" className="text-xs font-normal">{items.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="h-9 px-6 text-left font-medium text-muted-foreground">Key</th>
-                      <th className="h-9 px-6 text-left font-medium text-muted-foreground">Value</th>
-                      <th className="h-9 px-6 text-left font-medium text-muted-foreground">Type</th>
-                      <th className="h-9 px-6 text-left font-medium text-muted-foreground">Flags</th>
-                      <th className="h-9 px-6 text-left font-medium text-muted-foreground">Updated</th>
-                      <th className="h-9 px-6 text-left font-medium text-muted-foreground"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((s) => (
-                      <SettingRow
-                        key={s.key}
-                        setting={s}
-                        onSave={(key, value) => updateMut.mutate({ key, value })}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        ))
-      )}
+      {/* Language */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Languages className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-base">{t.settings.languageLabel}</CardTitle>
+          </div>
+          <CardDescription>{t.settings.languageDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Button
+              variant={lang === "vi" ? "default" : "outline"}
+              size="sm"
+              onClick={() => lang !== "vi" && toggleLang()}
+            >
+              Tiếng Việt
+            </Button>
+            <Button
+              variant={lang === "en" ? "default" : "outline"}
+              size="sm"
+              onClick={() => lang !== "en" && toggleLang()}
+            >
+              English
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Theme */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Sun className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-base">{t.settings.appearance}</CardTitle>
+          </div>
+          <CardDescription>{t.settings.appearanceDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Button
+              variant={theme === "light" ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setTheme("light")}
+            >
+              <Sun className="h-4 w-4" />
+              {t.settings.themeLight}
+            </Button>
+            <Button
+              variant={theme === "dark" ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setTheme("dark")}
+            >
+              <Moon className="h-4 w-4" />
+              {t.settings.themeDark}
+            </Button>
+            <Button
+              variant={theme === "system" ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setTheme("system")}
+            >
+              <Monitor className="h-4 w-4" />
+              {t.settings.themeSystem}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Change Password */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-base">{t.settings.changePassword}</CardTitle>
+          </div>
+          <CardDescription>{t.settings.passwordDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 max-w-sm">
+            <div className="space-y-1.5">
+              <Label>{t.settings.currentPassword}</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                {...register("currentPassword")}
+              />
+              {errors.currentPassword && (
+                <p className="text-xs text-destructive">{errors.currentPassword.message}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t.settings.newPassword}</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                {...register("newPassword")}
+              />
+              {errors.newPassword && (
+                <p className="text-xs text-destructive">{errors.newPassword.message}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t.settings.confirmPassword}</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                {...register("confirmPassword")}
+              />
+              {errors.confirmPassword && (
+                <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+              )}
+            </div>
+            <Button type="submit" size="sm" disabled={changePasswordMut.isPending} className="gap-1.5">
+              {changePasswordMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t.settings.saveChanges}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

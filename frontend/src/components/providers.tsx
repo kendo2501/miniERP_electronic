@@ -2,6 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "next-themes";
 import { LanguageProvider } from "@/context/language-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -19,11 +20,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <LanguageProvider>
-      <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster richColors position="top-right" />
-      </QueryClientProvider>
-    </LanguageProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <LanguageProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+          <Toaster richColors position="top-right" />
+        </QueryClientProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
