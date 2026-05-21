@@ -18,9 +18,16 @@ export class RedisService extends Redis implements OnModuleDestroy {
 
   constructor(configService: ConfigService) {
     const redisUrl = configService.get<string>('REDIS_URL');
+    // Pass URL directly so ioredis handles rediss:// TLS automatically.
+    // Manual parsing strips the scheme and loses TLS, causing silent hangs.
     super(
       redisUrl
-        ? { ...parseRedisUrl(redisUrl), retryStrategy: (t) => Math.min(t * 100, 3000), lazyConnect: false }
+        ? {
+            ...parseRedisUrl(redisUrl),
+            tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+            retryStrategy: (t) => Math.min(t * 100, 3000),
+            lazyConnect: false,
+          }
         : {
             host: configService.get<string>('REDIS_HOST', 'localhost'),
             port: configService.get<number>('REDIS_PORT', 6379),

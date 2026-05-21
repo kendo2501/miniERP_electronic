@@ -15,7 +15,7 @@ import { useLanguage } from "@/context/language-context";
 import { Globe } from "lucide-react";
 
 const schema = z.object({
-  email: z.email("Invalid email"),
+  email: z.string().min(1, "Email is required").includes("@", { message: "Invalid email" }),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 type FormValues = z.infer<typeof schema>;

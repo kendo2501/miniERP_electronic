@@ -22,6 +22,8 @@ export function Eg() {
   useEffect(() => {
     // Skip on touch/mobile — virtual keyboard shrinks innerHeight and triggers false positives
     if (navigator.maxTouchPoints > 1 || window.innerWidth < 768) return;
+    // Skip on auth pages — don't block login
+    if (window.location.pathname.startsWith("/login") || window.location.pathname.startsWith("/auth")) return;
 
     let mW = 0;
     try {
